@@ -1,0 +1,47 @@
+---
+title: "GET /v1/health — CSBoard API Liveness and Freshness Probe"
+sidebarTitle: "GET /health"
+description: "Check whether the CSBoard API is up and how fresh the price list is. The only endpoint that requires no authentication."
+---
+
+The health endpoint is a lightweight probe that confirms the API is reachable and tells you how stale the materialized price list is. It is the **only** endpoint that works without an API key, making it safe to poll from monitoring systems or to gate your application startup on a freshness check before making authenticated calls.
+
+## Response fields
+
+<ResponseField name="status" type="string" required>
+  Always `"ok"` when the service is up.
+</ResponseField>
+
+<ResponseField name="groups" type="integer" required>
+  Count of priced item groups currently in the price list (one group per unique `market_hash_name` + `wear` + `doppler_phase` combination).
+</ResponseField>
+
+<ResponseField name="price_list_age_seconds" type="integer" required>
+  Age of the materialized price list in seconds. Use this as a freshness indicator — a large value means prices may be lagging.
+</ResponseField>
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/health
+```
+
+## Example response
+
+```json
+{
+  "status": "ok",
+  "groups": 184213,
+  "price_list_age_seconds": 42
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 429 | `rate_limit_exceeded` | Over the request rate limit. Back off and retry after the `Retry-After` header value. |
+
+<Tip>
+  Poll this endpoint from your health-check or startup logic before making authenticated calls. If `price_list_age_seconds` is unexpectedly large (e.g. above a few minutes), treat downstream price data as potentially stale.
+</Tip>

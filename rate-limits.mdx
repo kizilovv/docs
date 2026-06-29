@@ -1,20 +1,71 @@
 ---
-title: "Rate limits"
-description: "Per-key limits and how to handle 429s."
+title: "CSBoard API Rate Limits and How to Handle 429 Errors"
+sidebarTitle: "Rate Limits"
+description: "Understand per-key request limits across all CSBoard API endpoints, read the Retry-After header, and implement correct 429 back-off logic."
 ---
 
-Limits are **per key**.
+The CSBoard API enforces per-key rate limits to keep the service stable for all users. If you exceed a limit you receive a `429` response immediately — no request is partially processed. Build your client to inspect the `Retry-After` header and pause before retrying, rather than hammering the endpoint in a tight loop.
 
-| Limit | Scope |
-| --- | --- |
-| **30 / min** | Pointed reads — listings, prices, currency, balance, order status |
-| **30 / min** | Buying — `POST /v1/orders` (spends money) |
-| **1 / min** | Bulk snapshot — `GET /v1/prices/snapshot.ndjson.gz` |
+## Limits by endpoint
 
-Exceeding a limit returns `429` with `{ "code": "rate_limit_exceeded" }` and a
-`Retry-After` header (seconds). The bulk snapshot returns
-`{ "code": "snapshot_rate_limited" }`.
+All limits are **per API key** and reset on a rolling 60-second window.
 
-More than 30 bad keys per minute from one IP triggers a 5-minute ban.
+| Limit | Endpoint(s) |
+|---|---|
+| **30 / min** | Listings, prices, currency, balance, and order status — all standard `GET` endpoints |
+| **30 / min** | `POST /v1/orders` (places a buy order and spends real money) |
+| **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed snapshot) |
 
-Need more headroom? [Contact us](https://csboard.com) to raise your key's limit.
+<Note>
+  Sending more than 30 requests with **invalid or missing API keys** from the same IP address within one minute triggers an automatic 5-minute IP-level ban. During the ban every request from that IP returns `401 too_many_failed_auth` regardless of which key is used. Rotate to a valid key and wait out the cooldown before retrying.
+</Note>
+
+## 429 response format
+
+When you exceed a standard endpoint limit the API returns:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 14
+Content-Type: application/json
+
+{ "code": "rate_limit_exceeded", "detail": "Rate limit exceeded. Retry after 14 seconds." }
+```
+
+The `Retry-After` header value is an integer number of **seconds** you must wait before the next request will succeed.
+
+The bulk snapshot endpoint uses a distinct error code when rate-limited:
+
+```json
+{ "code": "snapshot_rate_limited", "detail": "Snapshot rate limit exceeded. Retry after 60 seconds." }
+```
+
+## Handling 429s in your client
+
+Read `Retry-After` and sleep for at least that many seconds before retrying. The example below shows a simple retry loop in bash:
+
+```bash
+while true; do
+  RESPONSE=$(curl -si https://csboard.com/v1/listings \
+    -H "Authorization: Bearer csb_pub_...")
+
+  STATUS=$(echo "$RESPONSE" | head -1 | awk '{print $2}')
+
+  if [ "$STATUS" = "429" ]; then
+    RETRY_AFTER=$(echo "$RESPONSE" | grep -i "retry-after" | awk '{print $2}' | tr -d '\r')
+    echo "Rate limited. Waiting ${RETRY_AFTER}s..."
+    sleep "$RETRY_AFTER"
+  else
+    echo "$RESPONSE" | tail -1  # print body
+    break
+  fi
+done
+```
+
+<Tip>
+  Add a small jitter (e.g. `sleep $((RETRY_AFTER + RANDOM % 5))`) when running multiple workers in parallel so they don't all resume at the same instant and immediately re-trigger the limit.
+</Tip>
+
+## Raising your limits
+
+The default limits suit most integrations, but if you have a high-throughput use case — such as a data pipeline or a high-frequency trading bot — [contact us](https://csboard.com) to discuss a higher per-key limit for your account.

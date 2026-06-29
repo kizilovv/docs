@@ -1,0 +1,212 @@
+---
+title: "GET /v1/listings — Browse Live CS2 Marketplace Listings"
+sidebarTitle: "GET /listings"
+description: "Fetch live, buyable CS2 skin listings with float, paint seed, stickers, and USD asking price. Filter by wear, category, rarity, float range, and more."
+---
+
+The listings endpoint exposes every buyable item currently on the CSBoard marketplace. Each record includes the complete inspection data you need for evaluation — float value, paint seed, applied stickers with their wear — alongside the authoritative asking price in USD. Results are paginated using a keyset cursor so you can reliably walk the full catalog even as new listings arrive.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+<ParamField query="search" type="string">
+  Full-text match on the item's `market_hash_name`, e.g. `AK-47 | Redline`.
+</ParamField>
+
+<ParamField query="category" type="string">
+  Filter by item category, e.g. `Rifle`, `Knife`, `Gloves`, `Pistol`.
+</ParamField>
+
+<ParamField query="wear" type="string">
+  Filter by wear bucket. One of: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  Filter by rarity tier, e.g. `Classified`, `Covert`, `Extraordinary`.
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  Minimum asking price in USD (inclusive).
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  Maximum asking price in USD (inclusive).
+</ParamField>
+
+<ParamField query="min_float" type="number">
+  Minimum float value (inclusive). Accepts values from `0.0` to `1.0`.
+</ParamField>
+
+<ParamField query="max_float" type="number">
+  Maximum float value (inclusive). Accepts values from `0.0` to `1.0`.
+</ParamField>
+
+<ParamField query="stat_trak" type="string">
+  StatTrak™ filter. `only` returns only StatTrak™ items; `exclude` removes them from results.
+</ParamField>
+
+<ParamField query="souvenir" type="string">
+  Souvenir filter. `only` returns only Souvenir items; `exclude` removes them from results.
+</ParamField>
+
+<ParamField query="sort" type="string" default="id">
+  Sort order. One of: `id` (stable default), `newest`, `price_asc`, `price_desc`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset pagination cursor. Pass the `next_cursor` value from the previous response to fetch the next page.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  Number of results per page. Minimum `1`, maximum `200`.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="items" type="Listing[]" required>
+  Array of listing objects for this page.
+
+  <Expandable title="Listing object">
+    <ResponseField name="id" type="string" required>
+      Stable listing identifier. Pass this to `POST /v1/orders` to purchase the item.
+    </ResponseField>
+
+    <ResponseField name="market_hash_name" type="string" required>
+      Steam market hash name, e.g. `AK-47 | Redline (Minimal Wear)`.
+    </ResponseField>
+
+    <ResponseField name="wear" type="string | null">
+      Wear bucket: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, or `Battle-Scarred`. `null` for items without wear (e.g. some knives or gloves).
+    </ResponseField>
+
+    <ResponseField name="doppler_phase" type="string | null">
+      Doppler or Gamma Doppler phase, e.g. `"Phase 2"`, `"Ruby"`, `"Emerald"`. `null` for non-Doppler items.
+    </ResponseField>
+
+    <ResponseField name="float_value" type="number | null">
+      Item float value between `0.0` and `1.0`. `null` if not applicable.
+    </ResponseField>
+
+    <ResponseField name="paint_seed" type="integer | null">
+      Paint seed (pattern index). `null` if not applicable.
+    </ResponseField>
+
+    <ResponseField name="stickers" type="Sticker[]" required>
+      Applied stickers. Empty array if none.
+
+      <Expandable title="Sticker object">
+        <ResponseField name="name" type="string">
+          Sticker name, e.g. `Crown (Foil)`.
+        </ResponseField>
+        <ResponseField name="image" type="string (URI)">
+          CDN URL of the sticker image.
+        </ResponseField>
+        <ResponseField name="slot" type="integer">
+          Sticker slot position, `0` through `4`.
+        </ResponseField>
+        <ResponseField name="wear" type="number | null">
+          Sticker wear between `0.0` and `1.0`. `null` if the sticker has not been scraped.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="price_usd" type="number" required>
+      Authoritative asking price in USD. This is exactly the amount charged if you buy this listing via `POST /v1/orders`.
+    </ResponseField>
+
+    <ResponseField name="category" type="string" required>
+      Item category, e.g. `Rifle`, `Knife`, `Gloves`.
+    </ResponseField>
+
+    <ResponseField name="rarity" type="string">
+      Rarity tier, e.g. `Classified`, `Covert`.
+    </ResponseField>
+
+    <ResponseField name="image" type="string (URI)">
+      CDN URL of the item image.
+    </ResponseField>
+
+    <ResponseField name="inspect_link" type="string">
+      Steam inspect link (`steam://rungame/...`) for this item.
+    </ResponseField>
+
+    <ResponseField name="tradable" type="boolean" required>
+      Whether the item is currently tradable. `false` means it is in a trade hold.
+    </ResponseField>
+
+    <ResponseField name="tradable_at" type="datetime | null">
+      ISO 8601 timestamp indicating when the item leaves its trade hold. `null` if already tradable.
+    </ResponseField>
+
+    <ResponseField name="delivery" type="string" required>
+      Expected delivery mode: `instant` (transferred right away) or `hold` (subject to Steam trade hold).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string | null" required>
+  Opaque keyset cursor. Pass this as the `cursor` query parameter to fetch the next page. `null` on the last page.
+</ResponseField>
+
+## Pagination
+
+This endpoint uses **keyset pagination**. To walk all pages:
+
+1. Make the initial request (no `cursor`).
+2. If `next_cursor` is non-null, repeat the request with `cursor=<next_cursor>`.
+3. Stop when `next_cursor` is `null` — you have reached the last page.
+
+Keyset pagination is stable: new listings appearing during iteration won't cause duplicates or skipped rows.
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float=0.07&max_float=0.12&sort=price_asc&limit=20" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "items": [
+    {
+      "id": "ext_sp_8841201",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "wear": "Minimal Wear",
+      "doppler_phase": null,
+      "float_value": 0.0912,
+      "paint_seed": 412,
+      "stickers": [
+        {
+          "name": "Crown (Foil)",
+          "image": "https://cdn.csboard.com/stickers/crown_foil.png",
+          "slot": 0,
+          "wear": 0.0
+        }
+      ],
+      "price_usd": 14.37,
+      "category": "Rifle",
+      "rarity": "Classified",
+      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "tradable": false,
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "delivery": "hold"
+    }
+  ],
+  "next_cursor": "eyJpZCI6ImV4dF9zcF84ODQxMjAxIn0"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `unauthorized` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Over 30 requests/min. Back off for the number of seconds in the `Retry-After` header. |
+
+<Tip>
+  `price_usd` on each listing is the **authoritative buy price** — it reflects the live asking price at query time and is exactly what you'll be charged. Do not use the `min_price_usd` from the `/prices` endpoint as a buy-price estimate; that value can lag.
+</Tip>

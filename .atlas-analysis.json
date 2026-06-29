@@ -1,0 +1,68 @@
+{
+  "projectType": "api-service",
+  "projectName": "CSBoard API",
+  "projectDescription": "A REST API providing live CS2 marketplace data — listings, prices, floats, stickers, and FX rates — plus opt-in automated buying from your CSBoard balance.",
+  "theme": "luma",
+  "primaryColor": "#22c55e",
+  "lightColor": "#4ade80",
+  "darkColor": "#16a34a",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "authentication", "rate-limits"]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/market-data", "guides/buying", "guides/automation"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Status",
+            "pages": ["api-reference/get-health"]
+          },
+          {
+            "group": "Market Data",
+            "pages": [
+              "api-reference/get-listings",
+              "api-reference/get-prices",
+              "api-reference/get-prices-snapshot",
+              "api-reference/get-currency"
+            ]
+          },
+          {
+            "group": "Trading",
+            "pages": ["api-reference/post-orders"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Live buyable CS2 listings with float values, paint seeds, and sticker data",
+    "minAsk price list grouped by market hash name, wear, and Doppler phase",
+    "Full price-list snapshot as gzipped NDJSON for bulk ingestion",
+    "FX rate table (USD base) matching the site's own payment flows",
+    "Opt-in automated buying debited from your CSBoard balance",
+    "Overcharge protection via atomic max_price_usd ceiling",
+    "Idempotency support to prevent duplicate purchases on retry",
+    "Bearer token authentication with separate read and trading key capabilities",
+    "Keyset (cursor) pagination on listings and prices",
+    "Per-key rate limits with Retry-After headers"
+  ],
+  "publicApiSurface": [
+    "GET /v1/health",
+    "GET /v1/listings",
+    "GET /v1/prices",
+    "GET /v1/prices/snapshot.ndjson.gz",
+    "GET /v1/currency",
+    "POST /v1/orders"
+  ]
+}

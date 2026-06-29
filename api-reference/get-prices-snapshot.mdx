@@ -1,0 +1,89 @@
+---
+title: "GET /v1/prices/snapshot.ndjson.gz — Full Price Snapshot"
+sidebarTitle: "GET /prices/snapshot"
+description: "Download the full CSBoard price catalog as a gzipped NDJSON file. One PriceRow per line. Designed for bulk ingestion with ETag-based conditional fetching."
+---
+
+The snapshot endpoint serves the complete CSBoard price list as a single gzipped NDJSON file. Every decompressed line is one `PriceRow` JSON object — the same schema returned by `GET /v1/prices`. This is the intended path for full-catalog consumers such as comparison sites, arbitrage bots, or data pipelines that need a complete local copy of the price list. For targeted queries against a subset of items, use `GET /v1/prices` instead.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+**Rate limit:** 1 request per minute, separate from the general 30 requests/min limit. Plan your polling interval accordingly.
+
+## Request headers
+
+<ParamField header="If-None-Match" type="string">
+  Pass the `ETag` value from a previous snapshot response to make a conditional request. If the snapshot has not changed since that ETag, the server returns `304 Not Modified` with no body, saving bandwidth and avoiding a fresh download.
+</ParamField>
+
+## Response headers
+
+| Header | Description |
+|---|---|
+| `ETag` | Opaque version string identifying this snapshot. Store it and send back as `If-None-Match` on the next request. |
+| `Content-Encoding` | `gzip` — the body is always gzip-compressed. |
+
+## Response body
+
+A gzip-compressed stream. After decompression, each newline-delimited line is a valid JSON object conforming to the `PriceRow` schema:
+
+| Field | Type | Description |
+|---|---|---|
+| `market_hash_name` | string | Steam market hash name. |
+| `wear` | string \| null | Wear bucket, or `null`. |
+| `doppler_phase` | string \| null | Doppler phase, or `null`. |
+| `min_price_usd` | number | Cheapest current ask in USD. |
+| `qty` | integer | Number of listings in this group. |
+
+## Example: download and inspect
+
+```bash
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --output snapshot.ndjson.gz \
+  && gunzip -c snapshot.ndjson.gz | head -5
+```
+
+Example decompressed output:
+
+```jsonl
+{"market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"min_price_usd":11.92,"qty":73}
+{"market_hash_name":"AWP | Asiimov (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"min_price_usd":54.20,"qty":12}
+{"market_hash_name":"Karambit | Doppler (Factory New)","wear":"Factory New","doppler_phase":"Ruby","min_price_usd":1240.00,"qty":1}
+```
+
+## Example: conditional request with ETag
+
+On the first download you receive an `ETag` header. Pass it back on subsequent requests to avoid re-downloading an unchanged snapshot:
+
+```bash
+# First request — save ETag from response headers
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --dump-header headers.txt \
+  --output snapshot.ndjson.gz
+
+# Subsequent request — conditional fetch
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "If-None-Match: \"etag-value\"" \
+  --output snapshot.ndjson.gz
+```
+
+A `304 Not Modified` response means the snapshot is identical to the one you already have — no new download needed.
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 304 | _(no body)_ | Snapshot unchanged since the supplied `If-None-Match` ETag. |
+| 401 | `unauthorized` | Missing or invalid API key. |
+| 429 | `snapshot_rate_limited` | Over the 1 request/min snapshot-specific rate limit. Wait before retrying. |
+
+<Tip>
+  Always store the `ETag` from each successful download and send it back as `If-None-Match` on the next request. A `304` response costs nothing against your rate limit quota and keeps your local copy up to date without unnecessary re-downloads.
+</Tip>
+
+<Note>
+  This endpoint is designed for **full-catalog ingestion**. If you only need prices for a specific item or a filtered subset, use `GET /v1/prices` — it supports search, category, and wear filters and does not count against the snapshot rate limit.
+</Note>

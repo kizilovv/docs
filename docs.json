@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "luma",
   "name": "CSBoard API",
   "colors": {
     "primary": "#2563eb",
@@ -17,14 +17,36 @@
         "tab": "Guides",
         "groups": [
           {
-            "group": "Get started",
-            "pages": ["index", "authentication", "rate-limits", "buying"]
+            "group": "Get Started",
+            "pages": ["introduction", "authentication", "rate-limits"]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/market-data", "guides/buying", "guides/automation"]
           }
         ]
       },
       {
         "tab": "API Reference",
-        "openapi": "openapi.json"
+        "groups": [
+          {
+            "group": "Status",
+            "pages": ["api-reference/get-health"]
+          },
+          {
+            "group": "Market Data",
+            "pages": [
+              "api-reference/get-listings",
+              "api-reference/get-prices",
+              "api-reference/get-prices-snapshot",
+              "api-reference/get-currency"
+            ]
+          },
+          {
+            "group": "Trading",
+            "pages": ["api-reference/post-orders"]
+          }
+        ]
       }
     ]
   },

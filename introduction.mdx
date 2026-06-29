@@ -1,0 +1,50 @@
+---
+title: "CSBoard API: Live CS2 Market Data & Automated Buying"
+sidebarTitle: "Introduction"
+description: "Access live CS2 skin listings, floats, sticker data, and min-ask prices — plus opt-in automated buying — through a single REST API."
+---
+
+The CSBoard API gives you programmatic access to the CSBoard CS2 skin marketplace. Whether you're building a price tracker, powering an AI trading agent, or automating purchases from your balance, the API delivers live listings, float values, sticker details, min-ask prices, and FX conversion rates over a single REST interface. All endpoints are key-gated except the health check, and buying capability requires a separately enabled trading key.
+
+## Base URL
+
+```
+https://csboard.com/v1
+```
+
+## Key concepts
+
+- **Listings** — Live items available for purchase on the marketplace, including float, stickers, and ask price.
+- **Prices** — Aggregated min-ask prices per skin, updated in real time. Also available as a bulk compressed snapshot.
+- **Buying** — Place orders against your CSBoard balance using a trading-enabled key.
+- **FX rates** — All prices in this API are **USD**. Use [`GET /v1/currency`](/api-reference/get-currency) to convert to a local currency.
+
+Pagination across all list endpoints uses a **keyset cursor** — pass the `cursor` value returned in one response as the `cursor` query parameter of the next request.
+
+## Quick start
+
+Only [`GET /v1/health`](/api-reference/get-health) works without a key. Every other endpoint requires a `csb_pub_` Bearer token in the `Authorization` header:
+
+```bash
+curl https://csboard.com/v1/listings \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+Generate your key at [csboard.com/profile?tab=api](https://csboard.com/profile?tab=api) and see the [Authentication](/authentication) page for full details on key types and error handling.
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn how to generate a key, pass it on requests, and understand the difference between read and trading keys.
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/rate-limits">
+    Understand per-key request limits, the `Retry-After` header, and how to handle 429 responses.
+  </Card>
+  <Card title="Market Data Guide" icon="chart-line" href="/guides/market-data">
+    Query live listings, retrieve min-ask prices, and download bulk snapshots.
+  </Card>
+  <Card title="Buying Guide" icon="cart-shopping" href="/guides/buying">
+    Place orders against your CSBoard balance using a trading-enabled key.
+  </Card>
+</CardGroup>

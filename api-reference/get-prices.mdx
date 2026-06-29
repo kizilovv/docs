@@ -1,0 +1,110 @@
+---
+title: "GET /v1/prices — minAsk Price List for CS2 Items"
+sidebarTitle: "GET /prices"
+description: "Retrieve a paginated minAsk price snapshot grouped by market hash name, wear, and Doppler phase, with cheapest ask and listing count per row."
+---
+
+The prices endpoint returns a grouped price snapshot of the CSBoard marketplace. Each row represents a unique combination of `market_hash_name`, `wear`, and `doppler_phase`, and carries the cheapest current asking price together with how many copies are listed. This makes it efficient for building price comparison tables, alerting pipelines, or portfolio valuation — you can retrieve pricing for thousands of items without pulling individual listings.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+<ParamField query="search" type="string">
+  Full-text match on `market_hash_name`, e.g. `AK-47 | Redline`.
+</ParamField>
+
+<ParamField query="category" type="string">
+  Filter by item category, e.g. `Rifle`, `Knife`, `Gloves`.
+</ParamField>
+
+<ParamField query="wear" type="string">
+  Filter by wear bucket. One of: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  Filter by rarity tier, e.g. `Classified`, `Covert`.
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  Minimum `min_price_usd` in USD (inclusive).
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  Maximum `min_price_usd` in USD (inclusive).
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset pagination cursor. Pass the `next_cursor` value from the previous response.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="100">
+  Number of rows per page. Minimum `1`, maximum `500`.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="items" type="PriceRow[]" required>
+  Array of price rows for this page.
+
+  <Expandable title="PriceRow object">
+    <ResponseField name="market_hash_name" type="string" required>
+      Steam market hash name, e.g. `AK-47 | Redline (Field-Tested)`.
+    </ResponseField>
+
+    <ResponseField name="wear" type="string | null">
+      Wear bucket for this price group. `null` for items without a wear tier.
+    </ResponseField>
+
+    <ResponseField name="doppler_phase" type="string | null">
+      Doppler or Gamma Doppler phase for this price group, e.g. `"Phase 2"`, `"Ruby"`. `null` for non-Doppler items.
+    </ResponseField>
+
+    <ResponseField name="min_price_usd" type="number" required>
+      Cheapest current asking price in USD across all listings in this group.
+    </ResponseField>
+
+    <ResponseField name="qty" type="integer" required>
+      Number of listings currently available in this group.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string | null" required>
+  Keyset cursor for the next page. Pass as `cursor` on the next request. `null` on the last page.
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "min_price_usd": 11.92,
+      "qty": 73
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `unauthorized` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Over 30 requests/min. Wait for the `Retry-After` header value before retrying. |
+
+<Warning>
+  The prices endpoint returns an **indicative grouped snapshot**. The data is periodically materialized and can lag behind the live marketplace. Use `GET /v1/listings` for the authoritative, real-time asking price of a specific item before placing an order.
+</Warning>

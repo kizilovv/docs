@@ -1,0 +1,133 @@
+---
+title: "POST /v1/orders — Buy CS2 Listings from Your Balance"
+sidebarTitle: "POST /orders"
+description: "Purchase 1–10 CS2 listings by ID in a single atomic request, debited from your CSBoard balance. Requires a trading-enabled API key and a linked Steam account."
+---
+
+The orders endpoint lets you buy between 1 and 10 listings in a single atomic request. The charge is debited from your CSBoard balance at the **live** asking price at the moment of execution — not at the price you saw when you queried `/v1/listings`. To protect yourself from price movements between lookup and purchase, always include `max_price_usd` as a total ceiling. The endpoint is idempotent: retrying with the same `Idempotency-Key` replays the original order rather than creating a duplicate charge.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+**Trading capability required.** The API key must have buying enabled. Configure this in your CSBoard profile.
+
+## Prerequisites
+
+Before placing an order, ensure:
+
+1. **Trading-enabled key** — buying must be turned on for your API key in your CSBoard profile settings.
+2. **Linked Steam account and trade URL** — your CSBoard account must have a Steam account connected with a valid trade URL so items can be delivered.
+3. **Sufficient balance** — your CSBoard balance must cover the total cost of the items at their live prices.
+
+## Request headers
+
+<ParamField header="Idempotency-Key" type="string">
+  Optional. A unique string (e.g. a UUID) that identifies this order attempt. If you retry a request with the same key, the server replays the original order response instead of executing a second purchase. Use this to safely retry on network timeouts without risk of double-charging.
+</ParamField>
+
+## Request body
+
+<ParamField body="item_ids" type="string[]" required>
+  Array of 1–10 unique listing IDs to purchase. Obtain these from the `id` field of `GET /v1/listings` responses. Each ID must appear only once per request.
+</ParamField>
+
+<ParamField body="max_price_usd" type="number">
+  Total price ceiling in USD, enforced atomically at execution time. If the live total of all items exceeds this value, the entire order is rejected with a `price_moved` error and you are not charged. **Strongly recommended** — without it you have no overcharge protection.
+</ParamField>
+
+<ParamField body="idempotency_key" type="string">
+  Alternative to the `Idempotency-Key` header. If both are provided, the header takes precedence. Use one or the other, not both.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="order_id" type="string" required>
+  Unique identifier for this order, e.g. `ord_01J9Z3K8Q2`.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Current order status: `processing`, `completed`, or `failed`.
+</ResponseField>
+
+<ResponseField name="items" type="object[]">
+  Per-item breakdown of the order.
+
+  <Expandable title="Item object">
+    <ResponseField name="item_id" type="string">
+      The listing ID that was purchased.
+    </ResponseField>
+    <ResponseField name="charged_usd" type="number">
+      The amount charged for this specific item at its live price.
+    </ResponseField>
+    <ResponseField name="delivery" type="string">
+      Delivery mode for this item: `instant` (transferred immediately) or `hold` (subject to Steam trade hold).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total_charged_usd" type="number" required>
+  Sum of all per-item charges. This is the total amount debited from your balance.
+</ResponseField>
+
+<ResponseField name="balance_after_usd" type="number">
+  Your CSBoard balance immediately after the debit.
+</ResponseField>
+
+<ResponseField name="created_at" type="datetime">
+  ISO 8601 timestamp of when the order was created.
+</ResponseField>
+
+## Example request
+
+```bash
+curl -X POST https://csboard.com/v1/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+  -d '{
+    "item_ids": ["ext_sp_8841201", "ext_sp_8841340"],
+    "max_price_usd": 30.00
+  }'
+```
+
+## Example response
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "status": "processing",
+  "items": [
+    {
+      "item_id": "ext_sp_8841201",
+      "charged_usd": 14.37,
+      "delivery": "hold"
+    },
+    {
+      "item_id": "ext_sp_8841340",
+      "charged_usd": 12.10,
+      "delivery": "instant"
+    }
+  ],
+  "total_charged_usd": 26.47,
+  "balance_after_usd": 73.53,
+  "created_at": "2026-06-29T17:12:04Z"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 409 | `price_moved` | The live total of your items exceeded `max_price_usd`. Order rejected; no charge made. The response includes `current_total_usd` showing the actual price. |
+| 402 | `insufficient_balance` | Your balance is too low to cover the order total. |
+| 400 | `steam_account_required` | No linked Steam account or valid trade URL on your CSBoard account. |
+| 403 | `trading_not_enabled` | The API key does not have buying enabled. Enable it in your profile. |
+| 401 | `unauthorized` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Over 30 requests/min. Wait for the `Retry-After` header value before retrying. |
+
+<Warning>
+  Always include `max_price_usd` in your request. Prices on a live marketplace can change between the moment you query `/v1/listings` and the moment your order executes. Without this ceiling, your balance could be debited at a higher price than you intended, and there is no automatic rollback.
+</Warning>
+
+<Note>
+  Items delivered via `hold` are subject to a Steam trade hold. Check the `tradable_at` field on the original listing (from `GET /v1/listings`) to see exactly when a held item will become tradable in your Steam inventory.
+</Note>

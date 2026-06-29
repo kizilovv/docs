@@ -1,0 +1,144 @@
+---
+title: "Buy CS2 Skins Automatically from Your CSBoard Balance"
+sidebarTitle: "Buying"
+description: "Place automated orders against your CSBoard balance, protect against price moves, and guarantee idempotent delivery using POST /v1/orders."
+---
+
+Buying through the CSBoard API lets you acquire CS2 skins programmatically — straight from your balance, with atomic overcharge protection and built-in idempotency. Before your first order goes through, you need to complete a short one-time setup. Follow the steps below in order.
+
+<Warning>
+  A standard read key can **never** spend money. Trading is deliberately opt-in — a leaked or compromised read key cannot place orders or drain your balance until you explicitly enable it.
+</Warning>
+
+## Setup
+
+<Steps>
+  <Step title="Enable trading on your key">
+    Go to your [API profile](https://csboard.com/profile?tab=api) and flip the **buying** toggle for the key you want to use. Until you do this, every call to `POST /v1/orders` returns `403 trading_not_enabled`.
+  </Step>
+  <Step title="Link your Steam account and trade URL">
+    Orders are delivered directly to Steam, so you must have a linked Steam account and a valid trade URL set in your profile. Without one, the API returns `400 steam_account_required`.
+  </Step>
+  <Step title="Fund your CSBoard balance">
+    Purchases are debited from your existing CSBoard balance. Top up on the site — there is no card or crypto payment path through the API itself.
+  </Step>
+  <Step title="Find listings to buy">
+    Query `GET /v1/listings` to find items and collect their `id` fields. Every `id` in the response is a stable reference you pass directly to the orders endpoint.
+
+    ```bash
+    curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Minimal%20Wear&sort=price_asc&limit=5" \
+      -H "Authorization: Bearer csb_pub_..."
+    ```
+  </Step>
+  <Step title="Place your order">
+    POST the listing IDs to `/v1/orders`. Include `max_price_usd` and an `Idempotency-Key` — both are explained in detail below.
+
+    ```bash
+    curl -X POST https://csboard.com/v1/orders \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+      -d '{"item_ids":["ext_sp_8841201"],"max_price_usd":20.00}'
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Overcharge protection
+
+You are always charged the **live price at execution**, not the price you saw when you browsed listings. Markets move — a listing you fetched 30 seconds ago may have been relisted at a higher price by the time your order lands.
+
+Use `max_price_usd` as a total ceiling. The debit is atomic: if the live total at execution exceeds your ceiling, the entire order is rejected with `409 price_moved` — nothing is charged and no items are transferred.
+
+<Tip>
+  Always read `price_usd` from `GET /v1/listings` immediately before placing an order — that value is authoritative and equals the exact charge. The `/v1/prices` endpoint returns an indicative grouped snapshot that can lag the live per-item price.
+</Tip>
+
+If the price moved and you receive a `409`, the response body includes `current_total_usd` so you can decide whether to re-submit with a higher ceiling or abort:
+
+```json
+{
+  "code": "price_moved",
+  "message": "Live total 31.20 exceeds max_price_usd 30.00.",
+  "current_total_usd": 31.20
+}
+```
+
+---
+
+## Idempotency
+
+Network failures happen. Without idempotency, a retry after a timeout could buy the same item twice. Prevent that by sending a unique `Idempotency-Key` header with every order request.
+
+- If the server receives two requests with the same key, it replays the original order result — the purchase is never executed a second time.
+- You can also pass `idempotency_key` in the request body instead of the header; both have the same effect.
+- Use a UUID v4 generated per order attempt, not per retry.
+
+```bash
+curl -X POST https://csboard.com/v1/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+  -d '{
+    "item_ids": ["ext_sp_8841201", "ext_sp_8841340"],
+    "max_price_usd": 30.00
+  }'
+```
+
+---
+
+## Example response
+
+A successful order returns `200` with the order details and your remaining balance:
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "status": "processing",
+  "items": [
+    {
+      "item_id": "ext_sp_8841201",
+      "charged_usd": 14.37,
+      "delivery": "hold"
+    },
+    {
+      "item_id": "ext_sp_8841340",
+      "charged_usd": 12.10,
+      "delivery": "instant"
+    }
+  ],
+  "total_charged_usd": 26.47,
+  "balance_after_usd": 73.53,
+  "created_at": "2026-06-29T17:12:04Z"
+}
+```
+
+---
+
+## Delivery
+
+Each item in the order response includes a `delivery` field:
+
+- **`instant`** — the item is tradable now and will be sent to your Steam trade URL immediately.
+- **`hold`** — the item is under a Steam trade hold. Check the listing's `tradable_at` field (ISO 8601 timestamp) to see when it becomes tradable.
+
+---
+
+## Error reference
+
+| Code | HTTP Status | Meaning |
+|------|-------------|---------|
+| `price_moved` | 409 | Live price exceeded `max_price_usd` — response includes `current_total_usd` |
+| `insufficient_balance` | 402 | Your CSBoard balance is below the order total |
+| `steam_account_required` | 400 | No Steam account or trade URL linked to your profile |
+| `trading_not_enabled` | 403 | The API key does not have buying enabled |
+
+---
+
+## Next steps
+
+- [Automate buying with bots and price monitors](/guides/automation)
+- [Query live listings and prices](/guides/market-data)
+- [API Reference — POST /v1/orders](/api-reference/post-orders)
+- [API Reference — GET /v1/listings](/api-reference/get-listings)

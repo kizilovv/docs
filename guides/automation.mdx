@@ -1,0 +1,313 @@
+---
+title: "Automate CS2 Skin Trading with the CSBoard API"
+sidebarTitle: "Automation"
+description: "Build bots, price monitors, and data pipelines on top of the CSBoard API — from polling new listings to safe automated buying and full-catalog ingestion."
+---
+
+The CSBoard API is designed for automation. Every endpoint is deterministic, cursor-paginated, and rate-limit-aware, which makes it straightforward to build price monitors, sniping bots, arbitrage tools, and full market data pipelines. This guide covers the key patterns you need to build reliable automated systems.
+
+---
+
+## AI Agent Integration
+
+If you are building an AI agent or LLM-powered tool, the fastest way to give it access to the full API surface is via the machine-readable spec at [`/llms.txt`](https://csboard.com/llms.txt). That file contains the complete API in a single, compact document — no parsing required.
+
+For agents that support the Model Context Protocol (MCP), add the CSBoard server to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "csboard": {
+      "url": "https://csboard.com/mcp",
+      "headers": {
+        "Authorization": "Bearer csb_pub_..."
+      }
+    }
+  }
+}
+```
+
+Once connected, the agent can call any CSBoard endpoint as a tool — browsing listings, checking prices, and placing orders — without you writing any glue code.
+
+---
+
+## Polling for New Listings
+
+To detect new listings as they appear without re-scanning the entire catalog, use `sort=newest` combined with cursor pagination. On each poll cycle, walk pages until you reach a listing ID you have already seen, then stop.
+
+```bash
+# First poll — fetch the newest 50 listings and record next_cursor
+curl "https://csboard.com/v1/listings?sort=newest&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+```python
+import time
+import httpx
+
+API_KEY = "csb_pub_..."
+BASE_URL = "https://csboard.com/v1"
+SEEN_IDS: set[str] = set()
+
+def poll_new_listings(category: str = "Knife") -> list[dict]:
+    """Return all listings added since the last poll."""
+    new_items = []
+    cursor = None
+
+    while True:
+        params = {"sort": "newest", "limit": 50, "category": category}
+        if cursor:
+            params["cursor"] = cursor
+
+        resp = httpx.get(
+            f"{BASE_URL}/listings",
+            params=params,
+            headers={"Authorization": f"Bearer {API_KEY}"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        for item in data["items"]:
+            if item["id"] in SEEN_IDS:
+                # Reached a listing we already processed — stop paging
+                return new_items
+            SEEN_IDS.add(item["id"])
+            new_items.append(item)
+
+        if data["next_cursor"] is None:
+            break
+        cursor = data["next_cursor"]
+
+    return new_items
+
+while True:
+    fresh = poll_new_listings(category="Knife")
+    if fresh:
+        print(f"Found {len(fresh)} new listing(s)")
+    time.sleep(30)  # Respect rate limits — poll every 30 seconds
+```
+
+<Tip>
+  Seed `SEEN_IDS` on startup by running one full poll without acting on the results. That way, you only trigger actions on listings that appear after your bot starts — not on everything that was already live.
+</Tip>
+
+---
+
+## Price Monitoring Bot
+
+Poll `GET /v1/prices` on a schedule, compare each item's `min_price_usd` against your target threshold, and trigger an alert or automated buy when the price drops below it.
+
+```python
+import httpx
+import time
+
+API_KEY = "csb_pub_..."
+BASE_URL = "https://csboard.com/v1"
+
+# Items to watch: market_hash_name → max price willing to pay
+WATCHLIST = {
+    "AK-47 | Redline (Field-Tested)": 12.00,
+    "AWP | Asiimov (Field-Tested)": 55.00,
+    "Karambit | Fade (Factory New)": 800.00,
+}
+
+def check_prices() -> list[dict]:
+    """Return watchlist items whose price has dropped to or below threshold."""
+    alerts = []
+
+    for name, threshold in WATCHLIST.items():
+        resp = httpx.get(
+            f"{BASE_URL}/prices",
+            params={"search": name, "max_price": threshold},
+            headers={"Authorization": f"Bearer {API_KEY}"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        for row in data["items"]:
+            if row["market_hash_name"] == name and row["min_price_usd"] <= threshold:
+                alerts.append({
+                    "name": name,
+                    "price": row["min_price_usd"],
+                    "qty": row["qty"],
+                    "threshold": threshold,
+                })
+
+    return alerts
+
+while True:
+    try:
+        hits = check_prices()
+        for alert in hits:
+            print(
+                f"ALERT: {alert['name']} @ ${alert['price']:.2f} "
+                f"(threshold ${alert['threshold']:.2f}, qty {alert['qty']})"
+            )
+            # → trigger_buy(alert["name"]) or send_notification(alert)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            retry_after = int(e.response.headers.get("Retry-After", 60))
+            print(f"Rate limited — waiting {retry_after}s")
+            time.sleep(retry_after)
+            continue
+        raise
+
+    time.sleep(60)  # Poll once per minute
+```
+
+<Note>
+  `min_price_usd` from `/v1/prices` is an indicative grouped snapshot — it can lag the live per-item price. Always fetch the specific listing from `/v1/listings` and use its `price_usd` as the authoritative price before placing an order.
+</Note>
+
+---
+
+## Safe Buying Automation
+
+Automated buying requires more defensive coding than manual purchasing. Follow these four rules unconditionally.
+
+**1. Always send `max_price_usd`**
+
+Your ceiling is enforced atomically inside the balance debit. Without it, a price spike between your listing fetch and your order execution can result in an unexpected charge. Set `max_price_usd` to the `price_usd` you observed, plus a small buffer if you are willing to absorb minor slippage:
+
+```python
+listing_price = 14.37
+max_price = round(listing_price * 1.02, 2)  # Allow up to 2% slippage
+```
+
+**2. Always use an Idempotency-Key**
+
+Generate one UUID v4 per order attempt. If your request times out or returns a network error, retry with the **same key** — the server replays the original result instead of executing a second purchase.
+
+```python
+import uuid
+import httpx
+
+def place_order(item_ids: list[str], max_price: float) -> dict:
+    idempotency_key = str(uuid.uuid4())  # One key per attempt
+
+    resp = httpx.post(
+        "https://csboard.com/v1/orders",
+        headers={
+            "Authorization": f"Bearer {API_KEY}",
+            "Idempotency-Key": idempotency_key,
+        },
+        json={"item_ids": item_ids, "max_price_usd": max_price},
+    )
+    resp.raise_for_status()
+    return resp.json()
+```
+
+**3. Handle `429` with Retry-After**
+
+Rate-limited responses include a `Retry-After` header (seconds). Always read that value and sleep for exactly that duration — do not use a fixed backoff, as it may be shorter or longer than required.
+
+**4. Handle `409 price_moved` gracefully**
+
+A `409` means the price moved past your ceiling — nothing was charged. Decide whether to re-fetch the listing, update `max_price_usd`, and retry, or abandon the opportunity:
+
+```python
+def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | None:
+    for attempt in range(retries):
+        try:
+            return place_order([item_id], max_price)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 409:
+                data = e.response.json()
+                current = data.get("current_total_usd", max_price)
+                print(f"Price moved to ${current:.2f}, was ${max_price:.2f}")
+                # Decide: abort, or raise ceiling and retry
+                if current <= max_price * 1.05:  # Accept up to 5% over
+                    max_price = current
+                    continue
+                print("Price spike too large — aborting")
+                return None
+            if e.response.status_code == 429:
+                retry_after = int(e.response.headers.get("Retry-After", 60))
+                time.sleep(retry_after)
+                continue
+            raise
+    return None
+```
+
+---
+
+## Bulk Data Pipeline
+
+For comparison sites, analytics dashboards, or any system that needs the full catalog, use the snapshot endpoint instead of paginating through `/v1/prices`.
+
+```bash
+# Download the full snapshot
+curl -s "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -o snapshot.ndjson.gz
+
+gunzip -c snapshot.ndjson.gz | wc -l   # Count total rows
+```
+
+Use ETags to avoid re-downloading an unchanged snapshot. Store the `ETag` header value from each `200` response and send it back as `If-None-Match` on the next request. A `304 Not Modified` response means your local copy is still current.
+
+```python
+import gzip
+import json
+import httpx
+
+SNAPSHOT_URL = "https://csboard.com/v1/prices/snapshot.ndjson.gz"
+stored_etag: str | None = None
+
+def refresh_snapshot() -> list[dict] | None:
+    """Download snapshot only if it changed. Returns rows, or None if unchanged."""
+    global stored_etag
+
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    if stored_etag:
+        headers["If-None-Match"] = stored_etag
+
+    resp = httpx.get(SNAPSHOT_URL, headers=headers)
+
+    if resp.status_code == 304:
+        print("Snapshot unchanged — skipping")
+        return None
+
+    resp.raise_for_status()
+    stored_etag = resp.headers.get("ETag")
+
+    rows = []
+    for line in gzip.decompress(resp.content).splitlines():
+        if line.strip():
+            rows.append(json.loads(line))
+
+    print(f"Loaded {len(rows)} price rows")
+    return rows
+```
+
+<Note>
+  The snapshot endpoint is rate-limited to **1 request per minute**. Structure your pipeline to use it as a base layer refreshed every few minutes, and overlay real-time updates from `/v1/prices` for items you are actively monitoring.
+</Note>
+
+---
+
+## Best practices checklist
+
+<Tip>
+  **Before going to production, verify all of the following:**
+
+  - ✅ You send `max_price_usd` on every `POST /v1/orders` call
+  - ✅ You generate a fresh UUID v4 `Idempotency-Key` for every order attempt
+  - ✅ Your retry logic reuses the same `Idempotency-Key` on network-error retries
+  - ✅ Your `429` handler reads and sleeps for `Retry-After`, not a hardcoded value
+  - ✅ Your `409 price_moved` handler decides explicitly whether to retry or abort
+  - ✅ You read `price_usd` from `/v1/listings` (not `/v1/prices`) before placing an order
+  - ✅ You use ETags with the snapshot endpoint to avoid redundant downloads
+  - ✅ Your API key has trading enabled **only** if your bot is intended to buy
+</Tip>
+
+---
+
+## Related pages
+
+- [Market Data — listings, prices, snapshot, FX](/guides/market-data)
+- [Buying — setup, overcharge protection, idempotency](/guides/buying)
+- [API Reference — GET /v1/listings](/api-reference/get-listings)
+- [API Reference — GET /v1/prices](/api-reference/get-prices)
+- [API Reference — POST /v1/orders](/api-reference/post-orders)
+- [Authentication](/authentication)

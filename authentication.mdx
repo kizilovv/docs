@@ -1,43 +1,81 @@
 ---
-title: "Authentication"
-description: "Bearer keys in the csb_pub_ namespace."
+title: "Authenticate with the CSBoard API Using Bearer Tokens"
+sidebarTitle: "Authentication"
+description: "Generate a csb_pub_ API key, pass it as a Bearer token or query parameter, and understand read vs. trading key capabilities."
 ---
 
-## Base URL
+Every CSBoard API request (except `GET /v1/health`) must include a valid API key. Keys belong to the `csb_pub_` namespace, are scoped to either read-only or trading access, and are tied to your CSBoard account. The server stores only the SHA-256 hash of each key — the raw secret is shown once at creation and never again, so store it somewhere safe.
 
-```
-https://csboard.com/v1
-```
+## Get your API key
 
-## API keys
+<Steps>
+  <Step title="Open your profile API tab">
+    Go to [csboard.com/profile?tab=api](https://csboard.com/profile?tab=api) and sign in if prompted.
+  </Step>
+  <Step title="Generate a new key">
+    Click **Generate key**. Choose a label that identifies what the key is for (e.g. `price-tracker-prod`).
+  </Step>
+  <Step title="Copy the key immediately">
+    Your new `csb_pub_…` key is shown only once. Copy it to your secrets manager or environment variables before closing the dialog.
+  </Step>
+  <Step title="Enable trading (optional)">
+    If you need to place orders, find the key in your key list and toggle **Trading enabled**. See the warning below before doing this.
+  </Step>
+</Steps>
 
-Send your key as a Bearer token on **every** request:
+<Warning>
+  Trading capability is separate from read access and must be explicitly enabled per key on your profile page. A key without trading enabled will return `403 trading_not_enabled` when it attempts to call `POST /v1/orders`. Never enable trading on a key that you share with third parties or embed in client-side code.
+</Warning>
+
+## Pass your key on requests
+
+Send the key as a Bearer token in the `Authorization` header on every request:
 
 ```bash
 curl https://csboard.com/v1/listings \
   -H "Authorization: Bearer csb_pub_..."
 ```
 
-Keys are generated in your profile — [grab one here](https://csboard.com/profile?tab=api).
-As a convenience you may also pass `?api_key=csb_pub_...` as a query parameter.
+As a convenience you can also pass the key as the `api_key` query parameter — useful for quick tests in a browser or tools that don't support custom headers:
 
-- Only [`GET /v1/health`](/api-reference/get-health) works without a key.
-- Read keys can only read. **Buying** requires a separately enabled trading
-  capability on the key — see [Buying](/buying).
-- We store only `SHA256(key)`, never the raw key.
+```bash
+curl "https://csboard.com/v1/listings?api_key=csb_pub_..."
+```
 
-## Errors
+Prefer the `Authorization` header in production; query parameters are more likely to appear in server logs.
 
-Every error returns `{ code, detail }`:
+## Key capabilities
+
+| Capability | Read key | Trading key |
+|---|---|---|
+| All `GET` endpoints | ✅ | ✅ |
+| `POST /v1/orders` | ❌ | ✅ |
+
+<Tip>
+  Create separate keys for separate workloads (e.g. one read key for your price dashboard, one trading key for your buy bot) so you can revoke them independently without disrupting everything at once.
+</Tip>
+
+## Security and storage
+
+We store only `SHA256(key)` — never the raw secret. This means:
+
+- If you lose your key you must generate a new one; there is no "reveal key" option.
+- A compromised key can be revoked instantly from your profile without affecting other keys.
+
+## Authentication errors
+
+Every error from the API returns a JSON body in this format:
 
 ```json
 { "code": "invalid_api_key", "detail": "Unknown or revoked API key." }
 ```
 
-| Status | code | When |
-| --- | --- | --- |
-| 401 | `missing_api_key` | No key / wrong prefix |
-| 401 | `invalid_api_key` | Unknown or revoked key |
-| 401 | `too_many_failed_auth` | Too many bad keys from your IP (5-min ban) |
-| 403 | `trading_not_enabled` | Key can read but not buy |
-| 429 | `rate_limit_exceeded` | Over your limit — see [Rate limits](/rate-limits) |
+| HTTP status | `code` | When it occurs |
+|---|---|---|
+| 401 | `missing_api_key` | No key provided or key does not start with `csb_pub_` |
+| 401 | `invalid_api_key` | Key is not recognised or has been revoked |
+| 401 | `too_many_failed_auth` | Too many invalid keys from your IP — 5-minute ban applied |
+| 403 | `trading_not_enabled` | Key is valid but trading has not been enabled for it |
+| 429 | `rate_limit_exceeded` | You have exceeded your per-key request limit |
+
+For details on the 429 error and how to back off correctly, see [Rate Limits](/rate-limits).

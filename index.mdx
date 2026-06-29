@@ -1,38 +1,50 @@
 ---
-title: "CSBoard API"
-description: "Market data over the CSBoard marketplace — plus opt-in buying from your balance."
+title: "CSBoard API — CS2 Skin Marketplace for Developers"
+sidebarTitle: "Overview"
+description: "REST API for live CS2 skin listings, bulk price snapshots, FX rates, and automated buying — all secured with a Bearer token."
 ---
 
-For developers & AI agents.
+The CSBoard API gives you programmatic access to the CS2 skin marketplace. Fetch live buyable listings complete with float values, paint seeds, sticker data, and USD prices; pull a full gzipped price-list snapshot for bulk catalog ingestion; retrieve FX rates aligned with the site's payment flows; and place automated buy orders debited directly from your CSBoard balance — all from a single REST API rooted at `https://csboard.com/v1`.
 
-Live listings, floats, stickers, minAsk prices and FX rates over the CSBoard
-marketplace — plus opt-in buying straight from your balance. Free to read,
-key-gated, built for automation.
+## Get started
 
 <CardGroup cols={2}>
-  <Card title="Get your API key" icon="key" href="https://csboard.com/profile?tab=api">
-    Generate a `csb_pub_…` key in your CSBoard profile.
+  <Card title="Introduction" icon="rocket" href="/introduction">
+    Learn what the API offers, how it's structured, and what you can build.
   </Card>
-  <Card title="Point your AI agent here" icon="robot" href="/llms.txt">
-    The entire API in one file — auth, every endpoint, JSON samples, MCP config.
+  <Card title="Authentication" icon="key" href="/authentication">
+    Generate a `csb_pub_` Bearer token and secure your requests.
+  </Card>
+  <Card title="Market Data" icon="chart-line" href="/guides/market-data">
+    Query live listings, minAsk prices, and full snapshot downloads.
+  </Card>
+  <Card title="Buying" icon="cart-shopping" href="/guides/buying">
+    Place automated buy orders debited from your CSBoard balance.
   </Card>
 </CardGroup>
 
-## Base URL
-
-```
-https://csboard.com/v1
-```
-
-Every price in this API is **USD**. Use [`GET /v1/currency`](/api-reference/get-currency)
-to convert to a local currency.
-
 ## Quick start
+
+Grab live listings in a single request — no setup beyond your API key:
 
 ```bash
 curl https://csboard.com/v1/listings \
   -H "Authorization: Bearer csb_pub_..."
 ```
 
-Only [`GET /v1/health`](/api-reference/get-health) works without a key; every
-other endpoint requires one. See [Authentication](/authentication).
+## Explore the API
+
+<CardGroup cols={2}>
+  <Card title="Automation Guide" icon="robot" href="/guides/automation">
+    Build fully automated buying workflows with rate-limit best practices.
+  </Card>
+  <Card title="Rate Limits" icon="gauge-high" href="/rate-limits">
+    Understand request quotas and how to handle `429` responses gracefully.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/get-listings">
+    Browse every endpoint — listings, prices, snapshot, currency, and orders.
+  </Card>
+  <Card title="Health Check" icon="heart-pulse" href="/api-reference/get-health">
+    Verify API availability before you start a trading session.
+  </Card>
+</CardGroup>

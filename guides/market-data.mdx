@@ -1,0 +1,226 @@
+---
+title: "Query Live CS2 Listings and Prices with CSBoard API"
+sidebarTitle: "Market Data"
+description: "Browse live buyable listings, look up minAsk prices, download full-catalog snapshots, and convert prices to any currency with the CSBoard API."
+---
+
+The CSBoard API gives you real-time access to every buyable CS2 skin on the marketplace — individual listings with float values, stickers, and paint seeds, as well as aggregated price rows for fast market scans. This guide walks you through all four market-data endpoints and shows you how to combine them effectively.
+
+## Browsing Listings
+
+Use `GET /v1/listings` to fetch live, buyable listings. Every item returned is available to buy right now. The endpoint supports rich filtering so you can narrow results to exactly the skins you care about.
+
+```bash
+# Fetch Factory New AK-47 Redlines under $20, sorted cheapest first
+curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Factory%20New&max_price=20&sort=price_asc" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+**Available filters**
+
+| Parameter | Description |
+|-----------|-------------|
+| `search` | Full-text match on market hash name |
+| `category` | e.g. `Rifle`, `Knife`, `Gloves` |
+| `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
+| `rarity` | e.g. `Classified`, `Covert` |
+| `min_price` / `max_price` | Price bounds in USD |
+| `min_float` / `max_float` | Float value bounds |
+| `stat_trak` | `only` or `exclude` |
+| `souvenir` | `only` or `exclude` |
+| `sort` | `id` (default) · `newest` · `price_asc` · `price_desc` |
+| `limit` | 1–200, default 50 |
+
+### Keyset pagination
+
+Results are paged via a cursor. When `next_cursor` is non-null, pass it back as `cursor` to fetch the next page. When `next_cursor` is `null`, you have reached the last page.
+
+```bash
+# Page 1
+curl "https://csboard.com/v1/listings?category=Knife&limit=100" \
+  -H "Authorization: Bearer csb_pub_..."
+
+# Page 2 — pass next_cursor from the previous response
+curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6ImV4dF9zcF84ODQxMjAxIn0" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### Example response
+
+```json
+{
+  "items": [
+    {
+      "id": "ext_sp_8841201",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "wear": "Minimal Wear",
+      "doppler_phase": null,
+      "float_value": 0.0912,
+      "paint_seed": 412,
+      "stickers": [
+        {
+          "name": "Crown (Foil)",
+          "image": "https://cdn.csboard.com/stickers/crown_foil.png",
+          "slot": 0,
+          "wear": 0.0
+        }
+      ],
+      "price_usd": 14.37,
+      "category": "Rifle",
+      "rarity": "Classified",
+      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "tradable": false,
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "delivery": "hold"
+    }
+  ],
+  "next_cursor": "eyJpZCI6ImV4dF9zcF84ODQxMjAxIn0"
+}
+```
+
+<Tip>
+  `price_usd` on a listing is the authoritative buy price — it is exactly what you are charged if you place an order for that item. The `/v1/prices` endpoint returns an indicative grouped snapshot and can lag the live per-item price.
+</Tip>
+
+---
+
+## Price List
+
+`GET /v1/prices` returns one row per unique skin group (market hash name + wear + Doppler phase), showing the current cheapest ask and how many are listed. It is designed for fast market scans and price comparisons across thousands of items — not for picking a specific listing to buy.
+
+```bash
+# Look up minAsk price for all Field-Tested Knives
+curl "https://csboard.com/v1/prices?category=Knife&wear=Field-Tested" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+```bash
+# Search by name
+curl "https://csboard.com/v1/prices?search=AWP%20Asiimov&limit=10" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### Example response
+
+```json
+{
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "min_price_usd": 11.92,
+      "qty": 73
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+**Listings vs. Price List — at a glance**
+
+| | `/v1/listings` | `/v1/prices` |
+|---|---|---|
+| Granularity | One row per buyable item | One row per skin group |
+| Price | Authoritative — exact charge | Indicative — may lag |
+| Float / stickers | ✅ | ❌ |
+| Best for | Finding items to buy | Market scanning / price feeds |
+| Max per page | 200 | 500 |
+
+---
+
+## Bulk Snapshot
+
+For full-catalog ingestion — comparison sites, price databases, arbitrage bots — use `GET /v1/prices/snapshot.ndjson.gz`. This endpoint streams the entire price list as a gzipped NDJSON file, one `PriceRow` JSON object per line.
+
+```bash
+# Download and decompress the full snapshot
+curl -s "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  | gunzip \
+  | head -5
+```
+
+### Conditional requests with ETag
+
+The snapshot sets an `ETag` header on every `200` response. Send it back as `If-None-Match` on the next request — if the snapshot hasn't changed, the server returns `304 Not Modified` with an empty body, saving bandwidth and processing time.
+
+```bash
+# First download — capture the ETag
+ETAG=$(curl -sI "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  | grep -i etag | awk '{print $2}' | tr -d '\r')
+
+# Subsequent requests — skip download if snapshot is unchanged
+curl -s -w "%{http_code}" \
+  "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "If-None-Match: $ETAG" \
+  -o snapshot.ndjson.gz
+# Prints 200 (new data) or 304 (no change)
+```
+
+<Note>
+  The snapshot endpoint is rate-limited to **1 request per minute**. Use the ETag pattern above to avoid re-downloading identical data — a `304` response does not count against your rate limit budget for data transfer, only the request itself.
+</Note>
+
+---
+
+## FX Conversion
+
+Every price in the CSBoard API is denominated in USD. Use `GET /v1/currency` to fetch the same FX rate table the site uses, then convert `price_usd` to any local currency client-side.
+
+```bash
+curl "https://csboard.com/v1/currency" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### Example response
+
+```json
+{
+  "base": "USD",
+  "rates": {
+    "USD": 1,
+    "EUR": 0.92,
+    "RUB": 78.4,
+    "GBP": 0.79
+  },
+  "updated_at": "2026-06-29T17:00:00Z",
+  "rub_source": "cbr",
+  "base_source": "openexchangerates"
+}
+```
+
+### Converting a price
+
+Multiply `price_usd` by the rate for your target currency:
+
+```bash
+# price_usd = 14.37, target = EUR, rate = 0.92
+# price_eur = 14.37 * 0.92 = 13.22
+echo "14.37 * 0.92" | bc
+```
+
+```python
+price_usd = 14.37
+rates = {"USD": 1, "EUR": 0.92, "RUB": 78.4, "GBP": 0.79}
+
+def to_local(price_usd: float, currency: str) -> float:
+    return round(price_usd * rates[currency], 2)
+
+print(to_local(price_usd, "EUR"))  # 13.22
+print(to_local(price_usd, "RUB"))  # 1126.19
+```
+
+FX rates are cached approximately every hour. For display purposes this is more than sufficient — for trading decisions, always use the `price_usd` field directly from `/v1/listings`.
+
+---
+
+## Next steps
+
+- [Buy listings with POST /v1/orders](/guides/buying)
+- [Automate price monitoring and buying bots](/guides/automation)
+- [API Reference — GET /v1/listings](/api-reference/get-listings)
+- [API Reference — GET /v1/prices](/api-reference/get-prices)

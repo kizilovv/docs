@@ -1,0 +1,81 @@
+---
+title: "GET /v1/currency — FX Rates for USD Price Conversion"
+sidebarTitle: "GET /currency"
+description: "Retrieve the live USD-base FX rate table used by CSBoard's payment flows. Multiply any price_usd value by the target currency rate for a local-currency price."
+---
+
+Every price in the CSBoard API is denominated in USD. The currency endpoint returns the same FX rate table that powers the site's own payment and display flows, giving you a consistent conversion layer for presenting local-currency prices to your users. Rates are sourced from OpenExchangeRates for major currencies and from the Central Bank of Russia for RUB, and are cached for approximately one hour.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Parameters
+
+This endpoint takes no query parameters.
+
+## Response fields
+
+<ResponseField name="base" type="string" required>
+  Always `"USD"`. All rates are expressed relative to one US dollar.
+</ResponseField>
+
+<ResponseField name="rates" type="object" required>
+  A map of ISO 4217 currency codes to their exchange rate against USD (units of that currency per 1 USD). Example: `{ "USD": 1, "EUR": 0.92, "RUB": 78.4, "GBP": 0.79 }`.
+</ResponseField>
+
+<ResponseField name="updated_at" type="datetime" required>
+  ISO 8601 timestamp of when the rate table was last refreshed.
+</ResponseField>
+
+<ResponseField name="rub_source" type="string">
+  Source identifier for the RUB rate, e.g. `"cbr"` (Central Bank of Russia).
+</ResponseField>
+
+<ResponseField name="base_source" type="string">
+  Source identifier for non-RUB rates, e.g. `"openexchangerates"`.
+</ResponseField>
+
+## Converting prices
+
+To display a `price_usd` value in a local currency, multiply it by the corresponding rate:
+
+```
+local_price = price_usd × rates["EUR"]
+# e.g. 14.37 USD × 0.92 = 13.22 EUR
+```
+
+Because the rates table is cached for ~1 hour, fetch it once at application start and refresh it periodically rather than calling this endpoint per-item.
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/currency \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "base": "USD",
+  "rates": {
+    "USD": 1,
+    "EUR": 0.92,
+    "RUB": 78.4,
+    "GBP": 0.79
+  },
+  "updated_at": "2026-06-29T17:00:00Z",
+  "rub_source": "cbr",
+  "base_source": "openexchangerates"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `unauthorized` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Over 30 requests/min. Check the `Retry-After` header before retrying. |
+
+<Tip>
+  Cache the rates response client-side and refresh it no more than once per hour. Rates are updated on the same ~1 hour cycle, so polling more frequently won't give you fresher data and consumes your rate limit budget.
+</Tip>
