@@ -3,9 +3,12 @@
   "theme": "mint",
   "name": "CSBoard API",
   "colors": {
-    "primary": "#22c55e",
-    "light": "#4ade80",
-    "dark": "#16a34a"
+    "primary": "#2563eb",
+    "light": "#60a5fa",
+    "dark": "#172554"
+  },
+  "appearance": {
+    "default": "dark"
   },
   "favicon": "/favicon.svg",
   "navigation": {
