@@ -14,10 +14,11 @@ https://csboard.com/v1
 
 ## Key concepts
 
-- **Listings** — Live items available for purchase on the marketplace, including float, stickers, and ask price.
-- **Prices** — Aggregated min-ask prices per skin, updated in real time. Also available as a bulk compressed snapshot.
-- **Buying** — Place orders against your CSBoard balance using a trading-enabled key.
-- **FX rates** — All prices in this API are **USD**. Use [`GET /v1/currency`](/api-reference/get-currency) to convert to a local currency.
+- **Health** — [`GET /v1/health`](/api-reference/get-health) is the only unauthenticated endpoint. Use it to verify the API is up and the price list is fresh before starting a session.
+- **Listings** — [`GET /v1/listings`](/api-reference/get-listings) returns live buyable items with float, paint seed, stickers, and ask price in USD. Supports keyset pagination and rich filters.
+- **Prices** — [`GET /v1/prices`](/api-reference/get-prices) delivers aggregated min-ask prices per skin group. [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) provides a full gzipped NDJSON dump for bulk catalog ingestion.
+- **Orders** — [`POST /v1/orders`](/api-reference/post-orders) places buy orders debited from your CSBoard balance. Requires a trading-enabled key.
+- **FX rates** — All prices in this API are **USD**. Use [`GET /v1/currency`](/api-reference/get-currency) to convert to a local currency using the same rate table the site uses.
 
 Pagination across all list endpoints uses a **keyset cursor** — pass the `cursor` value returned in one response as the `cursor` query parameter of the next request.
 

@@ -3,12 +3,9 @@
   "theme": "luma",
   "name": "CSBoard API",
   "colors": {
-    "primary": "#2563eb",
-    "light": "#60a5fa",
-    "dark": "#172554"
-  },
-  "appearance": {
-    "default": "dark"
+    "primary": "#22c55e",
+    "light": "#4ade80",
+    "dark": "#16a34a"
   },
   "favicon": "/favicon.svg",
   "navigation": {

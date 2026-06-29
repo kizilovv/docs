@@ -89,6 +89,18 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 `GET /v1/prices` returns one row per unique skin group (market hash name + wear + Doppler phase), showing the current cheapest ask and how many are listed. It is designed for fast market scans and price comparisons across thousands of items — not for picking a specific listing to buy.
 
+**Available filters**
+
+| Parameter | Description |
+|-----------|-------------|
+| `search` | Full-text match on market hash name |
+| `category` | e.g. `Rifle`, `Knife`, `Gloves` |
+| `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
+| `rarity` | e.g. `Classified`, `Covert` |
+| `min_price` / `max_price` | Price bounds in USD |
+| `cursor` | Keyset cursor from a previous `next_cursor` |
+| `limit` | 1–500, default 100 |
+
 ```bash
 # Look up minAsk price for all Field-Tested Knives
 curl "https://csboard.com/v1/prices?category=Knife&wear=Field-Tested" \

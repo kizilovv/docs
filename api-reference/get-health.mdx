@@ -1,7 +1,7 @@
 ---
 title: "GET /v1/health — CSBoard API Liveness and Freshness Probe"
 sidebarTitle: "GET /health"
-description: "Check whether the CSBoard API is up and how fresh the price list is. The only endpoint that requires no authentication."
+description: "Check whether the CSBoard API is reachable and how stale the price list is. The only endpoint that works without an API key — safe to poll unauthenticated."
 ---
 
 The health endpoint is a lightweight probe that confirms the API is reachable and tells you how stale the materialized price list is. It is the **only** endpoint that works without an API key, making it safe to poll from monitoring systems or to gate your application startup on a freshness check before making authenticated calls.

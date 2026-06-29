@@ -1,7 +1,7 @@
 ---
 title: "Authenticate with the CSBoard API Using Bearer Tokens"
 sidebarTitle: "Authentication"
-description: "Generate a csb_pub_ API key, pass it as a Bearer token or query parameter, and understand read vs. trading key capabilities."
+description: "Generate a csb_pub_ API key at your profile page, pass it as a Bearer token or query parameter, and understand read vs. trading key capabilities."
 ---
 
 Every CSBoard API request (except `GET /v1/health`) must include a valid API key. Keys belong to the `csb_pub_` namespace, are scoped to either read-only or trading access, and are tied to your CSBoard account. The server stores only the SHA-256 hash of each key — the raw secret is shown once at creation and never again, so store it somewhere safe.
