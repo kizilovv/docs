@@ -38,7 +38,7 @@ Buying through the CSBoard API lets you acquire CS2 skins programmatically — s
       -H "Authorization: Bearer csb_pub_..." \
       -H "Content-Type: application/json" \
       -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
-      -d '{"item_ids":["ext_sp_8841201"],"max_price_usd":20.00}'
+      -d '{"item_ids":["itm_8841201"],"max_price_usd":20.00}'
     ```
   </Step>
 </Steps>
@@ -81,7 +81,7 @@ curl -X POST https://csboard.com/v1/orders \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
   -d '{
-    "item_ids": ["ext_sp_8841201", "ext_sp_8841340"],
+    "item_ids": ["itm_8841201", "itm_8841340"],
     "max_price_usd": 30.00
   }'
 ```
@@ -98,12 +98,12 @@ A successful order returns `200` with the order details and your remaining balan
   "status": "processing",
   "items": [
     {
-      "item_id": "ext_sp_8841201",
+      "item_id": "itm_8841201",
       "charged_usd": 14.37,
       "delivery": "hold"
     },
     {
-      "item_id": "ext_sp_8841340",
+      "item_id": "itm_8841340",
       "charged_usd": 12.10,
       "delivery": "instant"
     }

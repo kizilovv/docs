@@ -87,7 +87,7 @@
                 "example": {
                   "items": [
                     {
-                      "id": "ext_sp_8841201",
+                      "id": "itm_8841201",
                       "market_hash_name": "AK-47 | Redline (Minimal Wear)",
                       "wear": "Minimal Wear",
                       "doppler_phase": null,
@@ -228,7 +228,7 @@
             "application/json": {
               "schema": { "$ref": "#/components/schemas/OrderRequest" },
               "example": {
-                "item_ids": ["ext_sp_8841201", "ext_sp_8841340"],
+                "item_ids": ["itm_8841201", "itm_8841340"],
                 "max_price_usd": 30.0,
                 "idempotency_key": "6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f"
               }
@@ -245,8 +245,8 @@
                   "order_id": "ord_01J9Z3K8Q2",
                   "status": "processing",
                   "items": [
-                    { "item_id": "ext_sp_8841201", "charged_usd": 14.37, "delivery": "hold" },
-                    { "item_id": "ext_sp_8841340", "charged_usd": 12.10, "delivery": "instant" }
+                    { "item_id": "itm_8841201", "charged_usd": 14.37, "delivery": "hold" },
+                    { "item_id": "itm_8841340", "charged_usd": 12.10, "delivery": "instant" }
                   ],
                   "total_charged_usd": 26.47,
                   "balance_after_usd": 73.53,
@@ -368,7 +368,7 @@
       "OrderRequest": {
         "type": "object",
         "properties": {
-          "item_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 10, "uniqueItems": true, "description": "1–10 unique ids from /v1/listings. Do not mix external-market items with platform items." },
+          "item_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 10, "uniqueItems": true, "description": "1–10 unique ids from /v1/listings. Some items can't be combined in a single order — if so the order is rejected and you can split it." },
           "max_price_usd": { "type": "number", "description": "Total ceiling in USD. Strongly recommended — your overcharge protection, enforced atomically inside the locked debit." },
           "idempotency_key": { "type": "string", "description": "Optional; or send the Idempotency-Key header. Replays the original order on retry." }
         },

@@ -1,10 +1,10 @@
 ---
-title: "CSBoard API: Live CS2 Market Data & Automated Buying"
+title: "CSBoard API — market data & trading"
 sidebarTitle: "Introduction"
 description: "Access live CS2 skin listings, floats, sticker data, and min-ask prices — plus opt-in automated buying — through a single REST API."
 ---
 
-The CSBoard API gives you programmatic access to the CSBoard CS2 skin marketplace. Whether you're building a price tracker, powering an AI trading agent, or automating purchases from your balance, the API delivers live listings, float values, sticker details, min-ask prices, and FX conversion rates over a single REST interface. All endpoints are key-gated except the health check, and buying capability requires a separately enabled trading key.
+The CSBoard API is a developer- and AI-agent-friendly REST interface over the CSBoard marketplace. Whether you're building a price tracker, powering an AI trading agent, or automating purchases from your balance, the API delivers live listings, float values, sticker details, minAsk prices, and FX conversion rates — plus opt-in buying straight from your CSBoard balance. All endpoints are key-gated except the health check, and buying capability requires a separately enabled trading key.
 
 ## Base URL
 
@@ -16,7 +16,7 @@ https://csboard.com/v1
 
 - **Health** — [`GET /v1/health`](/api-reference/get-health) is the only unauthenticated endpoint. Use it to verify the API is up and the price list is fresh before starting a session.
 - **Listings** — [`GET /v1/listings`](/api-reference/get-listings) returns live buyable items with float, paint seed, stickers, and ask price in USD. Supports keyset pagination and rich filters.
-- **Prices** — [`GET /v1/prices`](/api-reference/get-prices) delivers aggregated min-ask prices per skin group. [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) provides a full gzipped NDJSON dump for bulk catalog ingestion.
+- **Prices** — [`GET /v1/prices`](/api-reference/get-prices) delivers grouped minAsk prices per skin group. [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) provides a full gzipped NDJSON dump for bulk catalog ingestion.
 - **Orders** — [`POST /v1/orders`](/api-reference/post-orders) places buy orders debited from your CSBoard balance. Requires a trading-enabled key.
 - **FX rates** — All prices in this API are **USD**. Use [`GET /v1/currency`](/api-reference/get-currency) to convert to a local currency using the same rate table the site uses.
 

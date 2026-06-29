@@ -4,7 +4,7 @@ sidebarTitle: "Market Data"
 description: "Browse live buyable listings, look up minAsk prices, download full-catalog snapshots, and convert prices to any currency with the CSBoard API."
 ---
 
-The CSBoard API gives you real-time access to every buyable CS2 skin on the marketplace — individual listings with float values, stickers, and paint seeds, as well as aggregated price rows for fast market scans. This guide walks you through all four market-data endpoints and shows you how to combine them effectively.
+The CSBoard API gives you real-time access to every buyable CS2 skin on the marketplace — individual listings with float values, stickers, and paint seeds, as well as grouped price rows for fast market scans. This guide walks you through all four market-data endpoints and shows you how to combine them effectively.
 
 ## Browsing Listings
 
@@ -41,7 +41,7 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100" \
   -H "Authorization: Bearer csb_pub_..."
 
 # Page 2 — pass next_cursor from the previous response
-curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6ImV4dF9zcF84ODQxMjAxIn0" \
+curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Iml0bV84ODQxMjAxIn0=" \
   -H "Authorization: Bearer csb_pub_..."
 ```
 
@@ -51,7 +51,7 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 {
   "items": [
     {
-      "id": "ext_sp_8841201",
+      "id": "itm_8841201",
       "market_hash_name": "AK-47 | Redline (Minimal Wear)",
       "wear": "Minimal Wear",
       "doppler_phase": null,
@@ -75,7 +75,7 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
       "delivery": "hold"
     }
   ],
-  "next_cursor": "eyJpZCI6ImV4dF9zcF84ODQxMjAxIn0"
+  "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="
 }
 ```
 
