@@ -2,6 +2,7 @@
 title: "GET /v1/prices/snapshot.ndjson.gz — Full Price Snapshot"
 sidebarTitle: "GET /prices/snapshot"
 description: "Download the full CSBoard price catalog as a gzipped NDJSON file. One PriceRow per line. Designed for bulk ingestion with ETag-based conditional fetching."
+openapi: "GET /prices/snapshot.ndjson.gz"
 ---
 
 The snapshot endpoint serves the complete CSBoard price list as a single gzipped NDJSON file. Every decompressed line is one `PriceRow` JSON object — the same schema returned by `GET /v1/prices`. This is the intended path for full-catalog consumers such as comparison sites, arbitrage bots, or data pipelines that need a complete local copy of the price list. For targeted queries against a subset of items, use `GET /v1/prices` instead.

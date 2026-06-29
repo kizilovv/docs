@@ -2,6 +2,7 @@
 title: "GET /v1/balance — Account Balance and Trading Status"
 sidebarTitle: "GET /balance"
 description: "Check your CSBoard balance in USD, how much is settled versus held, and whether trading is enabled for your API key."
+openapi: "GET /balance"
 ---
 
 The balance endpoint returns your current balance in USD along with the breakdown that matters for automated buying: how much is **settled** (reversal-safe and available to spend on reversal-safe purchases) versus how much is currently **held**. Use `trading_enabled` to confirm buying is turned on for the key before you attempt an order.

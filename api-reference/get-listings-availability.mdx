@@ -2,6 +2,7 @@
 title: "GET /v1/listings/availability — Bulk Availability Check"
 sidebarTitle: "GET /listings/availability"
 description: "Check whether up to 100 CSBoard listings are still buyable in a single request, with per-id available counts and a list of unavailable ids."
+openapi: "GET /listings/availability"
 ---
 
 Before placing a batch order, confirm the listings you intend to buy are still available. Pass up to 100 listing ids as a comma-separated `ids` parameter; the response tells you how many of each id are currently available and which ids are gone.

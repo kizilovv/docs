@@ -18,11 +18,19 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": ["introduction", "authentication", "rate-limits"]
+            "pages": [
+              "introduction",
+              "authentication",
+              "rate-limits"
+            ]
           },
           {
             "group": "Guides",
-            "pages": ["guides/market-data", "guides/buying", "guides/automation"]
+            "pages": [
+              "guides/market-data",
+              "guides/buying",
+              "guides/automation"
+            ]
           }
         ]
       },
@@ -31,11 +39,15 @@
         "groups": [
           {
             "group": "Status",
-            "pages": ["api-reference/get-health"]
+            "pages": [
+              "api-reference/get-health"
+            ]
           },
           {
             "group": "Account",
-            "pages": ["api-reference/get-balance"]
+            "pages": [
+              "api-reference/get-balance"
+            ]
           },
           {
             "group": "Market Data",
@@ -57,13 +69,17 @@
               "api-reference/get-order"
             ]
           }
-        ]
+        ],
+        "openapi": "openapi.json"
       }
     ]
   },
   "navbar": {
     "links": [
-      { "label": "Get a key", "href": "https://csboard.com/profile?tab=api" }
+      {
+        "label": "Get a key",
+        "href": "https://csboard.com/profile?tab=api"
+      }
     ],
     "primary": {
       "type": "button",

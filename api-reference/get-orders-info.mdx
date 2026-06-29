@@ -2,6 +2,7 @@
 title: "GET /v1/orders/info — Batch Order Lookup"
 sidebarTitle: "GET /orders/info"
 description: "Look up the status of many CSBoard orders at once by custom_ids and/or order_ids, up to 200 ids per request."
+openapi: "GET /orders/info"
 ---
 
 Use this endpoint to poll the status of many orders in one call. Supply `custom_ids` (the ids you assigned at purchase time) and/or `order_ids` (CSBoard order ids) as comma-separated lists. You must provide at least one of the two, and no more than 200 ids in total across both.

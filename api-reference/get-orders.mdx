@@ -2,6 +2,7 @@
 title: "GET /v1/orders — List Your Purchase History"
 sidebarTitle: "GET /orders"
 description: "Page through your CSBoard purchase history with keyset pagination. Filter by time window and status; each order includes per-item delivery details."
+openapi: "GET /orders"
 ---
 
 The orders endpoint returns your purchase history, newest first, using keyset pagination. Filter by a time window and by status, then walk older pages by passing `meta.next_cursor` back as `cursor`. Each order carries a per-item breakdown with delivery status.

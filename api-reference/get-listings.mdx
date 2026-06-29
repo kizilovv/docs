@@ -2,6 +2,7 @@
 title: "GET /v1/listings — Browse Live CS2 Marketplace Listings"
 sidebarTitle: "GET /listings"
 description: "Fetch live, buyable CS2 skin listings with float, paint seed, stickers, and USD asking price. Filter by wear, category, rarity, float range, and more."
+openapi: "GET /listings"
 ---
 
 The listings endpoint exposes every buyable item currently on the CSBoard marketplace. Each record includes the complete inspection data you need for evaluation — float value, paint seed, applied stickers with their wear — alongside the authoritative asking price in USD. Results are paginated using a keyset cursor so you can reliably walk the full catalog even as new listings arrive.

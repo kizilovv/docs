@@ -2,6 +2,7 @@
 title: "POST /v1/orders — Buy CS2 Listings from Your Balance"
 sidebarTitle: "POST /orders"
 description: "Buy 1–10 CS2 listings by ID in a single atomic request, debited from your CSBoard balance. Requires a trading-enabled API key and linked Steam account."
+openapi: "POST /orders"
 ---
 
 The orders endpoint lets you buy between 1 and 10 listings in a single atomic request. The charge is debited from your CSBoard balance at the **live** asking price at the moment of execution — not at the price you saw when you queried `/v1/listings`. To protect yourself from price movements between lookup and purchase, always include `max_price_usd` as a total ceiling. The endpoint is idempotent: retrying with the same `Idempotency-Key` replays the original order rather than creating a duplicate charge.

@@ -2,6 +2,7 @@
 title: "GET /v1/prices — CS2 minAsk Price List by Item Group"
 sidebarTitle: "GET /prices"
 description: "Retrieve a paginated minAsk price snapshot grouped by market hash name, wear, and Doppler phase, with cheapest ask and listing count per row."
+openapi: "GET /prices"
 ---
 
 The prices endpoint returns a grouped price snapshot of the CSBoard marketplace. Each row represents a unique combination of `market_hash_name`, `wear`, and `doppler_phase`, and carries the cheapest current asking price together with how many copies are listed. This makes it efficient for building price comparison tables, alerting pipelines, or portfolio valuation — you can retrieve pricing for thousands of items without pulling individual listings.

@@ -2,6 +2,7 @@
 title: "GET /v1/currency — FX Rates for USD Price Conversion"
 sidebarTitle: "GET /currency"
 description: "Retrieve the USD-base FX rate table used by CSBoard payment flows. Multiply any price_usd by the target currency rate for a local-currency price."
+openapi: "GET /currency"
 ---
 
 Every price in the CSBoard API is denominated in USD. The currency endpoint returns the same FX rate table that powers the site's own payment and display flows, giving you a consistent conversion layer for presenting local-currency prices to your users. Rates are sourced from OpenExchangeRates for major currencies and from the Central Bank of Russia for RUB, and are cached for approximately one hour.
