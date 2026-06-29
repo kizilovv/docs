@@ -1,0 +1,48 @@
+---
+title: "Buying"
+description: "Buy skins from your CSBoard balance — opt-in and locked down."
+---
+
+Buying is opt-in and deliberately locked down.
+
+<Steps>
+  <Step title="Enable trading on your key">
+    A normal key only reads. Flip on buying for your key in your
+    [profile](https://csboard.com/profile?tab=api). Until then `POST /v1/orders`
+    returns `403 trading_not_enabled` — a leaked read key can never spend.
+  </Step>
+  <Step title="Link a Steam account + trade URL">
+    Orders ship straight to Steam, so a linked account and trade URL are
+    required, else `400 steam_account_required`.
+  </Step>
+  <Step title="Fund your balance">
+    Buys debit your existing CSBoard balance. Top up on the site — there is no
+    card/crypto over the API.
+  </Step>
+</Steps>
+
+## Overcharge protection
+
+You are charged the **live price at execution**. `price_usd` from
+[`/v1/listings`](/api-reference/get-listings) is authoritative (it equals the
+charge); [`/v1/prices`](/api-reference/get-prices) is an indicative grouped
+snapshot that can lag.
+
+Always send `max_price_usd` — a total ceiling enforced atomically inside the
+locked debit. If the live price moved past it, the order is rejected with
+`409 price_moved` (and the current total), never overcharging you.
+
+## Idempotency
+
+Send an `Idempotency-Key` header (or `idempotency_key` in the body). A retried
+request replays the original order instead of buying twice.
+
+```bash
+curl -X POST https://csboard.com/v1/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+  -d '{"item_ids":["ext_sp_8841201"],"max_price_usd":20.00}'
+```
+
+See [`POST /v1/orders`](/api-reference/post-orders) for the full reference.

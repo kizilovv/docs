@@ -1,0 +1,410 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CSBoard API",
+    "version": "1.0.0",
+    "description": "Market data over the CSBoard marketplace — live listings, floats, stickers, minAsk prices, FX rates — plus opt-in buying straight from your balance. Free to read, key-gated, built for automation.",
+    "contact": {
+      "name": "CSBoard",
+      "url": "https://csboard.com/docs"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://csboard.com/v1",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Status", "description": "Liveness and freshness probes." },
+    { "name": "Market data", "description": "Read the live catalog, prices, and FX rates." },
+    { "name": "Trading", "description": "Buy listings from your CSBoard balance. Opt-in, key-gated." }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Status"],
+        "summary": "Liveness + freshness probe",
+        "description": "Liveness and price-list freshness probe. No key required — use it to check the API is up and the price list is fresh. This is the only endpoint that works without authentication.",
+        "operationId": "getHealth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is up.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" },
+                "example": {
+                  "status": "ok",
+                  "groups": 184213,
+                  "price_list_age_seconds": 42
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/listings": {
+      "get": {
+        "tags": ["Market data"],
+        "summary": "Live buyable listings",
+        "description": "Live buyable listings across the marketplace — each with float, paint seed, stickers, and the asking price in USD. Use keyset pagination via `cursor`.",
+        "operationId": "listListings",
+        "parameters": [
+          { "name": "search", "in": "query", "description": "Full-text match on market hash name.", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "description": "e.g. Rifle, Knife, Gloves.", "schema": { "type": "string" } },
+          { "name": "wear", "in": "query", "description": "Item wear bucket.", "schema": { "type": "string", "enum": ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"] } },
+          { "name": "rarity", "in": "query", "description": "e.g. Classified, Covert.", "schema": { "type": "string" } },
+          { "name": "min_price", "in": "query", "description": "Minimum price in USD.", "schema": { "type": "number" } },
+          { "name": "max_price", "in": "query", "description": "Maximum price in USD.", "schema": { "type": "number" } },
+          { "name": "min_float", "in": "query", "description": "Minimum float value.", "schema": { "type": "number" } },
+          { "name": "max_float", "in": "query", "description": "Maximum float value.", "schema": { "type": "number" } },
+          { "name": "stat_trak", "in": "query", "description": "Filter StatTrak™ items.", "schema": { "type": "string", "enum": ["only", "exclude"] } },
+          { "name": "souvenir", "in": "query", "description": "Filter Souvenir items.", "schema": { "type": "string", "enum": ["only", "exclude"] } },
+          { "name": "sort", "in": "query", "description": "Sort order. Default id.", "schema": { "type": "string", "enum": ["id", "newest", "price_asc", "price_desc"], "default": "id" } },
+          { "name": "cursor", "in": "query", "description": "Keyset cursor from next_cursor.", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "description": "1–200. Default 50.", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of listings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": { "type": "array", "items": { "$ref": "#/components/schemas/Listing" } },
+                    "next_cursor": { "type": ["string", "null"], "description": "Pass back as `cursor` to fetch the next page. Null on the last page." }
+                  },
+                  "required": ["items", "next_cursor"]
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": "ext_sp_8841201",
+                      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+                      "wear": "Minimal Wear",
+                      "doppler_phase": null,
+                      "float_value": 0.0912,
+                      "paint_seed": 412,
+                      "stickers": [
+                        { "name": "Crown (Foil)", "image": "https://cdn.csboard.com/stickers/crown_foil.png", "slot": 0, "wear": 0.0 }
+                      ],
+                      "price_usd": 14.37,
+                      "category": "Rifle",
+                      "rarity": "Classified",
+                      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+                      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+                      "tradable": false,
+                      "tradable_at": "2026-07-06T12:00:00Z",
+                      "delivery": "hold"
+                    }
+                  ],
+                  "next_cursor": "eyJpZCI6ImV4dF9zcF84ODQxMjAxIn0"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/prices": {
+      "get": {
+        "tags": ["Market data"],
+        "summary": "minAsk price list",
+        "description": "The minAsk price list — one row per market hash name (+ wear + Doppler phase), with the cheapest current ask and how many are listed. Indicative grouped snapshot; can lag the live listing price.",
+        "operationId": "listPrices",
+        "parameters": [
+          { "name": "search", "in": "query", "description": "Full-text match on market hash name.", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "description": "e.g. Rifle, Knife, Gloves.", "schema": { "type": "string" } },
+          { "name": "wear", "in": "query", "description": "Item wear bucket.", "schema": { "type": "string", "enum": ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred"] } },
+          { "name": "rarity", "in": "query", "description": "e.g. Classified, Covert.", "schema": { "type": "string" } },
+          { "name": "min_price", "in": "query", "description": "Minimum price in USD.", "schema": { "type": "number" } },
+          { "name": "max_price", "in": "query", "description": "Maximum price in USD.", "schema": { "type": "number" } },
+          { "name": "cursor", "in": "query", "description": "Keyset cursor from next_cursor.", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "description": "1–500. Default 100.", "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of price rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": { "type": "array", "items": { "$ref": "#/components/schemas/PriceRow" } },
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"]
+                },
+                "example": {
+                  "items": [
+                    { "market_hash_name": "AK-47 | Redline (Field-Tested)", "wear": "Field-Tested", "doppler_phase": null, "min_price_usd": 11.92, "qty": 73 }
+                  ],
+                  "next_cursor": null
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/prices/snapshot.ndjson.gz": {
+      "get": {
+        "tags": ["Market data"],
+        "summary": "Full price-list snapshot (gzipped NDJSON)",
+        "description": "Full gzipped NDJSON dump of the price list — one price row JSON per line. Use this for full-catalog ingestion (e.g. comparison sites), not pagination. Rate limited to 1 request/minute. Supports ETag / If-None-Match: an unchanged snapshot returns 304 Not Modified.",
+        "operationId": "getPriceSnapshot",
+        "parameters": [
+          { "name": "If-None-Match", "in": "header", "description": "Conditional request. Pass the ETag from a previous snapshot to receive 304 if unchanged.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gzipped NDJSON stream. Each decompressed line is one PriceRow JSON object. Sets an ETag header.",
+            "headers": {
+              "ETag": { "description": "Opaque snapshot version. Send back as If-None-Match to skip unchanged downloads.", "schema": { "type": "string" } }
+            },
+            "content": {
+              "application/x-ndjson": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "304": { "description": "Not Modified — the snapshot has not changed since the ETag you sent." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/currency": {
+      "get": {
+        "tags": ["Market data"],
+        "summary": "FX rates (USD base)",
+        "description": "FX rates with USD as the base. Every price in this API is USD — use this to convert to a local currency. Same rate table the site and payment flows use (cached ~1h).",
+        "operationId": "getCurrency",
+        "responses": {
+          "200": {
+            "description": "Current FX rates.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Currency" },
+                "example": {
+                  "base": "USD",
+                  "rates": { "USD": 1, "EUR": 0.92, "RUB": 78.4, "GBP": 0.79 },
+                  "updated_at": "2026-06-29T17:00:00Z",
+                  "rub_source": "cbr",
+                  "base_source": "openexchangerates"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": ["Trading"],
+        "summary": "Buy listings from your balance",
+        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body.",
+        "operationId": "createOrder",
+        "parameters": [
+          { "name": "Idempotency-Key", "in": "header", "description": "Optional. A retried request with the same key replays the original order instead of buying twice.", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OrderRequest" },
+              "example": {
+                "item_ids": ["ext_sp_8841201", "ext_sp_8841340"],
+                "max_price_usd": 30.0,
+                "idempotency_key": "6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order accepted and debited.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" },
+                "example": {
+                  "order_id": "ord_01J9Z3K8Q2",
+                  "status": "processing",
+                  "items": [
+                    { "item_id": "ext_sp_8841201", "charged_usd": 14.37, "delivery": "hold" },
+                    { "item_id": "ext_sp_8841340", "charged_usd": 12.10, "delivery": "instant" }
+                  ],
+                  "total_charged_usd": 26.47,
+                  "balance_after_usd": 73.53,
+                  "created_at": "2026-06-29T17:12:04Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (e.g. price moved past your ceiling).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "price_moved": {
+                    "summary": "Live price exceeded max_price_usd",
+                    "value": { "code": "price_moved", "message": "Live total 31.20 exceeds max_price_usd 30.00.", "current_total_usd": 31.20 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "402": {
+            "description": "Insufficient balance.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "code": "insufficient_balance", "message": "Balance 10.00 is below order total 26.47." } } }
+          },
+          "403": {
+            "description": "Trading not enabled on this key.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "code": "trading_not_enabled", "message": "Enable buying for this key in your profile." } } }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Send your key as a Bearer token on every request: `Authorization: Bearer csb_pub_...`. Generate keys in your CSBoard profile."
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid API key.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "code": "unauthorized", "message": "Missing or invalid API key." } } }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded. Includes a Retry-After header.",
+        "headers": { "Retry-After": { "description": "Seconds to wait before retrying.", "schema": { "type": "integer" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "code": "rate_limit_exceeded", "message": "Too many requests." } } }
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "ok" },
+          "groups": { "type": "integer", "description": "Count of priced item groups." },
+          "price_list_age_seconds": { "type": "integer", "description": "Age of the materialized price list, in seconds (freshness)." }
+        },
+        "required": ["status", "groups", "price_list_age_seconds"]
+      },
+      "Sticker": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "image": { "type": "string", "format": "uri" },
+          "slot": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "wear": { "type": ["number", "null"], "description": "Sticker wear 0–1, or null if unscraped." }
+        },
+        "required": ["name", "image", "slot", "wear"]
+      },
+      "Listing": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Stable listing id. Pass to POST /v1/orders." },
+          "market_hash_name": { "type": "string" },
+          "wear": { "type": ["string", "null"], "enum": ["Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred", null] },
+          "doppler_phase": { "type": ["string", "null"], "description": "Doppler / Gamma Doppler phase, e.g. \"Phase 2\", \"Ruby\", or null." },
+          "float_value": { "type": ["number", "null"] },
+          "paint_seed": { "type": ["integer", "null"] },
+          "stickers": { "type": "array", "items": { "$ref": "#/components/schemas/Sticker" } },
+          "price_usd": { "type": "number", "description": "Authoritative asking price in USD. Equals the amount charged if you buy this listing." },
+          "category": { "type": "string" },
+          "rarity": { "type": "string" },
+          "image": { "type": "string", "format": "uri" },
+          "inspect_link": { "type": "string" },
+          "tradable": { "type": "boolean" },
+          "tradable_at": { "type": ["string", "null"], "format": "date-time", "description": "When the item leaves trade hold. Null if already tradable." },
+          "delivery": { "type": "string", "enum": ["instant", "hold"] }
+        },
+        "required": ["id", "market_hash_name", "price_usd", "category", "delivery", "stickers", "tradable"]
+      },
+      "PriceRow": {
+        "type": "object",
+        "properties": {
+          "market_hash_name": { "type": "string" },
+          "wear": { "type": ["string", "null"] },
+          "doppler_phase": { "type": ["string", "null"] },
+          "min_price_usd": { "type": "number", "description": "Cheapest current ask in USD." },
+          "qty": { "type": "integer", "description": "How many are listed at or above this group." }
+        },
+        "required": ["market_hash_name", "min_price_usd", "qty"]
+      },
+      "Currency": {
+        "type": "object",
+        "properties": {
+          "base": { "type": "string", "example": "USD" },
+          "rates": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Currency code → units per 1 USD." },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "rub_source": { "type": "string" },
+          "base_source": { "type": "string" }
+        },
+        "required": ["base", "rates", "updated_at"]
+      },
+      "OrderRequest": {
+        "type": "object",
+        "properties": {
+          "item_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 10, "uniqueItems": true, "description": "1–10 unique ids from /v1/listings. Do not mix external-market items with platform items." },
+          "max_price_usd": { "type": "number", "description": "Total ceiling in USD. Strongly recommended — your overcharge protection, enforced atomically inside the locked debit." },
+          "idempotency_key": { "type": "string", "description": "Optional; or send the Idempotency-Key header. Replays the original order on retry." }
+        },
+        "required": ["item_ids"]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["processing", "completed", "failed"] },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": { "type": "string" },
+                "charged_usd": { "type": "number" },
+                "delivery": { "type": "string", "enum": ["instant", "hold"] }
+              }
+            }
+          },
+          "total_charged_usd": { "type": "number" },
+          "balance_after_usd": { "type": "number" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["order_id", "status", "total_charged_usd"]
+      },
+      "Error": {
+        "type": "object",
+        "description": "All errors return { code, detail }. Some carry extra fields (e.g. price_moved adds current_total_usd, insufficient_balance adds required_usd/current_usd).",
+        "properties": {
+          "code": { "type": "string", "description": "Machine-readable error code, e.g. rate_limit_exceeded, trading_not_enabled, price_moved." },
+          "detail": { "type": "string", "description": "Human-readable explanation." }
+        },
+        "required": ["code"]
+      }
+    }
+  }
+}
