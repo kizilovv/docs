@@ -1,0 +1,129 @@
+---
+title: "POST /v1/market/buy — Buy and Deliver to a Steam Trade URL"
+sidebarTitle: "POST /market/buy"
+description: "Buy up to 100 items and deliver them straight to any Steam trade URL you supply, paid from your settled balance. Built for wholesale and automated delivery."
+---
+
+This endpoint lets you buy and deliver items directly to **any** Steam trade URL you supply — not just the trade URL linked to your account. The trade URL is built from the `partner` and `token` fields. Purchases are funded **only** from your **settled** (reversal-safe) balance, making it suitable for wholesale volume and automated delivery workflows.
+
+The endpoint is **idempotent via the `custom_id` body field**: retrying with the same `custom_id` replays the original purchase rather than buying twice, and the replayed response carries the header `Idempotent-Replayed: true`.
+
+<Warning>
+  This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. When the kill-switch is off it returns `403 external_buy_disabled`.
+</Warning>
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+**Trading capability required.** Buying must be enabled for the key, and the account must be reversal-clean.
+
+## Request body
+
+<ParamField body="item_ids" type="string[]" required>
+  1–100 unique listing ids to buy.
+</ParamField>
+
+<ParamField body="partner" type="string" required>
+  Steam trade URL `partner` value (1–32 chars). Together with `token`, forms the destination trade URL items are delivered to.
+</ParamField>
+
+<ParamField body="token" type="string" required>
+  Steam trade URL `token` value (1–32 chars). Together with `partner`, forms the destination trade URL.
+</ParamField>
+
+<ParamField body="max_price_usd" type="number">
+  Total price ceiling in USD. If the live total exceeds it, the order is rejected with `price_moved` and nothing is charged. Strongly recommended.
+</ParamField>
+
+<ParamField body="custom_id" type="string">
+  Idempotency key (1–128 chars). A retry with the same `custom_id` replays the original purchase; the replay response carries `Idempotent-Replayed: true`.
+</ParamField>
+
+<ParamField body="skip_unavailable" type="boolean" default="false">
+  If `true`, skip items that are no longer available instead of failing the whole request.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="data" type="object" required>
+  <Expandable title="data object">
+    <ResponseField name="purchase_id" type="string" required />
+    <ResponseField name="steam_id" type="string" required>
+      The Steam ID resolved from the supplied `partner` + `token`.
+    </ResponseField>
+    <ResponseField name="created_at" type="datetime" required />
+    <ResponseField name="custom_id" type="string | null" />
+    <ResponseField name="skins" type="object[]" required>
+      Per-item result.
+
+      <Expandable title="skin object">
+        <ResponseField name="name" type="string | null" />
+        <ResponseField name="price" type="number | null" />
+        <ResponseField name="status" type="string" />
+        <ResponseField name="return_reason" type="string | null" />
+        <ResponseField name="steam_trade_offer_id" type="string | null" />
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example request
+
+```bash
+curl -X POST https://csboard.com/v1/market/buy \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_ids": ["itm_8841201", "itm_8841340"],
+    "partner": "447383001",
+    "token": "Ab3xZ9Qp",
+    "max_price_usd": 30.00,
+    "custom_id": "batch-2026-06-29-01",
+    "skip_unavailable": false
+  }'
+```
+
+## Example response
+
+```json
+{
+  "data": {
+    "purchase_id": "pur_01J9Z3K8Q2",
+    "steam_id": "76561198000000000",
+    "created_at": "2026-06-29T17:12:04Z",
+    "custom_id": "batch-2026-06-29-01",
+    "skins": [
+      {
+        "name": "AK-47 | Redline (Minimal Wear)",
+        "price": 14.37,
+        "status": "delivering",
+        "return_reason": null,
+        "steam_trade_offer_id": "5512345678"
+      }
+    ]
+  }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Malformed body (e.g. `item_ids` empty or over 100). |
+| 400 | `unsupported_item` | One or more items cannot be delivered via this endpoint (e.g. `ss_live_*` ids). |
+| 400 | `invalid_trade_url` | `partner` + `token` do not form a valid Steam trade URL. |
+| 401 | `invalid_api_key` | Missing or invalid API key. |
+| 402 | `insufficient_settled_balance` | Settled balance below the order total. Includes `required_usd` and `settled_usd`. |
+| 402 | `insufficient_balance` | Balance below the order total. |
+| 403 | `external_buy_disabled` | Kill-switch is off; the endpoint is currently disabled. |
+| 403 | `trading_not_enabled` | Buying is not enabled for this key. |
+| 403 | `account_restricted` | The endpoint requires a reversal-clean account. |
+| 409 | `item_unavailable` | One or more items are no longer available. Includes `unavailable_ids[]`. |
+| 409 | `price_moved` | Live total exceeded the ceiling. Includes `quoted_max_usd`, `current_total_usd`, and `items[]`. |
+| 409 | `idempotency_in_progress` | A request with this `custom_id` is still being processed. |
+| 409 | `price_updating` | Prices are refreshing; retry shortly. |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |
+| 500 | `order_failed` | The purchase could not be completed. |
+
+<Note>
+  Funds come exclusively from your **settled** balance. Check `settled_balance_usd` on [`GET /v1/balance`](/api-reference/get-balance) before a large batch, and always send `max_price_usd` as overcharge protection.
+</Note>

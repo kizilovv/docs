@@ -1,0 +1,80 @@
+---
+title: "GET /v1/orders/{id} — Fetch a Single Order"
+sidebarTitle: "GET /orders/{id}"
+description: "Retrieve one CSBoard order by its order id, including per-item delivery status and Steam trade offer details."
+---
+
+Fetch a single order by its CSBoard order id. The response includes the full per-item breakdown with delivery status, return reasons, and Steam trade offer details.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Path parameters
+
+<ParamField path="id" type="string" required>
+  The CSBoard order id, e.g. `ord_01J9Z3K8Q2`.
+</ParamField>
+
+## Response fields
+
+The response is a single `Order` object with the same shape as the items in [`GET /v1/orders`](/api-reference/get-orders):
+
+<ResponseField name="order_id" type="string" required />
+<ResponseField name="steam_id" type="string | null" />
+<ResponseField name="status" type="string" required>
+  One of: `completed`, `hold`, `delivering`, `pending`, `cancelled`, `failed`.
+</ResponseField>
+<ResponseField name="custom_id" type="string | null" />
+<ResponseField name="currency" type="string" required>
+  Always `"USD"`.
+</ResponseField>
+<ResponseField name="charged_total_usd" type="number" required />
+<ResponseField name="item_count" type="integer" required />
+<ResponseField name="hold_until" type="datetime | null" />
+<ResponseField name="created_at" type="datetime" required />
+<ResponseField name="updated_at" type="datetime | null" />
+<ResponseField name="items" type="OrderItem[]" required>
+  Per-item breakdown. Each item has `market_hash_name`, `price_usd`, `status` (`hold` | `delivering` | `delivered` | `returned`), `tradable_at`, `return_reason`, `steam_trade_offer_id`, and `steam_trade_offer_finished_at`.
+</ResponseField>
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "steam_id": "76561198000000000",
+  "status": "completed",
+  "custom_id": "batch-2026-06-29-01",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
+  "hold_until": null,
+  "created_at": "2026-06-29T17:12:04Z",
+  "updated_at": "2026-06-29T17:15:40Z",
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": "delivered",
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "return_reason": null,
+      "steam_trade_offer_id": "5512345678",
+      "steam_trade_offer_finished_at": "2026-06-29T17:15:40Z"
+    }
+  ]
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 404 | `order_not_found` | No order exists for that id. |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |

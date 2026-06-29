@@ -1,0 +1,70 @@
+---
+title: "GET /v1/balance — Account Balance and Trading Status"
+sidebarTitle: "GET /balance"
+description: "Check your CSBoard balance in USD, how much is settled versus held, and whether trading is enabled for your API key."
+---
+
+The balance endpoint returns your current balance in USD along with the breakdown that matters for automated buying: how much is **settled** (reversal-safe and available to spend on reversal-safe purchases) versus how much is currently **held**. Use `trading_enabled` to confirm buying is turned on for the key before you attempt an order.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Parameters
+
+This endpoint takes no query parameters.
+
+## Response fields
+
+<ResponseField name="currency" type="string" required>
+  Always `"USD"`. All amounts are denominated in US dollars.
+</ResponseField>
+
+<ResponseField name="balance_usd" type="number" required>
+  Your total balance in USD.
+</ResponseField>
+
+<ResponseField name="trading_enabled" type="boolean" required>
+  Whether buying is enabled for this API key. If `false`, purchase endpoints return `trading_not_enabled`.
+</ResponseField>
+
+<ResponseField name="settled_balance_usd" type="number" required>
+  The portion of your balance that is settled and reversal-safe. This is what you can spend on reversal-safe purchases such as `POST /v1/market/buy`.
+</ResponseField>
+
+<ResponseField name="held_usd" type="number" required>
+  The portion of your balance currently held.
+</ResponseField>
+
+<ResponseField name="held_until" type="datetime | null" required>
+  ISO 8601 timestamp of when the held portion clears, or `null` if nothing is held.
+</ResponseField>
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/balance \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "currency": "USD",
+  "balance_usd": 1240.55,
+  "trading_enabled": true,
+  "settled_balance_usd": 980.10,
+  "held_usd": 260.45,
+  "held_until": "2026-07-06T12:00:00Z"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |
+
+<Tip>
+  Check `settled_balance_usd`, not `balance_usd`, before calling reversal-safe purchase endpoints — held funds cannot be spent there.
+</Tip>

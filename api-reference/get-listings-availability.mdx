@@ -1,0 +1,61 @@
+---
+title: "GET /v1/listings/availability — Bulk Availability Check"
+sidebarTitle: "GET /listings/availability"
+description: "Check whether up to 100 CSBoard listings are still buyable in a single request, with per-id available counts and a list of unavailable ids."
+---
+
+Before placing a batch order, confirm the listings you intend to buy are still available. Pass up to 100 listing ids as a comma-separated `ids` parameter; the response tells you how many of each id are currently available and which ids are gone.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+<ParamField query="ids" type="string" required>
+  Comma-separated listing ids, e.g. `itm_8841201,itm_8841340`. **Required.** Maximum 100 ids per request.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="data" type="object" required>
+  <Expandable title="data object">
+    <ResponseField name="available" type="object" required>
+      Map of listing id → integer count currently available. Ids with at least one available unit appear here.
+    </ResponseField>
+    <ResponseField name="unavailable_ids" type="string[]" required>
+      Listing ids that are no longer available.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/listings/availability?ids=itm_8841201,itm_8841340,itm_8841999" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": {
+    "available": {
+      "itm_8841201": 1,
+      "itm_8841340": 3
+    },
+    "unavailable_ids": ["itm_8841999"]
+  }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 422 | `invalid_request` | `ids` was omitted, or more than 100 ids were supplied. |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |
+
+<Tip>
+  Availability is a point-in-time snapshot. An id reported as available can still sell out before your purchase executes — always send `max_price_usd` and handle `item_unavailable` on the buy call.
+</Tip>

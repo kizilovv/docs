@@ -1,0 +1,148 @@
+---
+title: "GET /v1/orders — List Your Purchase History"
+sidebarTitle: "GET /orders"
+description: "Page through your CSBoard purchase history with keyset pagination. Filter by time window and status; each order includes per-item delivery details."
+---
+
+The orders endpoint returns your purchase history, newest first, using keyset pagination. Filter by a time window and by status, then walk older pages by passing `meta.next_cursor` back as `cursor`. Each order carries a per-item breakdown with delivery status.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+<ParamField query="limit" type="integer" default="50">
+  Results per page. Minimum `1`, maximum `100`.
+</ParamField>
+
+<ParamField query="start_unix_time" type="integer">
+  Only return orders created at or after this Unix timestamp (seconds).
+</ParamField>
+
+<ParamField query="end_unix_time" type="integer">
+  Only return orders created at or before this Unix timestamp (seconds).
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by order status. One of: `completed`, `hold`, `delivering`, `pending`, `cancelled`, `failed`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset cursor from a previous response's `meta.next_cursor`. Pass it to fetch the next page.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="data" type="Order[]" required>
+  Array of orders for this page.
+
+  <Expandable title="Order object">
+    <ResponseField name="order_id" type="string" required>
+      CSBoard order id.
+    </ResponseField>
+    <ResponseField name="steam_id" type="string | null">
+      Steam ID the items were delivered to, if known.
+    </ResponseField>
+    <ResponseField name="status" type="string" required>
+      One of: `completed`, `hold`, `delivering`, `pending`, `cancelled`, `failed`.
+    </ResponseField>
+    <ResponseField name="custom_id" type="string | null">
+      Your own id, if you set one at purchase time.
+    </ResponseField>
+    <ResponseField name="currency" type="string" required>
+      Always `"USD"`.
+    </ResponseField>
+    <ResponseField name="charged_total_usd" type="number" required>
+      Total charged for the order in USD.
+    </ResponseField>
+    <ResponseField name="item_count" type="integer" required>
+      Number of items in the order.
+    </ResponseField>
+    <ResponseField name="hold_until" type="datetime | null">
+      When the order's held items clear, or `null`.
+    </ResponseField>
+    <ResponseField name="created_at" type="datetime" required>
+      ISO 8601 creation timestamp.
+    </ResponseField>
+    <ResponseField name="updated_at" type="datetime | null">
+      ISO 8601 timestamp of the last update, or `null`.
+    </ResponseField>
+    <ResponseField name="items" type="OrderItem[]" required>
+      Per-item breakdown.
+
+      <Expandable title="OrderItem object">
+        <ResponseField name="market_hash_name" type="string | null" />
+        <ResponseField name="price_usd" type="number | null" />
+        <ResponseField name="status" type="string" required>
+          One of: `hold`, `delivering`, `delivered`, `returned`.
+        </ResponseField>
+        <ResponseField name="tradable_at" type="datetime | null">
+          When the item leaves Steam trade hold, or `null`.
+        </ResponseField>
+        <ResponseField name="return_reason" type="string | null">
+          Why the item was returned, if `status` is `returned`. One of: `trade_timeout`, `declined`, `expired`, `rolled_back`, `unavailable`.
+        </ResponseField>
+        <ResponseField name="steam_trade_offer_id" type="string | null" />
+        <ResponseField name="steam_trade_offer_finished_at" type="datetime | null" />
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="meta" type="object" required>
+  <Expandable title="meta object">
+    <ResponseField name="next_cursor" type="string | null" required>
+      Pass back as `cursor` to fetch the next page. `null` on the last page.
+    </ResponseField>
+    <ResponseField name="per_page" type="integer" required>
+      Page size used for this response.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/orders?status=completed&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": [
+    {
+      "order_id": "ord_01J9Z3K8Q2",
+      "steam_id": "76561198000000000",
+      "status": "completed",
+      "custom_id": "batch-2026-06-29-01",
+      "currency": "USD",
+      "charged_total_usd": 26.47,
+      "item_count": 2,
+      "hold_until": null,
+      "created_at": "2026-06-29T17:12:04Z",
+      "updated_at": "2026-06-29T17:15:40Z",
+      "items": [
+        {
+          "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+          "price_usd": 14.37,
+          "status": "delivered",
+          "tradable_at": "2026-07-06T12:00:00Z",
+          "return_reason": null,
+          "steam_trade_offer_id": "5512345678",
+          "steam_trade_offer_finished_at": "2026-06-29T17:15:40Z"
+        }
+      ]
+    }
+  ],
+  "meta": { "next_cursor": "eyJpZCI6Im9yZF8wMUo5WjNLOFEyIn0=", "per_page": 50 }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 422 | `invalid_request` | Invalid query parameters (e.g. `limit` out of range). |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |

@@ -1,0 +1,66 @@
+---
+title: "GET /v1/orders/info — Batch Order Lookup"
+sidebarTitle: "GET /orders/info"
+description: "Look up the status of many CSBoard orders at once by custom_ids and/or order_ids, up to 200 ids per request."
+---
+
+Use this endpoint to poll the status of many orders in one call. Supply `custom_ids` (the ids you assigned at purchase time) and/or `order_ids` (CSBoard order ids) as comma-separated lists. You must provide at least one of the two, and no more than 200 ids in total across both.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+<ParamField query="custom_ids" type="string">
+  Comma-separated custom ids you assigned at purchase time.
+</ParamField>
+
+<ParamField query="order_ids" type="string">
+  Comma-separated CSBoard order ids.
+</ParamField>
+
+<Note>
+  Provide at least one of `custom_ids` or `order_ids`. The combined total across both parameters must not exceed 200 ids.
+</Note>
+
+## Response fields
+
+<ResponseField name="data" type="Order[]" required>
+  Array of matching orders. Each `Order` has the same shape as in [`GET /v1/orders`](/api-reference/get-orders) — including `order_id`, `status`, `charged_total_usd`, and the per-item `items` breakdown.
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/orders/info?custom_ids=batch-2026-06-29-01,batch-2026-06-29-02" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": [
+    {
+      "order_id": "ord_01J9Z3K8Q2",
+      "steam_id": "76561198000000000",
+      "status": "completed",
+      "custom_id": "batch-2026-06-29-01",
+      "currency": "USD",
+      "charged_total_usd": 26.47,
+      "item_count": 2,
+      "hold_until": null,
+      "created_at": "2026-06-29T17:12:04Z",
+      "updated_at": "2026-06-29T17:15:40Z",
+      "items": []
+    }
+  ]
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 422 | `invalid_request` | No ids supplied, or more than 200 ids in total. |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |
