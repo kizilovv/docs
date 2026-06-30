@@ -1,0 +1,19 @@
+---
+title: "Changelog"
+sidebarTitle: "Overview"
+description: "Product updates, new features, and fixes for the CSBoard API."
+---
+
+<Update label="June 30, 2026">
+
+## New features
+
+**Exact `name` filter on listings and prices**
+
+You can now pass a `name` query parameter to `/v1/listings` and `/v1/prices` to fetch a single specific item by its exact `market_hash_name` (case-insensitive). Unlike the existing `search` parameter — which does fuzzy word matching and can collide on overlapping titles (for example, `Spectrum Case` vs `Spectrum 2 Case`) — `name` returns only the item you asked for. When both parameters are supplied, `name` takes precedence.
+
+This makes it straightforward to pull a single item's live listings or min-ask price without post-filtering the response.
+
+See [Market Data](/guides/market-data), [GET /v1/listings](/api-reference/get-listings), and [GET /v1/prices](/api-reference/get-prices).
+
+</Update>

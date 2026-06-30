@@ -74,6 +74,17 @@
               }
             ],
             "openapi": "openapi.json"
+          },
+          {
+            "tab": "Changelog",
+            "groups": [
+              {
+                "group": "Changelog",
+                "pages": [
+                  "changelog/overview"
+                ]
+              }
+            ]
           }
         ]
       },
