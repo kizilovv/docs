@@ -20,7 +20,8 @@ curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Factory%20New&
 
 | Параметр | Описание |
 |-----------|-------------|
-| `search` | Полнотекстовый поиск по market hash name |
+| `search` | Нечёткий поиск по подстроке в market hash name — подходит для поиска, но не позволяет изолировать имя, являющееся словесным подмножеством более длинного (например, `Spectrum Case` и `Spectrum 2 Case`) |
+| `name` | **Точное** market hash name (регистр не учитывается) — точный способ найти один предмет. `name=Spectrum Case` вернёт только Spectrum Case. Имеет приоритет над `search` |
 | `category` | Например, `Rifle`, `Knife`, `Gloves` |
 | `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
 | `rarity` | Например, `Classified`, `Covert` |
@@ -93,7 +94,8 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 | Параметр | Описание |
 |-----------|-------------|
-| `search` | Полнотекстовый поиск по market hash name |
+| `search` | Нечёткий поиск по подстроке в market hash name — подходит для поиска, но не позволяет изолировать имя, являющееся словесным подмножеством более длинного (например, `Spectrum Case` и `Spectrum 2 Case`) |
+| `name` | **Точное** market hash name (регистр не учитывается) — точный способ найти один предмет. `name=Spectrum Case` вернёт только Spectrum Case. Имеет приоритет над `search` |
 | `category` | Например, `Rifle`, `Knife`, `Gloves` |
 | `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
 | `rarity` | Например, `Classified`, `Covert` |

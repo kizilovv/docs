@@ -12,7 +12,11 @@ openapi: "GET /listings"
 ## Query-параметры
 
 <ParamField query="search" type="string">
-  Полнотекстовое совпадение по `market_hash_name` товара, например `AK-47 | Redline`.
+  Нечёткое совпадение по `market_hash_name` товара — запрос разбивается на слова, и каждое сопоставляется как подстрока, идеально подходит для поиска. Обратите внимание: имя, слова которого являются подмножеством более длинного имени предмета (например, `Spectrum Case` и `Spectrum 2 Case`), нельзя изолировать таким способом. Для одного конкретного предмета используйте `name`.
+</ParamField>
+
+<ParamField query="name" type="string">
+  Точное `market_hash_name` (регистр не учитывается). Точный способ получить листинги одного конкретного предмета — `name=Spectrum Case` вернёт только Spectrum Case, никогда `Spectrum 2 Case`. Имеет приоритет над `search`, если переданы оба параметра.
 </ParamField>
 
 <ParamField query="category" type="string">

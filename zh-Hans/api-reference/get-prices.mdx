@@ -12,7 +12,11 @@ prices 端点返回 CSBoard 市场的分组价格快照。每一行代表 `marke
 ## 查询参数
 
 <ParamField query="search" type="string">
-  对 `market_hash_name` 进行全文匹配，例如 `AK-47 | Redline`。
+  对 `market_hash_name` 进行模糊匹配 —— 将查询拆分为多个词，并对每个词进行子串匹配。如果某个名称是更长商品名称的词子集（例如 `Spectrum Case` 与 `Spectrum 2 Case`），则无法通过此方式单独筛选；要精确查询，请使用 `name`。
+</ParamField>
+
+<ParamField query="name" type="string">
+  精确的 `market_hash_name`（不区分大小写）—— 单个商品的精确查询方式。`name=Spectrum Case` 仅返回 Spectrum Case 组，绝不会返回 `Spectrum 2 Case`。优先于 `search`。
 </ParamField>
 
 <ParamField query="category" type="string">

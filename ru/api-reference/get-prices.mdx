@@ -12,7 +12,11 @@ openapi: "GET /prices"
 ## Query-параметры
 
 <ParamField query="search" type="string">
-  Полнотекстовое совпадение по `market_hash_name`, например `AK-47 | Redline`.
+  Нечёткое совпадение по `market_hash_name` — запрос разбивается на слова, и каждое сопоставляется как подстрока. Имя, являющееся словесным подмножеством более длинного имени предмета (например, `Spectrum Case` и `Spectrum 2 Case`), нельзя изолировать таким способом; для точного поиска используйте `name`.
+</ParamField>
+
+<ParamField query="name" type="string">
+  Точное `market_hash_name` (регистр не учитывается) — точный способ найти один предмет. `name=Spectrum Case` вернёт только группу Spectrum Case, никогда `Spectrum 2 Case`. Имеет приоритет над `search`.
 </ParamField>
 
 <ParamField query="category" type="string">
