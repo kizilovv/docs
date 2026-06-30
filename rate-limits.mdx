@@ -12,8 +12,8 @@ All limits are **per API key** and reset on a rolling 60-second window.
 
 | Limit | Endpoint(s) |
 |---|---|
-| **30 / min** | Listings, prices, currency, balance, and order status — all standard `GET` endpoints |
-| **30 / min** | `POST /v1/orders` (places a buy order and spends real money) |
+| **100 / min** | Listings, prices, currency, balance, and order status — all standard `GET` endpoints |
+| **250 / min** | `POST /v1/orders` (places a buy order and spends real money) |
 | **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed snapshot) |
 
 <Note>
