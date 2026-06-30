@@ -8,7 +8,7 @@ The CSBoard API is designed for automation. Every endpoint is deterministic, cur
 
 ---
 
-## AI Agent Integration
+## AI agent integration
 
 If you are building an AI agent or LLM-powered tool, the fastest way to give it access to the full API surface is via the machine-readable spec at [`/llms.txt`](https://csboard.com/llms.txt). That file contains the complete API in a single, compact document — no parsing required.
 
@@ -31,7 +31,7 @@ Once connected, the agent can call any CSBoard endpoint as a tool — browsing l
 
 ---
 
-## Polling for New Listings
+## Polling for new listings
 
 To detect new listings as they appear without re-scanning the entire catalog, use `sort=newest` combined with cursor pagination. On each poll cycle, walk pages until you reach a listing ID you have already seen, then stop.
 
@@ -93,7 +93,7 @@ while True:
 
 ---
 
-## Price Monitoring Bot
+## Price monitoring bot
 
 Poll `GET /v1/prices` on a schedule, compare each item's `min_price_usd` against your target threshold, and trigger an alert or automated buy when the price drops below it.
 
@@ -161,7 +161,7 @@ while True:
 
 ---
 
-## Safe Buying Automation
+## Safe buying automation
 
 Automated buying requires more defensive coding than manual purchasing. Follow these four rules unconditionally.
 
@@ -231,7 +231,7 @@ def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | N
 
 ---
 
-## Bulk Data Pipeline
+## Bulk data pipeline
 
 For comparison sites, analytics dashboards, or any system that needs the full catalog, use the snapshot endpoint instead of paginating through `/v1/prices`.
 
