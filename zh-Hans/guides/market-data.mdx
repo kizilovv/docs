@@ -20,7 +20,8 @@ curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Factory%20New&
 
 | 参数 | 说明 |
 |-----------|-------------|
-| `search` | 对市场哈希名进行全文匹配 |
+| `search` | 对市场哈希名进行模糊子串匹配 —— 适合探索，但无法单独筛选出作为更长名称词子集的名称（例如 `Spectrum Case` 与 `Spectrum 2 Case`） |
+| `name` | **精确** 市场哈希名（不区分大小写）—— 单个商品的精确查询方式。`name=Spectrum Case` 仅返回 Spectrum Case。优先于 `search` |
 | `category` | 例如 `Rifle`、`Knife`、`Gloves` |
 | `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
 | `rarity` | 例如 `Classified`、`Covert` |
@@ -93,7 +94,8 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 | 参数 | 说明 |
 |-----------|-------------|
-| `search` | 对市场哈希名进行全文匹配 |
+| `search` | 对市场哈希名进行模糊子串匹配 —— 适合探索，但无法单独筛选出作为更长名称词子集的名称（例如 `Spectrum Case` 与 `Spectrum 2 Case`） |
+| `name` | **精确** 市场哈希名（不区分大小写）—— 单个商品的精确查询方式。`name=Spectrum Case` 仅返回 Spectrum Case。优先于 `search` |
 | `category` | 例如 `Rifle`、`Knife`、`Gloves` |
 | `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
 | `rarity` | 例如 `Classified`、`Covert` |
