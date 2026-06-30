@@ -12,7 +12,11 @@ The prices endpoint returns a grouped price snapshot of the CSBoard marketplace.
 ## Query parameters
 
 <ParamField query="search" type="string">
-  Full-text match on `market_hash_name`, e.g. `AK-47 | Redline`.
+  Fuzzy match on `market_hash_name` — splits the query into words and substring-matches each. A name that is a word-subset of a longer item's name (e.g. `Spectrum Case` vs `Spectrum 2 Case`) cannot be isolated this way; use `name` for an exact lookup.
+</ParamField>
+
+<ParamField query="name" type="string">
+  Exact `market_hash_name` (case-insensitive) — the precise single-item lookup. `name=Spectrum Case` returns only the Spectrum Case group, never `Spectrum 2 Case`. Takes precedence over `search`.
 </ParamField>
 
 <ParamField query="category" type="string">
@@ -39,7 +43,7 @@ The prices endpoint returns a grouped price snapshot of the CSBoard marketplace.
   Keyset pagination cursor. Pass the `next_cursor` value from the previous response.
 </ParamField>
 
-<ParamField query="limit" type="integer" default="100">
+<ParamField query="limit" default="100" type="integer">
   Number of rows per page. Minimum `1`, maximum `500`.
 </ParamField>
 
@@ -102,7 +106,7 @@ curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
 ## Error codes
 
 | HTTP status | Code | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | 401 | `unauthorized` | Missing or invalid API key. |
 | 429 | `rate_limit_exceeded` | Over 30 requests/min. Wait for the `Retry-After` header value before retrying. |
 
