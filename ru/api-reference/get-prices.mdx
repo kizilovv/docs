@@ -1,0 +1,111 @@
+---
+title: "GET /v1/prices — список minAsk цен CS2 по группам товаров"
+sidebarTitle: "GET /prices"
+description: "Получите пагинированный снимок minAsk цен, сгруппированный по market hash name, износу и фазе Doppler, с минимальной ценой продажи и количеством листингов в каждой строке."
+openapi: "GET /prices"
+---
+
+Эндпоинт prices возвращает сгруппированный снимок цен маркетплейса CSBoard. Каждая строка представляет уникальную комбинацию `market_hash_name`, `wear` и `doppler_phase` и содержит самую дешёвую текущую цену продажи и количество выставленных копий. Это удобно для построения таблиц сравнения цен, систем оповещений или оценки портфеля — вы можете получить цены тысяч предметов, не запрашивая отдельные листинги.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+## Query-параметры
+
+<ParamField query="search" type="string">
+  Полнотекстовое совпадение по `market_hash_name`, например `AK-47 | Redline`.
+</ParamField>
+
+<ParamField query="category" type="string">
+  Фильтр по категории товара, например `Rifle`, `Knife`, `Gloves`.
+</ParamField>
+
+<ParamField query="wear" type="string">
+  Фильтр по диапазону износа. Одно из: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  Фильтр по уровню редкости, например `Classified`, `Covert`.
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  Минимальный `min_price_usd` в USD (включительно).
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  Максимальный `min_price_usd` в USD (включительно).
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset-курсор пагинации. Передайте значение `next_cursor` из предыдущего ответа.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="100">
+  Количество строк на странице. Минимум `1`, максимум `500`.
+</ParamField>
+
+## Поля ответа
+
+<ResponseField name="items" type="PriceRow[]" required>
+  Массив строк с ценами для этой страницы.
+
+  <Expandable title="PriceRow object">
+    <ResponseField name="market_hash_name" type="string" required>
+      Steam market hash name, например `AK-47 | Redline (Field-Tested)`.
+    </ResponseField>
+
+    <ResponseField name="wear" type="string | null">
+      Диапазон износа для этой группы цен. `null` для предметов без диапазона износа.
+    </ResponseField>
+
+    <ResponseField name="doppler_phase" type="string | null">
+      Фаза Doppler или Gamma Doppler для этой группы цен, например `"Phase 2"`, `"Ruby"`. `null` для предметов, не относящихся к Doppler.
+    </ResponseField>
+
+    <ResponseField name="min_price_usd" type="number" required>
+      Самая дешёвая текущая цена продажи в USD среди всех листингов в этой группе.
+    </ResponseField>
+
+    <ResponseField name="qty" type="integer" required>
+      Количество листингов, доступных в этой группе сейчас.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string | null" required>
+  Keyset-курсор для следующей страницы. Передайте как `cursor` в следующем запросе. `null` на последней странице.
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "min_price_usd": 11.92,
+      "qty": 73
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
+| 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Перед повтором подождите время, указанное в заголовке `Retry-After`. |
+
+<Warning>
+  Эндпоинт prices возвращает **индикативный сгруппированный снимок**. Данные периодически материализуются и могут отставать от живого маркетплейса. Для авторитетной цены продажи конкретного предмета в реальном времени перед оформлением заказа используйте `GET /v1/listings`.
+</Warning>

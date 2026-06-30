@@ -1,0 +1,134 @@
+---
+title: "POST /v1/orders — 使用余额购买 CS2 挂单"
+sidebarTitle: "POST /orders"
+description: "在单次原子请求中按 ID 购买 1–10 件 CS2 挂单，从您的 CSBoard 余额中扣款。需要启用交易的 API 密钥以及已绑定的 Steam 账户。"
+openapi: "POST /orders"
+---
+
+orders 端点允许您在单次原子请求中购买 1 到 10 件挂单。扣款将以执行**当时**的实时报价从您的 CSBoard 余额中划扣——而非您查询 `/v1/listings` 时看到的价格。为防止查询与下单之间的价格波动，请始终包含 `max_price_usd` 作为总价上限。该端点是幂等的：使用相同的 `Idempotency-Key` 重试会重放原始订单，而非产生重复扣款。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+**需要交易能力。** API 密钥必须启用购买功能。请在您的 CSBoard 个人资料中进行配置。
+
+## 前置条件
+
+下单前，请确保：
+
+1. **启用交易的密钥**——必须在您的 CSBoard 个人资料设置中为该 API 密钥开启购买功能。
+2. **已绑定的 Steam 账户与交易链接**——您的 CSBoard 账户必须已绑定 Steam 账户并配置有效的交易链接，以便商品可以交付。
+3. **充足的余额**——您的 CSBoard 余额必须能够覆盖所有商品按实时价格的总成本。
+
+## 请求头
+
+<ParamField header="Idempotency-Key" type="string">
+  可选。用于标识本次下单尝试的唯一字符串（例如 UUID）。如果您使用相同的键重试请求，服务器将重放原始订单响应，而不会执行第二次购买。借此可在网络超时时安全重试而无重复扣款风险。
+</ParamField>
+
+## 请求体
+
+<ParamField body="item_ids" type="string[]" required>
+  1–10 个唯一的挂单 ID 数组。请从 `GET /v1/listings` 响应的 `id` 字段获取。每个 ID 在一次请求中只能出现一次。
+</ParamField>
+
+<ParamField body="max_price_usd" type="number">
+  美元总价上限，将在执行时原子地强制执行。如果所有商品的实时总额超过该值，整个订单将以 `price_moved` 错误被拒绝，且不会扣款。**强烈建议使用**——若无此值，您将无任何超额扣款保护。
+</ParamField>
+
+<ParamField body="idempotency_key" type="string">
+  `Idempotency-Key` 请求头的替代方案。如果两者都提供，则以请求头为准。请二选一使用，不要同时使用。
+</ParamField>
+
+## 响应字段
+
+<ResponseField name="order_id" type="string" required>
+  本次订单的唯一标识符，例如 `ord_01J9Z3K8Q2`。
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  当前订单状态：`processing`、`completed` 或 `failed`。
+</ResponseField>
+
+<ResponseField name="items" type="object[]">
+  订单的逐件商品明细。
+
+  <Expandable title="Item object">
+    <ResponseField name="item_id" type="string">
+      被购买的挂单 ID。
+    </ResponseField>
+    <ResponseField name="charged_usd" type="number">
+      按实时价格对该具体商品扣除的金额。
+    </ResponseField>
+    <ResponseField name="delivery" type="string">
+      该商品的交付模式：`instant`（即时转移）或 `hold`（受 Steam 交易冻结约束）。
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total_charged_usd" type="number" required>
+  所有逐件扣款的合计。这是从您余额中划扣的总金额。
+</ResponseField>
+
+<ResponseField name="balance_after_usd" type="number">
+  扣款后您的 CSBoard 余额。
+</ResponseField>
+
+<ResponseField name="created_at" type="datetime">
+  订单创建时的 ISO 8601 时间戳。
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl -X POST https://csboard.com/v1/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+  -d '{
+    "item_ids": ["itm_8841201", "itm_8841340"],
+    "max_price_usd": 30.00
+  }'
+```
+
+## 示例响应
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "status": "processing",
+  "items": [
+    {
+      "item_id": "itm_8841201",
+      "charged_usd": 14.37,
+      "delivery": "hold"
+    },
+    {
+      "item_id": "itm_8841340",
+      "charged_usd": 12.10,
+      "delivery": "instant"
+    }
+  ],
+  "total_charged_usd": 26.47,
+  "balance_after_usd": 73.53,
+  "created_at": "2026-06-29T17:12:04Z"
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 409 | `price_moved` | 商品的实时总额超过了 `max_price_usd`。订单被拒绝；未扣款。响应中包含 `current_total_usd`，显示实际价格。 |
+| 402 | `insufficient_balance` | 余额过低，无法覆盖订单总额。 |
+| 400 | `steam_account_required` | 您的 CSBoard 账户上未绑定 Steam 账户或没有有效的交易链接。 |
+| 403 | `trading_not_enabled` | 该 API 密钥未启用购买功能。请在您的个人资料中启用。 |
+| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请在重试前等待 `Retry-After` 响应头中的秒数。 |
+
+<Warning>
+  请始终在请求中包含 `max_price_usd`。实时市场上的价格可能在您查询 `/v1/listings` 到订单执行之间发生变化。若没有此上限，您的余额可能以高于预期的价格被扣除，且没有自动回滚机制。
+</Warning>
+
+<Note>
+  通过 `hold` 交付的商品受 Steam 交易冻结约束。请查看原始挂单（来自 `GET /v1/listings`）上的 `tradable_at` 字段，了解被冻结的商品何时能在您的 Steam 库存中可交易。
+</Note>

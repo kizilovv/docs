@@ -1,0 +1,81 @@
+---
+title: "使用 Bearer 令牌进行 CSBoard API 身份验证"
+sidebarTitle: "身份验证"
+description: "在个人资料页面生成 csb_pub_ API 密钥，将其作为 Bearer 令牌或查询参数传递，并了解只读密钥与交易密钥的能力差异。"
+---
+
+每个 CSBoard API 请求（除 `GET /v1/health` 外）都必须包含有效的 API 密钥。密钥属于 `csb_pub_` 命名空间，作用域为只读访问或交易访问，并与您的 CSBoard 账户绑定。服务器仅存储每个密钥的 SHA-256 哈希值——原始密钥仅在创建时显示一次，之后不会再次显示，因此请将其安全地保存。
+
+## 获取您的 API 密钥
+
+<Steps>
+  <Step title="打开您的个人资料 API 选项卡">
+    访问 [csboard.com/profile?tab=api](https://csboard.com/profile?tab=api)，如有提示请登录。
+  </Step>
+  <Step title="生成新密钥">
+    点击 **Generate key**。选择一个能标识该密钥用途的标签（例如 `price-tracker-prod`）。
+  </Step>
+  <Step title="立即复制密钥">
+    您新生成的 `csb_pub_…` 密钥仅显示一次。请在关闭对话框前将其复制到您的密钥管理器或环境变量中。
+  </Step>
+  <Step title="启用交易（可选）">
+    如果您需要下单，请在密钥列表中找到该密钥并切换 **Trading enabled**。在此之前请先阅读下方警告。
+  </Step>
+</Steps>
+
+<Warning>
+  交易能力独立于只读访问，且必须在个人资料页面对每个密钥显式启用。未启用交易的密钥在尝试调用 `POST /v1/orders` 时将返回 `403 trading_not_enabled`。切勿在与第三方共享或嵌入到客户端代码中的密钥上启用交易功能。
+</Warning>
+
+## 在请求中传递您的密钥
+
+在每个请求的 `Authorization` 头中以 Bearer 令牌形式发送密钥：
+
+```bash
+curl https://csboard.com/v1/listings \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+为方便起见，您也可以将密钥作为 `api_key` 查询参数传递——这对于在浏览器中进行快速测试或不支持自定义头部的工具非常有用：
+
+```bash
+curl "https://csboard.com/v1/listings?api_key=csb_pub_..."
+```
+
+在生产环境中应优先使用 `Authorization` 头；查询参数更容易出现在服务器日志中。
+
+## 密钥能力
+
+| 能力 | 只读密钥 | 交易密钥 |
+|---|---|---|
+| 所有 `GET` 端点 | ✅ | ✅ |
+| `POST /v1/orders` | ❌ | ✅ |
+
+<Tip>
+  为不同工作负载创建独立的密钥（例如，为价格仪表板使用一个只读密钥，为购买机器人使用一个交易密钥），以便您可以独立撤销它们，而无需一次性中断所有功能。
+</Tip>
+
+## 安全与存储
+
+我们仅存储 `SHA256(key)`——绝不存储原始密钥。这意味着：
+
+- 如果您丢失了密钥，必须生成一个新的；没有「显示密钥」选项。
+- 受损的密钥可以从您的个人资料中立即撤销，而不会影响其他密钥。
+
+## 身份验证错误
+
+API 返回的每个错误都会以以下格式返回 JSON 主体：
+
+```json
+{ "code": "invalid_api_key", "detail": "Unknown or revoked API key." }
+```
+
+| HTTP 状态 | `code` | 触发场景 |
+|---|---|---|
+| 401 | `missing_api_key` | 未提供密钥或密钥不以 `csb_pub_` 开头 |
+| 401 | `invalid_api_key` | 密钥无法识别或已被撤销 |
+| 401 | `too_many_failed_auth` | 来自您 IP 的无效密钥过多——已应用 5 分钟封禁 |
+| 403 | `trading_not_enabled` | 密钥有效但未启用交易 |
+| 429 | `rate_limit_exceeded` | 您已超出每个密钥的请求限制 |
+
+有关 429 错误以及如何正确退避的详细信息，请参阅 [速率限制](/rate-limits)。

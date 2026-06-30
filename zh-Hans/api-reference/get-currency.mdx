@@ -1,0 +1,82 @@
+---
+title: "GET /v1/currency — 用于美元价格换算的汇率"
+sidebarTitle: "GET /currency"
+description: "获取 CSBoard 支付流程所使用的以美元为基准的汇率表。将任意 price_usd 乘以目标货币汇率，即可得到当地货币价格。"
+openapi: "GET /currency"
+---
+
+CSBoard API 中所有价格均以美元计价。currency 端点返回与站点自身支付与展示流程相同的汇率表，为您提供一致的换算层，用于向用户展示本地货币价格。汇率主要币种来源于 OpenExchangeRates，RUB 来源于俄罗斯中央银行，并缓存约一小时。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 参数
+
+此端点不接受任何查询参数。
+
+## 响应字段
+
+<ResponseField name="base" type="string" required>
+  始终为 `"USD"`。所有汇率均相对于 1 美元表示。
+</ResponseField>
+
+<ResponseField name="rates" type="object" required>
+  ISO 4217 货币代码到其相对美元汇率（每 1 美元等于多少该货币单位）的映射。例如：`{ "USD": 1, "EUR": 0.92, "RUB": 78.4, "GBP": 0.79 }`。
+</ResponseField>
+
+<ResponseField name="updated_at" type="datetime" required>
+  汇率表上次刷新时的 ISO 8601 时间戳。
+</ResponseField>
+
+<ResponseField name="rub_source" type="string">
+  RUB 汇率的来源标识，例如 `"cbr"`（俄罗斯中央银行）。
+</ResponseField>
+
+<ResponseField name="base_source" type="string">
+  非 RUB 汇率的来源标识，例如 `"openexchangerates"`。
+</ResponseField>
+
+## 价格换算
+
+要将 `price_usd` 值以本地货币显示，请将其乘以对应汇率：
+
+```
+local_price = price_usd × rates["EUR"]
+# 例如 14.37 USD × 0.92 = 13.22 EUR
+```
+
+由于汇率表缓存约 1 小时，请在应用启动时获取一次，并定期刷新，而非对每个商品都调用此端点。
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/currency \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "base": "USD",
+  "rates": {
+    "USD": 1,
+    "EUR": 0.92,
+    "RUB": 78.4,
+    "GBP": 0.79
+  },
+  "updated_at": "2026-06-29T17:00:00Z",
+  "rub_source": "cbr",
+  "base_source": "openexchangerates"
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。在重试前请检查 `Retry-After` 响应头。 |
+
+<Tip>
+  请在客户端缓存 rates 响应，每小时刷新不超过一次。汇率约每小时更新一次，更频繁地轮询不会带来更新鲜的数据，反而会消耗您的速率限制额度。
+</Tip>

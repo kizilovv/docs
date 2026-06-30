@@ -1,0 +1,130 @@
+---
+title: "POST /v1/market/buy — 购买并交付到 Steam 交易链接"
+sidebarTitle: "POST /market/buy"
+description: "一次最多购买 100 件商品，并直接交付到您提供的任意 Steam 交易链接，使用已结算余额支付。专为批发与自动化交付而设计。"
+openapi: "POST /market/buy"
+---
+
+此端点允许您将商品购买并直接交付到您提供的**任意** Steam 交易链接——而不仅限于绑定到您账户的交易链接。交易链接由 `partner` 和 `token` 字段组成。购买**只能**使用您的**已结算**（不可撤销）余额，因此适用于批发量与自动化交付工作流。
+
+该端点**通过 `custom_id` 请求体字段实现幂等性**：使用相同的 `custom_id` 重试会重放原始的购买，而不会再次扣款；重放的响应会携带 `Idempotent-Replayed: true` 响应头。
+
+<Warning>
+  此端点处于熔断开关保护之下，要求账户启用了交易且不可撤销状态干净。熔断开关关闭时，将返回 `403 external_buy_disabled`。
+</Warning>
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+**需要交易能力。** 该密钥必须启用购买功能，且账户必须处于不可撤销状态干净。
+
+## 请求体
+
+<ParamField body="item_ids" type="string[]" required>
+  1–100 个唯一的挂单 id。
+</ParamField>
+
+<ParamField body="partner" type="string" required>
+  Steam 交易链接中的 `partner` 值（1–32 个字符）。与 `token` 一起构成商品交付的目标交易链接。
+</ParamField>
+
+<ParamField body="token" type="string" required>
+  Steam 交易链接中的 `token` 值（1–32 个字符）。与 `partner` 一起构成目标交易链接。
+</ParamField>
+
+<ParamField body="max_price_usd" type="number">
+  美元价格上限。如果实时总价超过该值，订单将以 `price_moved` 被拒绝且不扣款。强烈建议使用。
+</ParamField>
+
+<ParamField body="custom_id" type="string">
+  幂等键（1–128 个字符）。使用相同 `custom_id` 重试会重放原始购买；重放响应会携带 `Idempotent-Replayed: true`。
+</ParamField>
+
+<ParamField body="skip_unavailable" type="boolean" default="false">
+  如果为 `true`，跳过已不再可用的商品而不会让整个请求失败。
+</ParamField>
+
+## 响应字段
+
+<ResponseField name="data" type="object" required>
+  <Expandable title="data object">
+    <ResponseField name="purchase_id" type="string" required />
+    <ResponseField name="steam_id" type="string" required>
+      由所提供的 `partner` + `token` 解析得到的 Steam ID。
+    </ResponseField>
+    <ResponseField name="created_at" type="datetime" required />
+    <ResponseField name="custom_id" type="string | null" />
+    <ResponseField name="skins" type="object[]" required>
+      逐件结果。
+
+      <Expandable title="skin object">
+        <ResponseField name="name" type="string | null" />
+        <ResponseField name="price" type="number | null" />
+        <ResponseField name="status" type="string" />
+        <ResponseField name="return_reason" type="string | null" />
+        <ResponseField name="steam_trade_offer_id" type="string | null" />
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl -X POST https://csboard.com/v1/market/buy \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_ids": ["itm_8841201", "itm_8841340"],
+    "partner": "447383001",
+    "token": "Ab3xZ9Qp",
+    "max_price_usd": 30.00,
+    "custom_id": "batch-2026-06-29-01",
+    "skip_unavailable": false
+  }'
+```
+
+## 示例响应
+
+```json
+{
+  "data": {
+    "purchase_id": "pur_01J9Z3K8Q2",
+    "steam_id": "76561198000000000",
+    "created_at": "2026-06-29T17:12:04Z",
+    "custom_id": "batch-2026-06-29-01",
+    "skins": [
+      {
+        "name": "AK-47 | Redline (Minimal Wear)",
+        "price": 14.37,
+        "status": "delivering",
+        "return_reason": null,
+        "steam_trade_offer_id": "5512345678"
+      }
+    ]
+  }
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 400 | `invalid_request` | 请求体格式错误（例如 `item_ids` 为空或超过 100）。 |
+| 400 | `unsupported_item` | 一个或多个商品无法通过此端点交付（例如 `ss_live_*` id）。 |
+| 400 | `invalid_trade_url` | `partner` + `token` 无法组成有效的 Steam 交易链接。 |
+| 401 | `invalid_api_key` | API 密钥缺失或无效。 |
+| 402 | `insufficient_settled_balance` | 已结算余额低于订单总额。返回中包含 `required_usd` 和 `settled_usd`。 |
+| 402 | `insufficient_balance` | 余额低于订单总额。 |
+| 403 | `external_buy_disabled` | 熔断开关已关闭；此端点当前已禁用。 |
+| 403 | `trading_not_enabled` | 该密钥未启用购买功能。 |
+| 403 | `account_restricted` | 此端点要求账户处于不可撤销状态干净。 |
+| 409 | `item_unavailable` | 一个或多个商品已不再可用。返回中包含 `unavailable_ids[]`。 |
+| 409 | `price_moved` | 实时总价超过上限。返回中包含 `quoted_max_usd`、`current_total_usd` 以及 `items[]`。 |
+| 409 | `idempotency_in_progress` | 具有该 `custom_id` 的请求仍在处理中。 |
+| 409 | `price_updating` | 价格正在刷新；请稍后重试。 |
+| 429 | `rate_limit_exceeded` | 请求过多。请按照 `Retry-After` 响应头中的秒数退避。 |
+| 500 | `order_failed` | 购买无法完成。 |
+
+<Note>
+  资金完全来自您的**已结算**余额。在大批量下单前，请检查 [`GET /v1/balance`](/api-reference/get-balance) 上的 `settled_balance_usd`，并始终发送 `max_price_usd` 作为超额扣款保护。
+</Note>

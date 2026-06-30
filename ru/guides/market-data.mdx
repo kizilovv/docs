@@ -1,0 +1,238 @@
+---
+title: "Запрос актуальных листингов и цен CS2 через API CSBoard"
+sidebarTitle: "Рыночные данные"
+description: "Просматривайте актуальные листинги, получайте цены minAsk, скачивайте снапшоты полного каталога и конвертируйте цены в любую валюту с API CSBoard."
+---
+
+API CSBoard даёт реальный доступ к каждому доступному для покупки CS2-скину на маркетплейсе — отдельные листинги с float-значениями, стикерами и paint seed, а также сгруппированные строки цен для быстрых рыночных сканирований. Это руководство проведёт вас по всем четырём эндпоинтам рыночных данных и покажет, как эффективно их сочетать.
+
+## Просмотр листингов
+
+Используйте `GET /v1/listings`, чтобы получить актуальные доступные к покупке листинги. Каждый возвращённый предмет можно купить прямо сейчас. Эндпоинт поддерживает гибкую фильтрацию, позволяя сузить результат именно до интересующих вас скинов.
+
+```bash
+# Fetch Factory New AK-47 Redlines under $20, sorted cheapest first
+curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Factory%20New&max_price=20&sort=price_asc" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+**Доступные фильтры**
+
+| Параметр | Описание |
+|-----------|-------------|
+| `search` | Полнотекстовый поиск по market hash name |
+| `category` | Например, `Rifle`, `Knife`, `Gloves` |
+| `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
+| `rarity` | Например, `Classified`, `Covert` |
+| `min_price` / `max_price` | Границы цены в USD |
+| `min_float` / `max_float` | Границы значения float |
+| `stat_trak` | `only` или `exclude` |
+| `souvenir` | `only` или `exclude` |
+| `sort` | `id` (по умолчанию) · `newest` · `price_asc` · `price_desc` |
+| `limit` | 1–200, по умолчанию 50 |
+
+### Keyset-пагинация
+
+Результаты разбиваются на страницы с помощью курсора. Когда `next_cursor` не равен null, передайте его как `cursor`, чтобы получить следующую страницу. Когда `next_cursor` равен `null`, вы достигли последней страницы.
+
+```bash
+# Page 1
+curl "https://csboard.com/v1/listings?category=Knife&limit=100" \
+  -H "Authorization: Bearer csb_pub_..."
+
+# Page 2 — pass next_cursor from the previous response
+curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Iml0bV84ODQxMjAxIn0=" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### Пример ответа
+
+```json
+{
+  "items": [
+    {
+      "id": "itm_8841201",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "wear": "Minimal Wear",
+      "doppler_phase": null,
+      "float_value": 0.0912,
+      "paint_seed": 412,
+      "stickers": [
+        {
+          "name": "Crown (Foil)",
+          "image": "https://cdn.csboard.com/stickers/crown_foil.png",
+          "slot": 0,
+          "wear": 0.0
+        }
+      ],
+      "price_usd": 14.37,
+      "category": "Rifle",
+      "rarity": "Classified",
+      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "tradable": false,
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "delivery": "hold"
+    }
+  ],
+  "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="
+}
+```
+
+<Tip>
+  `price_usd` в листинге — это авторитетная цена покупки: ровно столько с вас спишется, если вы разместите ордер на этот предмет. Эндпоинт `/v1/prices` возвращает индикативный сгруппированный снапшот и может отставать от живой цены по предмету.
+</Tip>
+
+---
+
+## Прайс-лист
+
+`GET /v1/prices` возвращает одну строку на уникальную группу скинов (market hash name + wear + Doppler phase), показывая текущий самый дешёвый ask и количество выставленных предметов. Он предназначен для быстрых рыночных сканов и сравнения цен по тысячам предметов, а не для выбора конкретного листинга для покупки.
+
+**Доступные фильтры**
+
+| Параметр | Описание |
+|-----------|-------------|
+| `search` | Полнотекстовый поиск по market hash name |
+| `category` | Например, `Rifle`, `Knife`, `Gloves` |
+| `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
+| `rarity` | Например, `Classified`, `Covert` |
+| `min_price` / `max_price` | Границы цены в USD |
+| `cursor` | Keyset-курсор из предыдущего `next_cursor` |
+| `limit` | 1–500, по умолчанию 100 |
+
+```bash
+# Look up minAsk price for all Field-Tested Knives
+curl "https://csboard.com/v1/prices?category=Knife&wear=Field-Tested" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+```bash
+# Search by name
+curl "https://csboard.com/v1/prices?search=AWP%20Asiimov&limit=10" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### Пример ответа
+
+```json
+{
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "min_price_usd": 11.92,
+      "qty": 73
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+**Листинги и прайс-лист — кратко**
+
+| | `/v1/listings` | `/v1/prices` |
+|---|---|---|
+| Гранулярность | Одна строка на доступный к покупке предмет | Одна строка на группу скинов |
+| Цена | Авторитетная — точная сумма списания | Индикативная — может отставать |
+| Float / стикеры | ✅ | ❌ |
+| Лучше всего для | Поиска предметов для покупки | Рыночного сканирования / прайс-фидов |
+| Максимум на странице | 200 | 500 |
+
+---
+
+## Массовый снапшот
+
+Для загрузки полного каталога — сайтов сравнения, баз цен, ботов арбитража — используйте `GET /v1/prices/snapshot.ndjson.gz`. Этот эндпоинт стримит весь прайс-лист в виде gzip NDJSON-файла, по одному JSON-объекту `PriceRow` на строку.
+
+```bash
+# Download and decompress the full snapshot
+curl -s "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  | gunzip \
+  | head -5
+```
+
+### Условные запросы с ETag
+
+Снапшот устанавливает заголовок `ETag` в каждом ответе `200`. Отправьте его обратно как `If-None-Match` в следующем запросе — если снапшот не изменился, сервер вернёт `304 Not Modified` с пустым телом, экономя трафик и время обработки.
+
+```bash
+# First download — capture the ETag
+ETAG=$(curl -sI "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  | grep -i etag | awk '{print $2}' | tr -d '\r')
+
+# Subsequent requests — skip download if snapshot is unchanged
+curl -s -w "%{http_code}" \
+  "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "If-None-Match: $ETAG" \
+  -o snapshot.ndjson.gz
+# Prints 200 (new data) or 304 (no change)
+```
+
+<Note>
+  Эндпоинт снапшота ограничен **1 запросом в минуту**. Используйте паттерн ETag выше, чтобы избежать повторной загрузки одинаковых данных — ответ `304` не учитывается в вашем бюджете лимита запросов на передачу данных, только сам запрос.
+</Note>
+
+---
+
+## Конвертация валют
+
+Каждая цена в API CSBoard указана в USD. Используйте `GET /v1/currency`, чтобы получить ту же таблицу курсов, что использует сайт, и затем конвертировать `price_usd` в любую локальную валюту на клиенте.
+
+```bash
+curl "https://csboard.com/v1/currency" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### Пример ответа
+
+```json
+{
+  "base": "USD",
+  "rates": {
+    "USD": 1,
+    "EUR": 0.92,
+    "RUB": 78.4,
+    "GBP": 0.79
+  },
+  "updated_at": "2026-06-29T17:00:00Z",
+  "rub_source": "cbr",
+  "base_source": "openexchangerates"
+}
+```
+
+### Конвертация цены
+
+Умножьте `price_usd` на курс целевой валюты:
+
+```bash
+# price_usd = 14.37, target = EUR, rate = 0.92
+# price_eur = 14.37 * 0.92 = 13.22
+echo "14.37 * 0.92" | bc
+```
+
+```python
+price_usd = 14.37
+rates = {"USD": 1, "EUR": 0.92, "RUB": 78.4, "GBP": 0.79}
+
+def to_local(price_usd: float, currency: str) -> float:
+    return round(price_usd * rates[currency], 2)
+
+print(to_local(price_usd, "EUR"))  # 13.22
+print(to_local(price_usd, "RUB"))  # 1126.19
+```
+
+Курсы валют кешируются примерно раз в час. Для отображения этого более чем достаточно — для торговых решений всегда используйте поле `price_usd` непосредственно из `/v1/listings`.
+
+---
+
+## Дальнейшие шаги
+
+- [Покупка листингов через POST /v1/orders](/guides/buying)
+- [Автоматизация мониторинга цен и ботов покупки](/guides/automation)
+- [Справочник API — GET /v1/listings](/api-reference/get-listings)
+- [Справочник API — GET /v1/prices](/api-reference/get-prices)

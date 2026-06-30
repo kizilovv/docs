@@ -1,0 +1,71 @@
+---
+title: "GET /v1/balance — 账户余额与交易状态"
+sidebarTitle: "GET /balance"
+description: "查询您的 CSBoard 美元余额，已结算和冻结的金额，以及您的 API 密钥是否启用了交易。"
+openapi: "GET /balance"
+---
+
+balance 端点返回您当前以美元计的余额，以及对自动化购买至关重要的明细：有多少是**已结算**（不可撤销且可用于不可撤销购买）的，以及当前有多少处于**冻结**状态。请使用 `trading_enabled` 在尝试下单之前确认该密钥已开启购买功能。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 参数
+
+此端点不接受任何查询参数。
+
+## 响应字段
+
+<ResponseField name="currency" type="string" required>
+  始终为 `"USD"`。所有金额均以美元计价。
+</ResponseField>
+
+<ResponseField name="balance_usd" type="number" required>
+  您以美元计的总余额。
+</ResponseField>
+
+<ResponseField name="trading_enabled" type="boolean" required>
+  此 API 密钥是否启用了购买功能。如果为 `false`，购买端点将返回 `trading_not_enabled`。
+</ResponseField>
+
+<ResponseField name="settled_balance_usd" type="number" required>
+  您余额中已结算且不可撤销的部分。这部分余额可用于不可撤销的购买，例如 `POST /v1/market/buy`。
+</ResponseField>
+
+<ResponseField name="held_usd" type="number" required>
+  您余额中当前处于冻结状态的部分。
+</ResponseField>
+
+<ResponseField name="held_until" type="datetime | null" required>
+  冻结部分解冻时的 ISO 8601 时间戳；如果没有冻结金额，则为 `null`。
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/balance \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "currency": "USD",
+  "balance_usd": 1240.55,
+  "trading_enabled": true,
+  "settled_balance_usd": 980.10,
+  "held_usd": 260.45,
+  "held_until": "2026-07-06T12:00:00Z"
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 请求过多。请按照 `Retry-After` 响应头中的秒数退避。 |
+
+<Tip>
+  在调用不可撤销的购买端点之前，请检查 `settled_balance_usd` 而非 `balance_usd`——冻结资金无法用于此类购买。
+</Tip>

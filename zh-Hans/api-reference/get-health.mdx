@@ -1,0 +1,48 @@
+---
+title: "GET /v1/health — CSBoard API 存活与新鲜度探针"
+sidebarTitle: "GET /health"
+description: "检查 CSBoard API 是否可达，以及价格列表的陈旧程度。这是唯一无需 API 密钥即可调用的端点——可以安全地匿名轮询。"
+openapi: "GET /health"
+---
+
+health 端点是一个轻量级探针，用于确认 API 是否可达，并告诉您实体化的价格列表有多陈旧。它是**唯一**无需 API 密钥即可工作的端点，因此非常适合从监控系统轮询，或在执行已认证调用前在应用启动阶段进行新鲜度检查。
+
+## 响应字段
+
+<ResponseField name="status" type="string" required>
+  服务正常时始终为 `"ok"`。
+</ResponseField>
+
+<ResponseField name="groups" type="integer" required>
+  当前价格列表中已定价的商品组数量（每个唯一的 `market_hash_name` + `wear` + `doppler_phase` 组合算一组）。
+</ResponseField>
+
+<ResponseField name="price_list_age_seconds" type="integer" required>
+  实体化价格列表的年龄，以秒为单位。请将其作为新鲜度指标——数值过大意味着价格可能滞后。
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/health
+```
+
+## 示例响应
+
+```json
+{
+  "status": "ok",
+  "groups": 184213,
+  "price_list_age_seconds": 42
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 429 | `rate_limit_exceeded` | 超过请求速率限制。请退避后按 `Retry-After` 响应头中的秒数重试。 |
+
+<Tip>
+  在执行已认证调用之前，请在健康检查或启动逻辑中轮询此端点。如果 `price_list_age_seconds` 出乎意料地大（例如超过几分钟），请将下游价格数据视为可能已陈旧。
+</Tip>

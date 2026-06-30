@@ -1,0 +1,81 @@
+---
+title: "GET /v1/orders/{id} — 获取单个订单"
+sidebarTitle: "GET /orders/{id}"
+description: "通过订单 id 获取单个 CSBoard 订单，包含逐件商品的交付状态以及 Steam 报价详情。"
+openapi: "GET /orders/{id}"
+---
+
+通过 CSBoard 订单 id 获取单个订单。响应包含完整的逐件商品明细，包括交付状态、退货原因以及 Steam 报价详情。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 路径参数
+
+<ParamField path="id" type="string" required>
+  CSBoard 订单 id，例如 `ord_01J9Z3K8Q2`。
+</ParamField>
+
+## 响应字段
+
+响应是一个 `Order` 对象，其结构与 [`GET /v1/orders`](/api-reference/get-orders) 中的条目相同：
+
+<ResponseField name="order_id" type="string" required />
+<ResponseField name="steam_id" type="string | null" />
+<ResponseField name="status" type="string" required>
+  可选值：`completed`、`hold`、`delivering`、`pending`、`cancelled`、`failed` 之一。
+</ResponseField>
+<ResponseField name="custom_id" type="string | null" />
+<ResponseField name="currency" type="string" required>
+  始终为 `"USD"`。
+</ResponseField>
+<ResponseField name="charged_total_usd" type="number" required />
+<ResponseField name="item_count" type="integer" required />
+<ResponseField name="hold_until" type="datetime | null" />
+<ResponseField name="created_at" type="datetime" required />
+<ResponseField name="updated_at" type="datetime | null" />
+<ResponseField name="items" type="OrderItem[]" required>
+  逐件商品明细。每件商品包含 `market_hash_name`、`price_usd`、`status`（`hold` | `delivering` | `delivered` | `returned`）、`tradable_at`、`return_reason`、`steam_trade_offer_id` 以及 `steam_trade_offer_finished_at`。
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "steam_id": "76561198000000000",
+  "status": "completed",
+  "custom_id": "batch-2026-06-29-01",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
+  "hold_until": null,
+  "created_at": "2026-06-29T17:12:04Z",
+  "updated_at": "2026-06-29T17:15:40Z",
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": "delivered",
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "return_reason": null,
+      "steam_trade_offer_id": "5512345678",
+      "steam_trade_offer_finished_at": "2026-06-29T17:15:40Z"
+    }
+  ]
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 404 | `order_not_found` | 该 id 对应的订单不存在。 |
+| 429 | `rate_limit_exceeded` | 请求过多。请按照 `Retry-After` 响应头中的秒数退避。 |

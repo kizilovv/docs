@@ -1,0 +1,90 @@
+---
+title: "GET /v1/prices/snapshot.ndjson.gz — полный снимок цен"
+sidebarTitle: "GET /prices/snapshot"
+description: "Скачайте полный каталог цен CSBoard в виде gzip-сжатого NDJSON. По одному PriceRow на строку. Спроектировано под массовую загрузку с условными запросами по ETag."
+openapi: "GET /prices/snapshot.ndjson.gz"
+---
+
+Эндпоинт snapshot отдаёт полный список цен CSBoard в виде одного gzip-сжатого файла NDJSON. Каждая распакованная строка — это один JSON-объект `PriceRow`, той же схемы, что возвращает `GET /v1/prices`. Это рекомендуемый путь для потребителей полного каталога: сайтов сравнения, арбитражных ботов или дата-пайплайнов, которым нужна полная локальная копия списка цен. Для точечных запросов по подмножеству товаров используйте `GET /v1/prices`.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+**Лимит запросов:** 1 запрос в минуту, отдельно от общего лимита 30 запросов/мин. Планируйте интервал опроса соответствующе.
+
+## Заголовки запроса
+
+<ParamField header="If-None-Match" type="string">
+  Передайте значение `ETag` из предыдущего ответа snapshot, чтобы сделать условный запрос. Если снимок не изменился с момента этого ETag, сервер вернёт `304 Not Modified` без тела, экономя трафик и избегая повторной загрузки.
+</ParamField>
+
+## Заголовки ответа
+
+| Заголовок | Описание |
+|---|---|
+| `ETag` | Непрозрачная строка версии, идентифицирующая этот снимок. Сохраните её и отправьте обратно в `If-None-Match` при следующем запросе. |
+| `Content-Encoding` | `gzip` — тело всегда сжато gzip. |
+
+## Тело ответа
+
+Поток, сжатый gzip. После распаковки каждая строка (разделитель — перевод строки) представляет собой валидный JSON-объект, соответствующий схеме `PriceRow`:
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `market_hash_name` | string | Steam market hash name. |
+| `wear` | string \| null | Диапазон износа или `null`. |
+| `doppler_phase` | string \| null | Фаза Doppler или `null`. |
+| `min_price_usd` | number | Самая дешёвая текущая цена продажи в USD. |
+| `qty` | integer | Количество листингов в этой группе. |
+
+## Пример: загрузка и просмотр
+
+```bash
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --output snapshot.ndjson.gz \
+  && gunzip -c snapshot.ndjson.gz | head -5
+```
+
+Пример распакованного вывода:
+
+```jsonl
+{"market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"min_price_usd":11.92,"qty":73}
+{"market_hash_name":"AWP | Asiimov (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"min_price_usd":54.20,"qty":12}
+{"market_hash_name":"Karambit | Doppler (Factory New)","wear":"Factory New","doppler_phase":"Ruby","min_price_usd":1240.00,"qty":1}
+```
+
+## Пример: условный запрос с ETag
+
+При первой загрузке вы получаете заголовок `ETag`. Передавайте его обратно в последующих запросах, чтобы не скачивать неизменённый снимок повторно:
+
+```bash
+# Первый запрос — сохраните ETag из заголовков ответа
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --dump-header headers.txt \
+  --output snapshot.ndjson.gz
+
+# Последующий запрос — условная загрузка
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "If-None-Match: \"etag-value\"" \
+  --output snapshot.ndjson.gz
+```
+
+Ответ `304 Not Modified` означает, что снимок идентичен уже имеющемуся у вас — повторная загрузка не нужна.
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 304 | _(без тела)_ | Снимок не изменился с переданного `If-None-Match` ETag. |
+| 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
+| 429 | `snapshot_rate_limited` | Превышен отдельный лимит снимка — 1 запрос/мин. Подождите перед повтором. |
+
+<Tip>
+  Всегда сохраняйте `ETag` из каждой успешной загрузки и отправляйте его обратно в `If-None-Match` при следующем запросе. Ответ `304` не расходует квоту лимита запросов и позволяет поддерживать локальную копию в актуальном состоянии без лишних повторных загрузок.
+</Tip>
+
+<Note>
+  Этот эндпоинт предназначен для **массовой загрузки полного каталога**. Если вам нужны цены только для конкретного товара или отфильтрованного подмножества, используйте `GET /v1/prices` — он поддерживает фильтры по search, category и wear и не учитывается в лимите snapshot.
+</Note>

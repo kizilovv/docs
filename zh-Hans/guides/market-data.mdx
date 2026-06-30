@@ -1,0 +1,238 @@
+---
+title: "使用 CSBoard API 查询实时 CS2 挂单和价格"
+sidebarTitle: "市场数据"
+description: "使用 CSBoard API 浏览实时可购买挂单、查询 minAsk 价格、下载完整目录快照，并将价格转换为任意货币。"
+---
+
+CSBoard API 让您可以实时访问市场上每件可购买的 CS2 皮肤——包括带有 float 值、贴纸和 paint seed 的单个挂单，以及用于快速市场扫描的分组价格行。本指南将带您了解所有四个市场数据端点，并展示如何有效地组合它们。
+
+## 浏览挂单
+
+使用 `GET /v1/listings` 获取实时、可购买的挂单。返回的每件物品当前都可购买。该端点支持丰富的过滤功能，让您可以将结果精确缩小到您关心的皮肤。
+
+```bash
+# Fetch Factory New AK-47 Redlines under $20, sorted cheapest first
+curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Factory%20New&max_price=20&sort=price_asc" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+**可用的过滤器**
+
+| 参数 | 说明 |
+|-----------|-------------|
+| `search` | 对市场哈希名进行全文匹配 |
+| `category` | 例如 `Rifle`、`Knife`、`Gloves` |
+| `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
+| `rarity` | 例如 `Classified`、`Covert` |
+| `min_price` / `max_price` | 以美元计的价格范围 |
+| `min_float` / `max_float` | float 值范围 |
+| `stat_trak` | `only` 或 `exclude` |
+| `souvenir` | `only` 或 `exclude` |
+| `sort` | `id`（默认） · `newest` · `price_asc` · `price_desc` |
+| `limit` | 1–200，默认 50 |
+
+### Keyset 分页
+
+结果通过游标分页。当 `next_cursor` 非空时，将其作为 `cursor` 传回以获取下一页。当 `next_cursor` 为 `null` 时，表示您已到达最后一页。
+
+```bash
+# Page 1
+curl "https://csboard.com/v1/listings?category=Knife&limit=100" \
+  -H "Authorization: Bearer csb_pub_..."
+
+# Page 2 — pass next_cursor from the previous response
+curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Iml0bV84ODQxMjAxIn0=" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### 响应示例
+
+```json
+{
+  "items": [
+    {
+      "id": "itm_8841201",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "wear": "Minimal Wear",
+      "doppler_phase": null,
+      "float_value": 0.0912,
+      "paint_seed": 412,
+      "stickers": [
+        {
+          "name": "Crown (Foil)",
+          "image": "https://cdn.csboard.com/stickers/crown_foil.png",
+          "slot": 0,
+          "wear": 0.0
+        }
+      ],
+      "price_usd": 14.37,
+      "category": "Rifle",
+      "rarity": "Classified",
+      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "tradable": false,
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "delivery": "hold"
+    }
+  ],
+  "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="
+}
+```
+
+<Tip>
+  挂单上的 `price_usd` 是权威的购买价格——如果您为该物品下单，这就是您将被扣除的确切金额。`/v1/prices` 端点返回的是一个指示性的分组快照，可能滞后于实时的单品价格。
+</Tip>
+
+---
+
+## 价格列表
+
+`GET /v1/prices` 为每个唯一的皮肤分组（市场哈希名 + 磨损 + Doppler 阶段）返回一行，显示当前最低询价以及挂出数量。它专为跨数千个物品的快速市场扫描和价格比较而设计——不适合用来挑选特定挂单进行购买。
+
+**可用的过滤器**
+
+| 参数 | 说明 |
+|-----------|-------------|
+| `search` | 对市场哈希名进行全文匹配 |
+| `category` | 例如 `Rifle`、`Knife`、`Gloves` |
+| `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
+| `rarity` | 例如 `Classified`、`Covert` |
+| `min_price` / `max_price` | 以美元计的价格范围 |
+| `cursor` | 来自上一次 `next_cursor` 的 keyset 游标 |
+| `limit` | 1–500，默认 100 |
+
+```bash
+# Look up minAsk price for all Field-Tested Knives
+curl "https://csboard.com/v1/prices?category=Knife&wear=Field-Tested" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+```bash
+# Search by name
+curl "https://csboard.com/v1/prices?search=AWP%20Asiimov&limit=10" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### 响应示例
+
+```json
+{
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "min_price_usd": 11.92,
+      "qty": 73
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+**挂单 vs. 价格列表 — 一目了然**
+
+| | `/v1/listings` | `/v1/prices` |
+|---|---|---|
+| 粒度 | 每件可购买物品一行 | 每个皮肤分组一行 |
+| 价格 | 权威——精确扣款金额 | 指示性——可能滞后 |
+| float / 贴纸 | ✅ | ❌ |
+| 最适合 | 寻找物品进行购买 | 市场扫描 / 价格订阅 |
+| 每页最大数 | 200 | 500 |
+
+---
+
+## 批量快照
+
+对于完整目录摄入——比价网站、价格数据库、套利机器人——请使用 `GET /v1/prices/snapshot.ndjson.gz`。该端点将整个价格列表以 gzip 压缩的 NDJSON 文件形式流式传输，每行一个 `PriceRow` JSON 对象。
+
+```bash
+# Download and decompress the full snapshot
+curl -s "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  | gunzip \
+  | head -5
+```
+
+### 使用 ETag 的条件请求
+
+快照在每个 `200` 响应上都会设置一个 `ETag` 头部。在下次请求中将其作为 `If-None-Match` 发回——如果快照未变更，服务器将返回 `304 Not Modified` 并带有空主体，节省带宽和处理时间。
+
+```bash
+# First download — capture the ETag
+ETAG=$(curl -sI "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  | grep -i etag | awk '{print $2}' | tr -d '\r')
+
+# Subsequent requests — skip download if snapshot is unchanged
+curl -s -w "%{http_code}" \
+  "https://csboard.com/v1/prices/snapshot.ndjson.gz" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "If-None-Match: $ETAG" \
+  -o snapshot.ndjson.gz
+# Prints 200 (new data) or 304 (no change)
+```
+
+<Note>
+  快照端点限速为 **每分钟 1 个请求**。请使用上述 ETag 模式避免重新下载相同的数据——`304` 响应不会计入数据传输的速率限制预算，仅请求本身计入。
+</Note>
+
+---
+
+## 汇率转换
+
+CSBoard API 中的每个价格都以美元（USD）计价。使用 `GET /v1/currency` 获取与站点相同的汇率表，然后在客户端将 `price_usd` 转换为任意本地货币。
+
+```bash
+curl "https://csboard.com/v1/currency" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+### 响应示例
+
+```json
+{
+  "base": "USD",
+  "rates": {
+    "USD": 1,
+    "EUR": 0.92,
+    "RUB": 78.4,
+    "GBP": 0.79
+  },
+  "updated_at": "2026-06-29T17:00:00Z",
+  "rub_source": "cbr",
+  "base_source": "openexchangerates"
+}
+```
+
+### 转换价格
+
+将 `price_usd` 乘以目标货币的汇率：
+
+```bash
+# price_usd = 14.37, target = EUR, rate = 0.92
+# price_eur = 14.37 * 0.92 = 13.22
+echo "14.37 * 0.92" | bc
+```
+
+```python
+price_usd = 14.37
+rates = {"USD": 1, "EUR": 0.92, "RUB": 78.4, "GBP": 0.79}
+
+def to_local(price_usd: float, currency: str) -> float:
+    return round(price_usd * rates[currency], 2)
+
+print(to_local(price_usd, "EUR"))  # 13.22
+print(to_local(price_usd, "RUB"))  # 1126.19
+```
+
+汇率大约每小时缓存一次。对于显示用途，这已经足够——对于交易决策，请始终直接使用来自 `/v1/listings` 的 `price_usd` 字段。
+
+---
+
+## 后续步骤
+
+- [使用 POST /v1/orders 购买挂单](/guides/buying)
+- [自动化价格监控和购买机器人](/guides/automation)
+- [API 参考 — GET /v1/listings](/api-reference/get-listings)
+- [API 参考 — GET /v1/prices](/api-reference/get-prices)

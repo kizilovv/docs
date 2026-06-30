@@ -1,0 +1,90 @@
+---
+title: "GET /v1/prices/snapshot.ndjson.gz — 完整价格快照"
+sidebarTitle: "GET /prices/snapshot"
+description: "以 gzip 压缩的 NDJSON 文件下载完整的 CSBoard 价格目录，每行一个 PriceRow。专为批量摄取设计，支持基于 ETag 的条件性获取。"
+openapi: "GET /prices/snapshot.ndjson.gz"
+---
+
+snapshot 端点以单个 gzip 压缩的 NDJSON 文件形式提供完整的 CSBoard 价格列表。解压后的每一行都是一个 `PriceRow` JSON 对象——与 `GET /v1/prices` 返回的模式相同。它专为全目录消费者设计，如比价站点、套利机器人或需要完整本地价格列表副本的数据管道。如果只是对部分商品进行有针对性的查询，请改用 `GET /v1/prices`。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+**速率限制：** 每分钟 1 次请求，独立于一般的 30 次/分钟限制。请相应规划您的轮询间隔。
+
+## 请求头
+
+<ParamField header="If-None-Match" type="string">
+  传入上一次快照响应中的 `ETag` 值，以发起条件请求。如果自该 ETag 以来快照未发生变化，服务器将返回 `304 Not Modified` 且无响应体，从而节省带宽并避免一次新的下载。
+</ParamField>
+
+## 响应头
+
+| 响应头 | 说明 |
+|---|---|
+| `ETag` | 标识该快照的不透明版本字符串。请将其保存并在下一次请求时作为 `If-None-Match` 发回。 |
+| `Content-Encoding` | `gzip`——响应体始终经过 gzip 压缩。 |
+
+## 响应体
+
+一个 gzip 压缩的数据流。解压后，每个以换行分隔的行都是一个符合 `PriceRow` 模式的有效 JSON 对象：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `market_hash_name` | string | Steam 市场哈希名称。 |
+| `wear` | string \| null | 磨损档位，或 `null`。 |
+| `doppler_phase` | string \| null | 多普勒相位，或 `null`。 |
+| `min_price_usd` | number | 当前最低美元报价。 |
+| `qty` | integer | 该组中的挂单数量。 |
+
+## 示例：下载并查看
+
+```bash
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --output snapshot.ndjson.gz \
+  && gunzip -c snapshot.ndjson.gz | head -5
+```
+
+解压输出示例：
+
+```jsonl
+{"market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"min_price_usd":11.92,"qty":73}
+{"market_hash_name":"AWP | Asiimov (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"min_price_usd":54.20,"qty":12}
+{"market_hash_name":"Karambit | Doppler (Factory New)","wear":"Factory New","doppler_phase":"Ruby","min_price_usd":1240.00,"qty":1}
+```
+
+## 示例：使用 ETag 的条件请求
+
+首次下载时，您会收到一个 `ETag` 响应头。在后续请求中将其传回，可避免重新下载未变化的快照：
+
+```bash
+# 首次请求 —— 保存响应头中的 ETag
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --dump-header headers.txt \
+  --output snapshot.ndjson.gz
+
+# 后续请求 —— 条件性获取
+curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "If-None-Match: \"etag-value\"" \
+  --output snapshot.ndjson.gz
+```
+
+`304 Not Modified` 响应意味着快照与您本地已有的副本完全一致——无需重新下载。
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 304 | _(无响应体)_ | 自所提供的 `If-None-Match` ETag 以来，快照未发生变化。 |
+| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 429 | `snapshot_rate_limited` | 超过快照专属的 1 次/分钟速率限制。请稍后再试。 |
+
+<Tip>
+  请始终保存每次成功下载时返回的 `ETag`，并在下次请求时作为 `If-None-Match` 发回。`304` 响应不会消耗您的速率限制配额，并能让您的本地副本保持最新而无需不必要的重新下载。
+</Tip>
+
+<Note>
+  此端点专为**全目录摄取**设计。如果您只需要特定商品或经过过滤的子集的价格，请改用 `GET /v1/prices`——它支持 search、category 和 wear 过滤，且不会计入快照速率限制。
+</Note>

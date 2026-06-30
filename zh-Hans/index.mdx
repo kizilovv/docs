@@ -1,0 +1,50 @@
+---
+title: "CSBoard API — 面向开发者的 CS2 皮肤市场"
+sidebarTitle: "概览"
+description: "用于实时 CS2 皮肤挂单、批量价格快照、汇率以及自动化购买的 REST API——全部通过 Bearer 令牌保护。免费读取。"
+---
+
+CSBoard API 让您可以通过编程方式访问 CS2 皮肤市场。获取实时可购买挂单，包含 float 值、paint seed、贴纸数据和美元价格；拉取完整的 gzip 压缩价格列表快照，用于批量目录摄入；获取与站点支付流程一致的汇率；并下达自动化购买订单，直接从您的 CSBoard 余额中扣款——一切都通过位于 `https://csboard.com/v1` 的单一 REST API 完成。
+
+## 开始使用
+
+<CardGroup cols={2}>
+  <Card title="简介" icon="rocket" href="/introduction">
+    了解 API 提供的功能、其结构以及您可以构建什么。
+  </Card>
+  <Card title="身份验证" icon="key" href="/authentication">
+    生成 `csb_pub_` Bearer 令牌并保护您的请求。
+  </Card>
+  <Card title="市场数据" icon="chart-line" href="/guides/market-data">
+    查询实时挂单、minAsk 价格和完整的快照下载。
+  </Card>
+  <Card title="购买" icon="cart-shopping" href="/guides/buying">
+    下达自动化购买订单，从您的 CSBoard 余额中扣款。
+  </Card>
+</CardGroup>
+
+## 快速开始
+
+通过一次请求即可获取实时挂单——除了 API 密钥之外无需任何设置：
+
+```bash
+curl https://csboard.com/v1/listings \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 探索 API
+
+<CardGroup cols={2}>
+  <Card title="自动化指南" icon="robot" href="/guides/automation">
+    构建完全自动化的购买工作流，并遵循速率限制最佳实践。
+  </Card>
+  <Card title="速率限制" icon="gauge-high" href="/rate-limits">
+    了解请求配额以及如何优雅地处理 `429` 响应。
+  </Card>
+  <Card title="API 参考" icon="code" href="/api-reference/get-listings">
+    浏览所有端点——挂单、价格、快照、货币和订单。
+  </Card>
+  <Card title="健康检查" icon="heart-pulse" href="/api-reference/get-health">
+    在开始交易会话之前验证 API 可用性。
+  </Card>
+</CardGroup>

@@ -1,0 +1,67 @@
+---
+title: "GET /v1/orders/info — пакетный поиск заказов"
+sidebarTitle: "GET /orders/info"
+description: "Узнайте статус сразу нескольких заказов CSBoard по custom_ids и/или order_ids — до 200 id за один запрос."
+openapi: "GET /orders/info"
+---
+
+Используйте этот эндпоинт, чтобы за один вызов опросить статус сразу нескольких заказов. Передайте `custom_ids` (id, которые вы назначили при покупке) и/или `order_ids` (CSBoard order id) в виде списков через запятую. Нужно передать хотя бы один из двух параметров и в сумме не более 200 id.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+## Query-параметры
+
+<ParamField query="custom_ids" type="string">
+  Назначенные вами при покупке custom id через запятую.
+</ParamField>
+
+<ParamField query="order_ids" type="string">
+  CSBoard order id через запятую.
+</ParamField>
+
+<Note>
+  Передайте хотя бы один из параметров `custom_ids` или `order_ids`. Суммарное количество id по обоим параметрам не должно превышать 200.
+</Note>
+
+## Поля ответа
+
+<ResponseField name="data" type="Order[]" required>
+  Массив подходящих заказов. Каждый `Order` имеет ту же структуру, что и в [`GET /v1/orders`](/api-reference/get-orders) — включая `order_id`, `status`, `charged_total_usd` и разбивку по предметам `items`.
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl "https://csboard.com/v1/orders/info?custom_ids=batch-2026-06-29-01,batch-2026-06-29-02" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "data": [
+    {
+      "order_id": "ord_01J9Z3K8Q2",
+      "steam_id": "76561198000000000",
+      "status": "completed",
+      "custom_id": "batch-2026-06-29-01",
+      "currency": "USD",
+      "charged_total_usd": 26.47,
+      "item_count": 2,
+      "hold_until": null,
+      "created_at": "2026-06-29T17:12:04Z",
+      "updated_at": "2026-06-29T17:15:40Z",
+      "items": []
+    }
+  ]
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 422 | `invalid_request` | Не передано ни одного id или в сумме передано более 200 id. |
+| 429 | `rate_limit_exceeded` | Слишком много запросов. Подождите время, указанное в заголовке `Retry-After`. |
