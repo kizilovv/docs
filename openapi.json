@@ -85,6 +85,15 @@
             }
           },
           {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "description": "Exact market_hash_name (case-insensitive) — the precise single-item lookup. Unlike fuzzy `search`, it isolates one item even when its name is a word-subset of a longer one (e.g. `Spectrum Case` vs `Spectrum 2 Case`). Takes precedence over `search`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "category",
             "in": "query",
             "description": "e.g. Rifle, Knife, Gloves.",
@@ -287,6 +296,15 @@
             "name": "search",
             "in": "query",
             "description": "Full-text match on market hash name.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "description": "Exact market_hash_name (case-insensitive) — the precise single-item lookup. Unlike fuzzy `search`, it isolates one item even when its name is a word-subset of a longer one (e.g. `Spectrum Case` vs `Spectrum 2 Case`). Takes precedence over `search`.",
             "schema": {
               "type": "string"
             }

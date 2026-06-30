@@ -12,7 +12,11 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 ## Query parameters
 
 <ParamField query="search" type="string">
-  Full-text match on the item's `market_hash_name`, e.g. `AK-47 | Redline`.
+  Fuzzy match on the item's `market_hash_name` — splits the query into words and substring-matches each, ideal for discovery. Note: a name whose words are a subset of a longer item's name (e.g. `Spectrum Case` vs `Spectrum 2 Case`) cannot be isolated this way. For a single specific item, use `name`.
+</ParamField>
+
+<ParamField query="name" type="string">
+  Exact `market_hash_name` (case-insensitive). The precise way to fetch one specific item's listings — `name=Spectrum Case` returns only Spectrum Case, never `Spectrum 2 Case`. Takes precedence over `search` when both are supplied.
 </ParamField>
 
 <ParamField query="category" type="string">
@@ -51,7 +55,7 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
   Souvenir filter. `only` returns only Souvenir items; `exclude` removes them from results.
 </ParamField>
 
-<ParamField query="sort" type="string" default="id">
+<ParamField query="sort" default="id" type="string">
   Sort order. One of: `id` (stable default), `newest`, `price_asc`, `price_desc`.
 </ParamField>
 
@@ -59,7 +63,7 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
   Keyset pagination cursor. Pass the `next_cursor` value from the previous response to fetch the next page.
 </ParamField>
 
-<ParamField query="limit" type="integer" default="50">
+<ParamField query="limit" default="50" type="integer">
   Number of results per page. Minimum `1`, maximum `200`.
 </ParamField>
 
@@ -100,12 +104,15 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
         <ResponseField name="name" type="string">
           Sticker name, e.g. `Crown (Foil)`.
         </ResponseField>
+
         <ResponseField name="image" type="string (URI)">
           CDN URL of the sticker image.
         </ResponseField>
+
         <ResponseField name="slot" type="integer">
           Sticker slot position, `0` through `4`.
         </ResponseField>
+
         <ResponseField name="wear" type="number | null">
           Sticker wear between `0.0` and `1.0`. `null` if the sticker has not been scraped.
         </ResponseField>
@@ -204,7 +211,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 ## Error codes
 
 | HTTP status | Code | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | 401 | `unauthorized` | Missing or invalid API key. |
 | 429 | `rate_limit_exceeded` | Over 30 requests/min. Back off for the number of seconds in the `Retry-After` header. |
 

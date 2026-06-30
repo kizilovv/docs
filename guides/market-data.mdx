@@ -19,8 +19,9 @@ curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Factory%20New&
 **Available filters**
 
 | Parameter | Description |
-|-----------|-------------|
-| `search` | Full-text match on market hash name |
+| --- | --- |
+| `search` | Fuzzy substring match on market hash name — good for discovery, but can't isolate a name that is a word-subset of a longer one (e.g. `Spectrum Case` vs `Spectrum 2 Case`) |
+| `name` | **Exact** market hash name (case-insensitive) — the precise single-item lookup. `name=Spectrum Case` returns only Spectrum Case. Takes precedence over `search` |
 | `category` | e.g. `Rifle`, `Knife`, `Gloves` |
 | `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
 | `rarity` | e.g. `Classified`, `Covert` |
@@ -87,13 +88,14 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 ## Price list
 
-`GET /v1/prices` returns one row per unique skin group (market hash name + wear + Doppler phase), showing the current cheapest ask and how many are listed. It is designed for fast market scans and price comparisons across thousands of items — not for picking a specific listing to buy.
+`GET /v1/prices` returns one row per unique skin group (market hash name \+ wear \+ Doppler phase), showing the current cheapest ask and how many are listed. It is designed for fast market scans and price comparisons across thousands of items — not for picking a specific listing to buy.
 
 **Available filters**
 
 | Parameter | Description |
-|-----------|-------------|
-| `search` | Full-text match on market hash name |
+| --- | --- |
+| `search` | Fuzzy substring match on market hash name — good for discovery, but can't isolate a name that is a word-subset of a longer one (e.g. `Spectrum Case` vs `Spectrum 2 Case`) |
+| `name` | **Exact** market hash name (case-insensitive) — the precise single-item lookup. `name=Spectrum Case` returns only Spectrum Case. Takes precedence over `search` |
 | `category` | e.g. `Rifle`, `Knife`, `Gloves` |
 | `wear` | `Factory New` · `Minimal Wear` · `Field-Tested` · `Well-Worn` · `Battle-Scarred` |
 | `rarity` | e.g. `Classified`, `Covert` |
@@ -132,8 +134,8 @@ curl "https://csboard.com/v1/prices?search=AWP%20Asiimov&limit=10" \
 
 **Listings vs. price list — at a glance**
 
-| | `/v1/listings` | `/v1/prices` |
-|---|---|---|
+|  | `/v1/listings` | `/v1/prices` |
+| --- | --- | --- |
 | Granularity | One row per buyable item | One row per skin group |
 | Price | Authoritative — exact charge | Indicative — may lag |
 | Float / stickers | ✅ | ❌ |
