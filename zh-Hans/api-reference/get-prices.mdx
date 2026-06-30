@@ -1,0 +1,111 @@
+---
+title: "GET /v1/prices — 按商品组的 CS2 minAsk 价格列表"
+sidebarTitle: "GET /prices"
+description: "按市场哈希名称、磨损以及多普勒相位分组，分页获取 minAsk 价格快照，每行包含最低报价和挂单数量。"
+openapi: "GET /prices"
+---
+
+prices 端点返回 CSBoard 市场的分组价格快照。每一行代表 `market_hash_name`、`wear` 与 `doppler_phase` 的一个唯一组合，并附带当前最低报价以及挂单的数量。这使其非常适合用于构建比价表、告警管道或资产估值——您可以为成千上万的商品获取价格而无需拉取每条挂单。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 查询参数
+
+<ParamField query="search" type="string">
+  对 `market_hash_name` 进行全文匹配，例如 `AK-47 | Redline`。
+</ParamField>
+
+<ParamField query="category" type="string">
+  按商品类别过滤，例如 `Rifle`、`Knife`、`Gloves`。
+</ParamField>
+
+<ParamField query="wear" type="string">
+  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  按稀有度档位过滤，例如 `Classified`、`Covert`。
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  最低 `min_price_usd`，单位美元（含）。
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  最高 `min_price_usd`，单位美元（含）。
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  键集分页游标。传入上一次响应中的 `next_cursor` 值。
+</ParamField>
+
+<ParamField query="limit" type="integer" default="100">
+  每页行数。最小 `1`，最大 `500`。
+</ParamField>
+
+## 响应字段
+
+<ResponseField name="items" type="PriceRow[]" required>
+  本页的价格行数组。
+
+  <Expandable title="PriceRow object">
+    <ResponseField name="market_hash_name" type="string" required>
+      Steam 市场哈希名称，例如 `AK-47 | Redline (Field-Tested)`。
+    </ResponseField>
+
+    <ResponseField name="wear" type="string | null">
+      该价格组的磨损档位。对于没有磨损档位的商品为 `null`。
+    </ResponseField>
+
+    <ResponseField name="doppler_phase" type="string | null">
+      该价格组的多普勒或伽马多普勒相位，例如 `"Phase 2"`、`"Ruby"`。非多普勒商品为 `null`。
+    </ResponseField>
+
+    <ResponseField name="min_price_usd" type="number" required>
+      该组中所有挂单的当前最低美元报价。
+    </ResponseField>
+
+    <ResponseField name="qty" type="integer" required>
+      该组中当前可用的挂单数量。
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string | null" required>
+  下一页的键集游标。在下一次请求时作为 `cursor` 传入。最后一页为 `null`。
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "items": [
+    {
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "min_price_usd": 11.92,
+      "qty": 73
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请在重试前等待 `Retry-After` 响应头中的秒数。 |
+
+<Warning>
+  prices 端点返回的是**指示性分组快照**。该数据是周期性实体化的，可能滞后于实时市场。在下单前，请使用 `GET /v1/listings` 获取特定商品权威的实时报价。
+</Warning>

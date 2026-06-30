@@ -1,0 +1,213 @@
+---
+title: "GET /v1/listings — просмотр актуальных листингов маркетплейса CS2"
+sidebarTitle: "GET /listings"
+description: "Получите актуальные доступные для покупки листинги CS2 с float, paint seed, наклейками и ценой продажи в USD. Фильтруйте по износу, категории, редкости, диапазону float и другим параметрам."
+openapi: "GET /listings"
+---
+
+Эндпоинт listings возвращает все товары, доступные для покупки на маркетплейсе CSBoard прямо сейчас. Каждая запись содержит полные данные для оценки — значение float, paint seed, наклеенные стикеры с их износом — вместе с авторитетной ценой продажи в USD. Результаты разбиваются на страницы при помощи keyset-курсора, что позволяет надёжно пройти весь каталог даже по мере появления новых листингов.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+## Query-параметры
+
+<ParamField query="search" type="string">
+  Полнотекстовое совпадение по `market_hash_name` товара, например `AK-47 | Redline`.
+</ParamField>
+
+<ParamField query="category" type="string">
+  Фильтр по категории товара, например `Rifle`, `Knife`, `Gloves`, `Pistol`.
+</ParamField>
+
+<ParamField query="wear" type="string">
+  Фильтр по диапазону износа. Одно из: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  Фильтр по уровню редкости, например `Classified`, `Covert`, `Extraordinary`.
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  Минимальная цена продажи в USD (включительно).
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  Максимальная цена продажи в USD (включительно).
+</ParamField>
+
+<ParamField query="min_float" type="number">
+  Минимальное значение float (включительно). Принимает значения от `0.0` до `1.0`.
+</ParamField>
+
+<ParamField query="max_float" type="number">
+  Максимальное значение float (включительно). Принимает значения от `0.0` до `1.0`.
+</ParamField>
+
+<ParamField query="stat_trak" type="string">
+  Фильтр StatTrak™. `only` возвращает только предметы StatTrak™; `exclude` исключает их из результатов.
+</ParamField>
+
+<ParamField query="souvenir" type="string">
+  Фильтр Souvenir. `only` возвращает только сувенирные предметы; `exclude` исключает их из результатов.
+</ParamField>
+
+<ParamField query="sort" type="string" default="id">
+  Порядок сортировки. Одно из: `id` (стабильный по умолчанию), `newest`, `price_asc`, `price_desc`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset-курсор пагинации. Передайте значение `next_cursor` из предыдущего ответа, чтобы получить следующую страницу.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  Количество результатов на странице. Минимум `1`, максимум `200`.
+</ParamField>
+
+## Поля ответа
+
+<ResponseField name="items" type="Listing[]" required>
+  Массив объектов листингов для этой страницы.
+
+  <Expandable title="Listing object">
+    <ResponseField name="id" type="string" required>
+      Стабильный идентификатор листинга. Передайте его в `POST /v1/orders`, чтобы купить предмет.
+    </ResponseField>
+
+    <ResponseField name="market_hash_name" type="string" required>
+      Steam market hash name, например `AK-47 | Redline (Minimal Wear)`.
+    </ResponseField>
+
+    <ResponseField name="wear" type="string | null">
+      Диапазон износа: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn` или `Battle-Scarred`. `null` для предметов без износа (например, некоторые ножи или перчатки).
+    </ResponseField>
+
+    <ResponseField name="doppler_phase" type="string | null">
+      Фаза Doppler или Gamma Doppler, например `"Phase 2"`, `"Ruby"`, `"Emerald"`. `null` для предметов, не относящихся к Doppler.
+    </ResponseField>
+
+    <ResponseField name="float_value" type="number | null">
+      Значение float от `0.0` до `1.0`. `null`, если неприменимо.
+    </ResponseField>
+
+    <ResponseField name="paint_seed" type="integer | null">
+      Paint seed (индекс паттерна). `null`, если неприменимо.
+    </ResponseField>
+
+    <ResponseField name="stickers" type="Sticker[]" required>
+      Наклеенные стикеры. Пустой массив, если их нет.
+
+      <Expandable title="Sticker object">
+        <ResponseField name="name" type="string">
+          Название стикера, например `Crown (Foil)`.
+        </ResponseField>
+        <ResponseField name="image" type="string (URI)">
+          URL изображения стикера на CDN.
+        </ResponseField>
+        <ResponseField name="slot" type="integer">
+          Номер слота стикера, от `0` до `4`.
+        </ResponseField>
+        <ResponseField name="wear" type="number | null">
+          Износ стикера от `0.0` до `1.0`. `null`, если износ стикера не был получен.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="price_usd" type="number" required>
+      Авторитетная цена продажи в USD. Это ровно та сумма, которая будет списана при покупке этого листинга через `POST /v1/orders`.
+    </ResponseField>
+
+    <ResponseField name="category" type="string" required>
+      Категория предмета, например `Rifle`, `Knife`, `Gloves`.
+    </ResponseField>
+
+    <ResponseField name="rarity" type="string">
+      Уровень редкости, например `Classified`, `Covert`.
+    </ResponseField>
+
+    <ResponseField name="image" type="string (URI)">
+      URL изображения предмета на CDN.
+    </ResponseField>
+
+    <ResponseField name="inspect_link" type="string">
+      Ссылка для осмотра в Steam (`steam://rungame/...`) для этого предмета.
+    </ResponseField>
+
+    <ResponseField name="tradable" type="boolean" required>
+      Можно ли сейчас обменивать предмет. `false` означает, что он находится в торговом холде.
+    </ResponseField>
+
+    <ResponseField name="tradable_at" type="datetime | null">
+      Временная метка ISO 8601, когда предмет выйдет из торгового холда. `null`, если предмет уже доступен для обмена.
+    </ResponseField>
+
+    <ResponseField name="delivery" type="string" required>
+      Ожидаемый режим доставки: `instant` (передаётся сразу) или `hold` (с учётом торгового холда Steam).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string | null" required>
+  Непрозрачный keyset-курсор. Передайте его как query-параметр `cursor`, чтобы получить следующую страницу. `null` на последней странице.
+</ResponseField>
+
+## Пагинация
+
+Этот эндпоинт использует **keyset-пагинацию**. Чтобы пройти все страницы:
+
+1. Выполните первый запрос (без `cursor`).
+2. Если `next_cursor` не равен null, повторите запрос с `cursor=<next_cursor>`.
+3. Остановитесь, когда `next_cursor` станет `null` — вы дошли до последней страницы.
+
+Keyset-пагинация стабильна: новые листинги, появляющиеся во время итерации, не приводят к дубликатам или пропущенным строкам.
+
+## Пример запроса
+
+```bash
+curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float=0.07&max_float=0.12&sort=price_asc&limit=20" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "items": [
+    {
+      "id": "itm_8841201",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "wear": "Minimal Wear",
+      "doppler_phase": null,
+      "float_value": 0.0912,
+      "paint_seed": 412,
+      "stickers": [
+        {
+          "name": "Crown (Foil)",
+          "image": "https://cdn.csboard.com/stickers/crown_foil.png",
+          "slot": 0,
+          "wear": 0.0
+        }
+      ],
+      "price_usd": 14.37,
+      "category": "Rifle",
+      "rarity": "Classified",
+      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "tradable": false,
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "delivery": "hold"
+    }
+  ],
+  "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
+| 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Подождите количество секунд, указанное в заголовке `Retry-After`. |
+
+<Tip>
+  Значение `price_usd` у каждого листинга — это **авторитетная цена покупки**: оно отражает текущую цену продажи на момент запроса и ровно столько с вас спишут. Не используйте `min_price_usd` из эндпоинта `/prices` как оценку цены покупки — это значение может отставать.
+</Tip>

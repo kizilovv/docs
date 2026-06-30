@@ -1,0 +1,62 @@
+---
+title: "GET /v1/listings/availability — 批量可用性查询"
+sidebarTitle: "GET /listings/availability"
+description: "在单次请求中检查最多 100 个 CSBoard 商品是否仍可购买，返回每个 id 的可用数量以及不可用 id 列表。"
+openapi: "GET /listings/availability"
+---
+
+在下批量订单之前，请确认您打算购买的商品仍然可用。通过逗号分隔的 `ids` 参数最多传入 100 个商品 id；响应将告诉您每个 id 当前可用的数量，以及哪些 id 已不再可用。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 查询参数
+
+<ParamField query="ids" type="string" required>
+  以逗号分隔的商品 id，例如 `itm_8841201,itm_8841340`。**必填。** 每次请求最多 100 个 id。
+</ParamField>
+
+## 响应字段
+
+<ResponseField name="data" type="object" required>
+  <Expandable title="data object">
+    <ResponseField name="available" type="object" required>
+      商品 id → 当前可用数量（整数）的映射。至少有一件可用的 id 会出现在这里。
+    </ResponseField>
+    <ResponseField name="unavailable_ids" type="string[]" required>
+      已不再可用的商品 id。
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl "https://csboard.com/v1/listings/availability?ids=itm_8841201,itm_8841340,itm_8841999" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "data": {
+    "available": {
+      "itm_8841201": 1,
+      "itm_8841340": 3
+    },
+    "unavailable_ids": ["itm_8841999"]
+  }
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 422 | `invalid_request` | 未提供 `ids`，或提供了超过 100 个 id。 |
+| 429 | `rate_limit_exceeded` | 请求过多。请按照 `Retry-After` 响应头中的秒数退避。 |
+
+<Tip>
+  可用性是一个时间点快照。报告为可用的 id 仍可能在您的购买执行前售罄——请始终发送 `max_price_usd`，并在购买调用中处理 `item_unavailable`。
+</Tip>

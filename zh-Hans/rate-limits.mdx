@@ -1,0 +1,71 @@
+---
+title: "CSBoard API 速率限制以及如何处理 429 错误"
+sidebarTitle: "速率限制"
+description: "了解所有 CSBoard API 端点的每密钥请求限制、读取 Retry-After 头部，并实现正确的 429 退避逻辑。"
+---
+
+CSBoard API 强制执行每密钥的速率限制，以确保服务对所有用户保持稳定。如果您超出限制，会立即收到 `429` 响应——不会有请求被部分处理。请构建您的客户端以检查 `Retry-After` 头部并在重试前暂停，而不是在紧密循环中持续冲击端点。
+
+## 各端点的限制
+
+所有限制均为 **每个 API 密钥**，并以 60 秒滚动窗口重置。
+
+| 限制 | 端点 |
+|---|---|
+| **30 / 分钟** | 挂单、价格、货币、余额和订单状态——所有标准 `GET` 端点 |
+| **30 / 分钟** | `POST /v1/orders`（下达购买订单并消费真实资金） |
+| **1 / 分钟** | `GET /v1/prices/snapshot.ndjson.gz`（批量压缩快照） |
+
+<Note>
+  从同一 IP 地址在一分钟内使用 **无效或缺失的 API 密钥** 发送超过 30 个请求，将触发自动 5 分钟的 IP 级封禁。在封禁期间，无论使用哪个密钥，来自该 IP 的每个请求都会返回 `401 too_many_failed_auth`。请轮换到有效密钥并等待冷却期结束后再重试。
+</Note>
+
+## 429 响应格式
+
+当您超出标准端点限制时，API 返回：
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 14
+Content-Type: application/json
+
+{ "code": "rate_limit_exceeded", "detail": "Rate limit exceeded. Retry after 14 seconds." }
+```
+
+`Retry-After` 头部的值是一个整数，表示在下次请求成功之前必须等待的 **秒数**。
+
+批量快照端点在被限流时使用不同的错误码：
+
+```json
+{ "code": "snapshot_rate_limited", "detail": "Snapshot rate limit exceeded. Retry after 60 seconds." }
+```
+
+## 在客户端中处理 429
+
+读取 `Retry-After` 并至少休眠相应秒数后再重试。下方示例展示了 bash 中的一个简单重试循环：
+
+```bash
+while true; do
+  RESPONSE=$(curl -si https://csboard.com/v1/listings \
+    -H "Authorization: Bearer csb_pub_...")
+
+  STATUS=$(echo "$RESPONSE" | head -1 | awk '{print $2}')
+
+  if [ "$STATUS" = "429" ]; then
+    RETRY_AFTER=$(echo "$RESPONSE" | grep -i "retry-after" | awk '{print $2}' | tr -d '\r')
+    echo "Rate limited. Waiting ${RETRY_AFTER}s..."
+    sleep "$RETRY_AFTER"
+  else
+    echo "$RESPONSE" | tail -1  # print body
+    break
+  fi
+done
+```
+
+<Tip>
+  在并行运行多个工作线程时，添加少量抖动（例如 `sleep $((RETRY_AFTER + RANDOM % 5))`），这样它们就不会在同一瞬间全部恢复并立即再次触发限制。
+</Tip>
+
+## 提高您的限制
+
+默认限制适合大多数集成场景，但如果您有高吞吐用例——例如数据管道或高频交易机器人——请 [联系我们](https://csboard.com) 讨论为您的账户提高每密钥的限制。

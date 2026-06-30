@@ -1,0 +1,213 @@
+---
+title: "GET /v1/listings — 浏览实时的 CS2 市场挂单"
+sidebarTitle: "GET /listings"
+description: "获取实时可购买的 CS2 饰品挂单，包含磨损、印花种子、贴纸以及美元报价。可按磨损、类别、稀有度、磨损范围等过滤。"
+openapi: "GET /listings"
+---
+
+listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每条记录都包含您进行评估所需的完整检视数据——磨损值、印花种子、已贴贴纸及其磨损——以及美元的权威报价。结果通过键集游标分页，即便不断有新挂单出现，您也能可靠地遍历整个目录。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 查询参数
+
+<ParamField query="search" type="string">
+  对商品的 `market_hash_name` 进行全文匹配，例如 `AK-47 | Redline`。
+</ParamField>
+
+<ParamField query="category" type="string">
+  按商品类别过滤，例如 `Rifle`、`Knife`、`Gloves`、`Pistol`。
+</ParamField>
+
+<ParamField query="wear" type="string">
+  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  按稀有度档位过滤，例如 `Classified`、`Covert`、`Extraordinary`。
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  最低报价，单位美元（含）。
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  最高报价，单位美元（含）。
+</ParamField>
+
+<ParamField query="min_float" type="number">
+  最小磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。
+</ParamField>
+
+<ParamField query="max_float" type="number">
+  最大磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。
+</ParamField>
+
+<ParamField query="stat_trak" type="string">
+  StatTrak™ 过滤。`only` 仅返回 StatTrak™ 商品；`exclude` 将其从结果中移除。
+</ParamField>
+
+<ParamField query="souvenir" type="string">
+  纪念品过滤。`only` 仅返回纪念品商品；`exclude` 将其从结果中移除。
+</ParamField>
+
+<ParamField query="sort" type="string" default="id">
+  排序方式。可选值：`id`（稳定的默认值）、`newest`、`price_asc`、`price_desc` 之一。
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  键集分页游标。传入上一次响应中的 `next_cursor` 值以获取下一页。
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  每页结果数。最小 `1`，最大 `200`。
+</ParamField>
+
+## 响应字段
+
+<ResponseField name="items" type="Listing[]" required>
+  本页的挂单对象数组。
+
+  <Expandable title="Listing object">
+    <ResponseField name="id" type="string" required>
+      稳定的挂单标识符。将其传给 `POST /v1/orders` 以购买该商品。
+    </ResponseField>
+
+    <ResponseField name="market_hash_name" type="string" required>
+      Steam 市场哈希名称，例如 `AK-47 | Redline (Minimal Wear)`。
+    </ResponseField>
+
+    <ResponseField name="wear" type="string | null">
+      磨损档位：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn` 或 `Battle-Scarred`。对于不带磨损的商品（如部分匕首或手套）为 `null`。
+    </ResponseField>
+
+    <ResponseField name="doppler_phase" type="string | null">
+      多普勒或伽马多普勒相位，例如 `"Phase 2"`、`"Ruby"`、`"Emerald"`。非多普勒商品为 `null`。
+    </ResponseField>
+
+    <ResponseField name="float_value" type="number | null">
+      商品磨损值，介于 `0.0` 和 `1.0` 之间。不适用时为 `null`。
+    </ResponseField>
+
+    <ResponseField name="paint_seed" type="integer | null">
+      印花种子（图案索引）。不适用时为 `null`。
+    </ResponseField>
+
+    <ResponseField name="stickers" type="Sticker[]" required>
+      已贴贴纸。若无则为空数组。
+
+      <Expandable title="Sticker object">
+        <ResponseField name="name" type="string">
+          贴纸名称，例如 `Crown (Foil)`。
+        </ResponseField>
+        <ResponseField name="image" type="string (URI)">
+          贴纸图像的 CDN URL。
+        </ResponseField>
+        <ResponseField name="slot" type="integer">
+          贴纸槽位，`0` 到 `4`。
+        </ResponseField>
+        <ResponseField name="wear" type="number | null">
+          贴纸磨损，介于 `0.0` 和 `1.0` 之间。如果贴纸尚未被刮过，则为 `null`。
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="price_usd" type="number" required>
+      美元权威报价。如果您通过 `POST /v1/orders` 购买该挂单，扣除的金额就是这个数值。
+    </ResponseField>
+
+    <ResponseField name="category" type="string" required>
+      商品类别，例如 `Rifle`、`Knife`、`Gloves`。
+    </ResponseField>
+
+    <ResponseField name="rarity" type="string">
+      稀有度档位，例如 `Classified`、`Covert`。
+    </ResponseField>
+
+    <ResponseField name="image" type="string (URI)">
+      商品图像的 CDN URL。
+    </ResponseField>
+
+    <ResponseField name="inspect_link" type="string">
+      该商品的 Steam 检视链接（`steam://rungame/...`）。
+    </ResponseField>
+
+    <ResponseField name="tradable" type="boolean" required>
+      该商品当前是否可交易。`false` 表示处于交易冻结期。
+    </ResponseField>
+
+    <ResponseField name="tradable_at" type="datetime | null">
+      该商品脱离交易冻结的 ISO 8601 时间戳。若已可交易则为 `null`。
+    </ResponseField>
+
+    <ResponseField name="delivery" type="string" required>
+      预期的交付模式：`instant`（即时转移）或 `hold`（受 Steam 交易冻结约束）。
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string | null" required>
+  不透明的键集游标。将其作为 `cursor` 查询参数传入以获取下一页。最后一页为 `null`。
+</ResponseField>
+
+## 分页
+
+此端点使用**键集分页**。要遍历所有页面：
+
+1. 发起初始请求（不带 `cursor`）。
+2. 如果 `next_cursor` 非空，则携带 `cursor=<next_cursor>` 重复请求。
+3. 当 `next_cursor` 为 `null` 时停止——您已到达最后一页。
+
+键集分页是稳定的：在遍历期间新出现的挂单不会导致重复或跳行。
+
+## 示例请求
+
+```bash
+curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float=0.07&max_float=0.12&sort=price_asc&limit=20" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "items": [
+    {
+      "id": "itm_8841201",
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "wear": "Minimal Wear",
+      "doppler_phase": null,
+      "float_value": 0.0912,
+      "paint_seed": 412,
+      "stickers": [
+        {
+          "name": "Crown (Foil)",
+          "image": "https://cdn.csboard.com/stickers/crown_foil.png",
+          "slot": 0,
+          "wear": 0.0
+        }
+      ],
+      "price_usd": 14.37,
+      "category": "Rifle",
+      "rarity": "Classified",
+      "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
+      "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "tradable": false,
+      "tradable_at": "2026-07-06T12:00:00Z",
+      "delivery": "hold"
+    }
+  ],
+  "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请按照 `Retry-After` 响应头中的秒数退避。 |
+
+<Tip>
+  每条挂单上的 `price_usd` 是**权威购买价格**——它反映了查询时刻的实时报价，也正是您将被扣除的金额。请不要将 `/prices` 端点中的 `min_price_usd` 用作购买价格估算；该值可能滞后。
+</Tip>

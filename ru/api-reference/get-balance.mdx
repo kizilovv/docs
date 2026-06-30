@@ -1,0 +1,71 @@
+---
+title: "GET /v1/balance — баланс аккаунта и статус торговли"
+sidebarTitle: "GET /balance"
+description: "Проверьте свой баланс CSBoard в USD, сколько средств подтверждено, а сколько удерживается, а также включена ли торговля для вашего API-ключа."
+openapi: "GET /balance"
+---
+
+Эндпоинт balance возвращает ваш текущий баланс в USD вместе с разбивкой, которая важна для автоматических покупок: сколько средств **подтверждено** (защищено от реверса и доступно для покупок, безопасных к реверсу) и сколько в данный момент **удерживается**. Используйте `trading_enabled`, чтобы убедиться, что покупки включены для ключа, прежде чем оформлять заказ.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+## Параметры
+
+Этот эндпоинт не принимает query-параметров.
+
+## Поля ответа
+
+<ResponseField name="currency" type="string" required>
+  Всегда `"USD"`. Все суммы выражены в долларах США.
+</ResponseField>
+
+<ResponseField name="balance_usd" type="number" required>
+  Ваш общий баланс в USD.
+</ResponseField>
+
+<ResponseField name="trading_enabled" type="boolean" required>
+  Включены ли покупки для этого API-ключа. Если `false`, эндпоинты покупки возвращают `trading_not_enabled`.
+</ResponseField>
+
+<ResponseField name="settled_balance_usd" type="number" required>
+  Часть баланса, которая подтверждена и защищена от реверса. Именно эти средства вы можете тратить на покупки, безопасные к реверсу, например через `POST /v1/market/buy`.
+</ResponseField>
+
+<ResponseField name="held_usd" type="number" required>
+  Часть баланса, которая в данный момент удерживается.
+</ResponseField>
+
+<ResponseField name="held_until" type="datetime | null" required>
+  Временная метка ISO 8601, когда удерживаемая часть будет освобождена, либо `null`, если ничего не удерживается.
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl https://csboard.com/v1/balance \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "currency": "USD",
+  "balance_usd": 1240.55,
+  "trading_enabled": true,
+  "settled_balance_usd": 980.10,
+  "held_usd": 260.45,
+  "held_until": "2026-07-06T12:00:00Z"
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 429 | `rate_limit_exceeded` | Слишком много запросов. Подождите время, указанное в заголовке `Retry-After`. |
+
+<Tip>
+  Перед вызовом эндпоинтов покупки, безопасных к реверсу, проверяйте `settled_balance_usd`, а не `balance_usd` — удерживаемые средства там потратить нельзя.
+</Tip>

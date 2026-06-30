@@ -1,0 +1,144 @@
+---
+title: "从您的 CSBoard 余额自动购买 CS2 皮肤"
+sidebarTitle: "购买"
+description: "通过 POST /v1/orders 从您的 CSBoard 余额下达自动化订单、防范价格变动，并保证幂等交付。"
+---
+
+通过 CSBoard API 购买可以让您以编程方式获取 CS2 皮肤——直接从您的余额扣款，具备原子超额收费保护和内置幂等性。在您的第一笔订单生效之前，您需要完成一次简短的一次性设置。请按顺序完成以下步骤。
+
+<Warning>
+  标准的只读密钥 **永远** 无法消费资金。交易是有意采用「主动启用」模式——泄露或受损的只读密钥在您显式启用之前无法下单或耗尽您的余额。
+</Warning>
+
+## 设置
+
+<Steps>
+  <Step title="在您的密钥上启用交易">
+    访问您的 [API 个人资料](https://csboard.com/profile?tab=api)，并为您想使用的密钥切换 **buying** 开关。在您完成此操作之前，每次对 `POST /v1/orders` 的调用都会返回 `403 trading_not_enabled`。
+  </Step>
+  <Step title="关联您的 Steam 账户和交易 URL">
+    订单直接交付到 Steam，因此您必须在个人资料中设置已关联的 Steam 账户和有效的交易 URL。否则 API 会返回 `400 steam_account_required`。
+  </Step>
+  <Step title="为您的 CSBoard 余额充值">
+    购买款项从您现有的 CSBoard 余额中扣除。请在站点上充值——API 本身不提供任何卡或加密货币支付路径。
+  </Step>
+  <Step title="寻找要购买的挂单">
+    查询 `GET /v1/listings` 以查找物品并收集它们的 `id` 字段。响应中的每个 `id` 都是一个稳定的引用，您可以直接将其传递给订单端点。
+
+    ```bash
+    curl "https://csboard.com/v1/listings?search=AK-47%20Redline&wear=Minimal%20Wear&sort=price_asc&limit=5" \
+      -H "Authorization: Bearer csb_pub_..."
+    ```
+  </Step>
+  <Step title="下单">
+    将挂单 ID POST 到 `/v1/orders`。包含 `max_price_usd` 和 `Idempotency-Key`——两者都将在下方详细说明。
+
+    ```bash
+    curl -X POST https://csboard.com/v1/orders \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+      -d '{"item_ids":["itm_8841201"],"max_price_usd":20.00}'
+    ```
+  </Step>
+</Steps>
+
+---
+
+## 超额收费保护
+
+您始终按 **执行时的实时价格** 扣款，而不是您浏览挂单时看到的价格。市场会变动——您 30 秒前获取的挂单到您的订单落地时可能已被以更高价格重新挂出。
+
+使用 `max_price_usd` 作为总价格上限。扣款是原子的：如果执行时的实时总价超过您的上限，整个订单将被拒绝并返回 `400 price_moved`——不会扣款也不会转移任何物品。
+
+<Tip>
+  在下单前，始终从 `GET /v1/listings` 读取 `price_usd`——该值是权威的，并等于确切的扣款金额。`/v1/prices` 端点返回的是一个指示性的分组快照，可能滞后于实时的单品价格。
+</Tip>
+
+如果价格变动且您收到 `400`，响应主体会包含 `current_total_usd`，以便您决定是否以更高的上限重新提交，或放弃：
+
+```json
+{
+  "code": "price_moved",
+  "message": "Live total 31.20 exceeds max_price_usd 30.00.",
+  "current_total_usd": 31.20
+}
+```
+
+---
+
+## 幂等性
+
+网络故障时有发生。如果没有幂等性，超时后的重试可能会让同一个物品被购买两次。通过在每个订单请求中发送唯一的 `Idempotency-Key` 头部来防止这种情况。
+
+- 如果服务器收到两个具有相同密钥的请求，它会重放原始订单结果——购买永远不会被执行第二次。
+- 您也可以在请求主体中传递 `idempotency_key` 而不是放在头部；两者效果相同。
+- 每次订单尝试使用一个 UUID v4，而不是每次重试。
+
+```bash
+curl -X POST https://csboard.com/v1/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+  -d '{
+    "item_ids": ["itm_8841201", "itm_8841340"],
+    "max_price_usd": 30.00
+  }'
+```
+
+---
+
+## 响应示例
+
+成功的订单返回 `200`，包含订单详情和您的剩余余额：
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "status": "processing",
+  "items": [
+    {
+      "item_id": "itm_8841201",
+      "charged_usd": 14.37,
+      "delivery": "hold"
+    },
+    {
+      "item_id": "itm_8841340",
+      "charged_usd": 12.10,
+      "delivery": "instant"
+    }
+  ],
+  "total_charged_usd": 26.47,
+  "balance_after_usd": 73.53,
+  "created_at": "2026-06-29T17:12:04Z"
+}
+```
+
+---
+
+## 交付
+
+订单响应中的每个物品都包含一个 `delivery` 字段：
+
+- **`instant`** — 物品当前可交易，将立即发送到您的 Steam 交易 URL。
+- **`hold`** — 物品处于 Steam 交易冻结期。查看挂单的 `tradable_at` 字段（ISO 8601 时间戳）以了解何时可交易。
+
+---
+
+## 错误参考
+
+| 代码 | HTTP 状态 | 含义 |
+|------|-------------|---------|
+| `price_moved` | 400 | 实时价格超出 `max_price_usd`——响应包含 `current_total_usd` |
+| `insufficient_balance` | 402 | 您的 CSBoard 余额低于订单总额 |
+| `steam_account_required` | 400 | 个人资料中未关联 Steam 账户或交易 URL |
+| `trading_not_enabled` | 403 | API 密钥未启用购买功能 |
+
+---
+
+## 后续步骤
+
+- [使用机器人和价格监控器自动化购买](/guides/automation)
+- [查询实时挂单和价格](/guides/market-data)
+- [API 参考 — POST /v1/orders](/api-reference/post-orders)
+- [API 参考 — GET /v1/listings](/api-reference/get-listings)

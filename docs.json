@@ -12,65 +12,198 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "tabs": [
+    "languages": [
       {
-        "tab": "Guides",
-        "groups": [
+        "language": "en",
+        "tabs": [
           {
-            "group": "Get Started",
-            "pages": [
-              "introduction",
-              "authentication",
-              "rate-limits"
+            "tab": "Guides",
+            "groups": [
+              {
+                "group": "Get Started",
+                "pages": [
+                  "introduction",
+                  "authentication",
+                  "rate-limits"
+                ]
+              },
+              {
+                "group": "Guides",
+                "pages": [
+                  "guides/market-data",
+                  "guides/buying",
+                  "guides/automation"
+                ]
+              }
             ]
           },
           {
-            "group": "Guides",
-            "pages": [
-              "guides/market-data",
-              "guides/buying",
-              "guides/automation"
-            ]
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Status",
+                "pages": [
+                  "api-reference/get-health"
+                ]
+              },
+              {
+                "group": "Account",
+                "pages": [
+                  "api-reference/get-balance"
+                ]
+              },
+              {
+                "group": "Market Data",
+                "pages": [
+                  "api-reference/get-listings",
+                  "api-reference/get-listings-availability",
+                  "api-reference/get-prices",
+                  "api-reference/get-prices-snapshot",
+                  "api-reference/get-currency"
+                ]
+              },
+              {
+                "group": "Trading",
+                "pages": [
+                  "api-reference/post-orders",
+                  "api-reference/post-market-buy",
+                  "api-reference/get-orders",
+                  "api-reference/get-orders-info",
+                  "api-reference/get-order"
+                ]
+              }
+            ],
+            "openapi": "openapi.json"
           }
         ]
       },
       {
-        "tab": "API Reference",
-        "groups": [
+        "language": "ru",
+        "tabs": [
           {
-            "group": "Status",
-            "pages": [
-              "api-reference/get-health"
+            "tab": "Руководства",
+            "groups": [
+              {
+                "group": "Начало работы",
+                "pages": [
+                  "ru/introduction",
+                  "ru/authentication",
+                  "ru/rate-limits"
+                ]
+              },
+              {
+                "group": "Руководства",
+                "pages": [
+                  "ru/guides/market-data",
+                  "ru/guides/buying",
+                  "ru/guides/automation"
+                ]
+              }
             ]
           },
           {
-            "group": "Account",
-            "pages": [
-              "api-reference/get-balance"
-            ]
-          },
-          {
-            "group": "Market Data",
-            "pages": [
-              "api-reference/get-listings",
-              "api-reference/get-listings-availability",
-              "api-reference/get-prices",
-              "api-reference/get-prices-snapshot",
-              "api-reference/get-currency"
-            ]
-          },
-          {
-            "group": "Trading",
-            "pages": [
-              "api-reference/post-orders",
-              "api-reference/post-market-buy",
-              "api-reference/get-orders",
-              "api-reference/get-orders-info",
-              "api-reference/get-order"
-            ]
+            "tab": "Справочник API",
+            "groups": [
+              {
+                "group": "Статус",
+                "pages": [
+                  "ru/api-reference/get-health"
+                ]
+              },
+              {
+                "group": "Аккаунт",
+                "pages": [
+                  "ru/api-reference/get-balance"
+                ]
+              },
+              {
+                "group": "Рыночные данные",
+                "pages": [
+                  "ru/api-reference/get-listings",
+                  "ru/api-reference/get-listings-availability",
+                  "ru/api-reference/get-prices",
+                  "ru/api-reference/get-prices-snapshot",
+                  "ru/api-reference/get-currency"
+                ]
+              },
+              {
+                "group": "Торговля",
+                "pages": [
+                  "ru/api-reference/post-orders",
+                  "ru/api-reference/post-market-buy",
+                  "ru/api-reference/get-orders",
+                  "ru/api-reference/get-orders-info",
+                  "ru/api-reference/get-order"
+                ]
+              }
+            ],
+            "openapi": "openapi.json"
           }
-        ],
-        "openapi": "openapi.json"
+        ]
+      },
+      {
+        "language": "zh-Hans",
+        "tabs": [
+          {
+            "tab": "指南",
+            "groups": [
+              {
+                "group": "快速开始",
+                "pages": [
+                  "zh-Hans/introduction",
+                  "zh-Hans/authentication",
+                  "zh-Hans/rate-limits"
+                ]
+              },
+              {
+                "group": "指南",
+                "pages": [
+                  "zh-Hans/guides/market-data",
+                  "zh-Hans/guides/buying",
+                  "zh-Hans/guides/automation"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "API 参考",
+            "groups": [
+              {
+                "group": "状态",
+                "pages": [
+                  "zh-Hans/api-reference/get-health"
+                ]
+              },
+              {
+                "group": "账户",
+                "pages": [
+                  "zh-Hans/api-reference/get-balance"
+                ]
+              },
+              {
+                "group": "市场数据",
+                "pages": [
+                  "zh-Hans/api-reference/get-listings",
+                  "zh-Hans/api-reference/get-listings-availability",
+                  "zh-Hans/api-reference/get-prices",
+                  "zh-Hans/api-reference/get-prices-snapshot",
+                  "zh-Hans/api-reference/get-currency"
+                ]
+              },
+              {
+                "group": "交易",
+                "pages": [
+                  "zh-Hans/api-reference/post-orders",
+                  "zh-Hans/api-reference/post-market-buy",
+                  "zh-Hans/api-reference/get-orders",
+                  "zh-Hans/api-reference/get-orders-info",
+                  "zh-Hans/api-reference/get-order"
+                ]
+              }
+            ],
+            "openapi": "openapi.json"
+          }
+        ]
       }
     ]
   },

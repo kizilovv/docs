@@ -1,0 +1,134 @@
+---
+title: "POST /v1/orders — покупка листингов CS2 со своего баланса"
+sidebarTitle: "POST /orders"
+description: "Покупайте 1–10 листингов CS2 по ID в одном атомарном запросе со списанием с баланса CSBoard. Требуется API-ключ с включённой торговлей и привязанный аккаунт Steam."
+openapi: "POST /orders"
+---
+
+Эндпоинт orders позволяет покупать от 1 до 10 листингов в одном атомарном запросе. Списание производится с вашего баланса CSBoard по **живой** цене продажи в момент исполнения — не по той цене, которую вы видели при запросе `/v1/listings`. Чтобы защититься от движений цены между запросом и покупкой, всегда указывайте `max_price_usd` как верхнюю границу итога. Эндпоинт идемпотентен: повтор с тем же `Idempotency-Key` воспроизводит исходный заказ, а не создаёт дубликат списания.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+**Требуется возможность торговли.** Для API-ключа должны быть включены покупки. Настройте это в профиле CSBoard.
+
+## Предварительные условия
+
+Перед оформлением заказа убедитесь, что:
+
+1. **Ключ с включённой торговлей** — покупки должны быть включены для вашего API-ключа в настройках профиля CSBoard.
+2. **Привязанный аккаунт Steam и trade URL** — к аккаунту CSBoard должен быть привязан аккаунт Steam с валидным trade URL, чтобы предметы можно было доставить.
+3. **Достаточный баланс** — баланс CSBoard должен покрывать суммарную стоимость предметов по их живым ценам.
+
+## Заголовки запроса
+
+<ParamField header="Idempotency-Key" type="string">
+  Необязательно. Уникальная строка (например, UUID), идентифицирующая эту попытку заказа. Если вы повторяете запрос с тем же ключом, сервер воспроизводит исходный ответ заказа вместо повторного исполнения покупки. Используйте это для безопасного повтора при сетевых таймаутах без риска двойного списания.
+</ParamField>
+
+## Тело запроса
+
+<ParamField body="item_ids" type="string[]" required>
+  Массив из 1–10 уникальных ID листингов для покупки. Получайте их из поля `id` ответов `GET /v1/listings`. Каждый ID должен встречаться в запросе только один раз.
+</ParamField>
+
+<ParamField body="max_price_usd" type="number">
+  Верхняя граница итоговой цены в USD, проверяется атомарно в момент исполнения. Если живой итог по всем предметам превышает это значение, весь заказ отклоняется с ошибкой `price_moved` и списания не происходит. **Настоятельно рекомендуется** — без него у вас нет защиты от переплаты.
+</ParamField>
+
+<ParamField body="idempotency_key" type="string">
+  Альтернатива заголовку `Idempotency-Key`. Если переданы оба, заголовок имеет приоритет. Используйте что-то одно.
+</ParamField>
+
+## Поля ответа
+
+<ResponseField name="order_id" type="string" required>
+  Уникальный идентификатор этого заказа, например `ord_01J9Z3K8Q2`.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Текущий статус заказа: `processing`, `completed` или `failed`.
+</ResponseField>
+
+<ResponseField name="items" type="object[]">
+  Разбивка заказа по предметам.
+
+  <Expandable title="Item object">
+    <ResponseField name="item_id" type="string">
+      ID листинга, который был куплен.
+    </ResponseField>
+    <ResponseField name="charged_usd" type="number">
+      Сумма, списанная за конкретный предмет по его живой цене.
+    </ResponseField>
+    <ResponseField name="delivery" type="string">
+      Режим доставки для этого предмета: `instant` (передаётся сразу) или `hold` (с учётом торгового холда Steam).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total_charged_usd" type="number" required>
+  Сумма всех списаний по предметам. Это итоговая сумма, списанная с вашего баланса.
+</ResponseField>
+
+<ResponseField name="balance_after_usd" type="number">
+  Ваш баланс CSBoard сразу после списания.
+</ResponseField>
+
+<ResponseField name="created_at" type="datetime">
+  Временная метка ISO 8601 создания заказа.
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl -X POST https://csboard.com/v1/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f9c2b10-1a2b-4c3d-8e4f-5a6b7c8d9e0f" \
+  -d '{
+    "item_ids": ["itm_8841201", "itm_8841340"],
+    "max_price_usd": 30.00
+  }'
+```
+
+## Пример ответа
+
+```json
+{
+  "order_id": "ord_01J9Z3K8Q2",
+  "status": "processing",
+  "items": [
+    {
+      "item_id": "itm_8841201",
+      "charged_usd": 14.37,
+      "delivery": "hold"
+    },
+    {
+      "item_id": "itm_8841340",
+      "charged_usd": 12.10,
+      "delivery": "instant"
+    }
+  ],
+  "total_charged_usd": 26.47,
+  "balance_after_usd": 73.53,
+  "created_at": "2026-06-29T17:12:04Z"
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 409 | `price_moved` | Живой итог по предметам превысил `max_price_usd`. Заказ отклонён; списания не было. Ответ включает `current_total_usd` с фактической ценой. |
+| 402 | `insufficient_balance` | Баланса недостаточно для покрытия суммы заказа. |
+| 400 | `steam_account_required` | К аккаунту CSBoard не привязан Steam-аккаунт или нет валидного trade URL. |
+| 403 | `trading_not_enabled` | Для API-ключа не включены покупки. Включите их в профиле. |
+| 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
+| 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Перед повтором подождите время, указанное в заголовке `Retry-After`. |
+
+<Warning>
+  Всегда указывайте `max_price_usd` в запросе. Цены на живом маркетплейсе могут измениться между моментом запроса `/v1/listings` и моментом исполнения заказа. Без этой верхней границы с баланса может быть списана более высокая сумма, чем вы планировали, и автоматического отката нет.
+</Warning>
+
+<Note>
+  Предметы, доставляемые в режиме `hold`, попадают под торговый холд Steam. Проверяйте поле `tradable_at` исходного листинга (из `GET /v1/listings`), чтобы узнать, когда именно удерживаемый предмет станет доступен для обмена в вашем инвентаре Steam.
+</Note>

@@ -1,0 +1,67 @@
+---
+title: "GET /v1/orders/info — 批量订单查询"
+sidebarTitle: "GET /orders/info"
+description: "通过 custom_ids 和/或 order_ids 在一次请求中查询多个 CSBoard 订单的状态，每次最多 200 个 id。"
+openapi: "GET /orders/info"
+---
+
+使用此端点可在一次调用中轮询多个订单的状态。以逗号分隔的列表形式提供 `custom_ids`（您在下单时分配的 id）和/或 `order_ids`（CSBoard 订单 id）。两者至少需提供一个，且两者总和不得超过 200 个 id。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 查询参数
+
+<ParamField query="custom_ids" type="string">
+  以逗号分隔的、您在下单时分配的自定义 id。
+</ParamField>
+
+<ParamField query="order_ids" type="string">
+  以逗号分隔的 CSBoard 订单 id。
+</ParamField>
+
+<Note>
+  `custom_ids` 和 `order_ids` 至少需提供一个。两个参数中 id 的总数不得超过 200。
+</Note>
+
+## 响应字段
+
+<ResponseField name="data" type="Order[]" required>
+  匹配的订单数组。每个 `Order` 的结构与 [`GET /v1/orders`](/api-reference/get-orders) 中相同——包括 `order_id`、`status`、`charged_total_usd` 以及逐件 `items` 明细。
+</ResponseField>
+
+## 示例请求
+
+```bash
+curl "https://csboard.com/v1/orders/info?custom_ids=batch-2026-06-29-01,batch-2026-06-29-02" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "data": [
+    {
+      "order_id": "ord_01J9Z3K8Q2",
+      "steam_id": "76561198000000000",
+      "status": "completed",
+      "custom_id": "batch-2026-06-29-01",
+      "currency": "USD",
+      "charged_total_usd": 26.47,
+      "item_count": 2,
+      "hold_until": null,
+      "created_at": "2026-06-29T17:12:04Z",
+      "updated_at": "2026-06-29T17:15:40Z",
+      "items": []
+    }
+  ]
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 422 | `invalid_request` | 未提供任何 id，或 id 总数超过 200。 |
+| 429 | `rate_limit_exceeded` | 请求过多。请按照 `Retry-After` 响应头中的秒数退避。 |

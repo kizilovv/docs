@@ -1,0 +1,130 @@
+---
+title: "POST /v1/market/buy — покупка и доставка на Steam trade URL"
+sidebarTitle: "POST /market/buy"
+description: "Покупайте до 100 предметов и доставляйте их прямо на любой указанный вами Steam trade URL, оплачивая из подтверждённого баланса. Создано для оптовых покупок и автоматической доставки."
+openapi: "POST /market/buy"
+---
+
+Этот эндпоинт позволяет покупать и доставлять предметы напрямую на **любой** указанный вами Steam trade URL — не только на trade URL, привязанный к вашему аккаунту. Trade URL формируется из полей `partner` и `token`. Покупки финансируются **только** из вашего **подтверждённого** (защищённого от реверса) баланса, что делает эндпоинт пригодным для оптовых объёмов и потоков автоматической доставки.
+
+Эндпоинт **идемпотентен через поле тела `custom_id`**: повтор с тем же `custom_id` воспроизводит исходную покупку, а не делает покупку дважды, и воспроизведённый ответ содержит заголовок `Idempotent-Replayed: true`.
+
+<Warning>
+  Этот эндпоинт работает за kill-switch и требует аккаунта, для которого включена торговля и нет истории реверсов. Когда kill-switch выключен, возвращается `403 external_buy_disabled`.
+</Warning>
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+**Требуется возможность торговли.** Для ключа должны быть включены покупки, а аккаунт должен быть чистым от реверсов.
+
+## Тело запроса
+
+<ParamField body="item_ids" type="string[]" required>
+  От 1 до 100 уникальных id листингов для покупки.
+</ParamField>
+
+<ParamField body="partner" type="string" required>
+  Значение `partner` из Steam trade URL (1–32 символа). Вместе с `token` образует конечный trade URL, на который доставляются предметы.
+</ParamField>
+
+<ParamField body="token" type="string" required>
+  Значение `token` из Steam trade URL (1–32 символа). Вместе с `partner` образует конечный trade URL.
+</ParamField>
+
+<ParamField body="max_price_usd" type="number">
+  Верхняя граница итоговой цены в USD. Если живой итог превышает её, заказ отклоняется с ошибкой `price_moved` и ничего не списывается. Настоятельно рекомендуется.
+</ParamField>
+
+<ParamField body="custom_id" type="string">
+  Ключ идемпотентности (1–128 символов). Повтор с тем же `custom_id` воспроизводит исходную покупку; ответ при повторе содержит `Idempotent-Replayed: true`.
+</ParamField>
+
+<ParamField body="skip_unavailable" type="boolean" default="false">
+  Если `true`, пропускать предметы, которые больше недоступны, вместо того чтобы отклонить весь запрос.
+</ParamField>
+
+## Поля ответа
+
+<ResponseField name="data" type="object" required>
+  <Expandable title="data object">
+    <ResponseField name="purchase_id" type="string" required />
+    <ResponseField name="steam_id" type="string" required>
+      Steam ID, определённый по переданным `partner` + `token`.
+    </ResponseField>
+    <ResponseField name="created_at" type="datetime" required />
+    <ResponseField name="custom_id" type="string | null" />
+    <ResponseField name="skins" type="object[]" required>
+      Результат по каждому предмету.
+
+      <Expandable title="skin object">
+        <ResponseField name="name" type="string | null" />
+        <ResponseField name="price" type="number | null" />
+        <ResponseField name="status" type="string" />
+        <ResponseField name="return_reason" type="string | null" />
+        <ResponseField name="steam_trade_offer_id" type="string | null" />
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl -X POST https://csboard.com/v1/market/buy \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_ids": ["itm_8841201", "itm_8841340"],
+    "partner": "447383001",
+    "token": "Ab3xZ9Qp",
+    "max_price_usd": 30.00,
+    "custom_id": "batch-2026-06-29-01",
+    "skip_unavailable": false
+  }'
+```
+
+## Пример ответа
+
+```json
+{
+  "data": {
+    "purchase_id": "pur_01J9Z3K8Q2",
+    "steam_id": "76561198000000000",
+    "created_at": "2026-06-29T17:12:04Z",
+    "custom_id": "batch-2026-06-29-01",
+    "skins": [
+      {
+        "name": "AK-47 | Redline (Minimal Wear)",
+        "price": 14.37,
+        "status": "delivering",
+        "return_reason": null,
+        "steam_trade_offer_id": "5512345678"
+      }
+    ]
+  }
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 400 | `invalid_request` | Некорректное тело (например, `item_ids` пуст или содержит более 100 элементов). |
+| 400 | `unsupported_item` | Один или несколько предметов нельзя доставить через этот эндпоинт (например, id `ss_live_*`). |
+| 400 | `invalid_trade_url` | `partner` + `token` не образуют валидный Steam trade URL. |
+| 401 | `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 402 | `insufficient_settled_balance` | Подтверждённый баланс ниже суммы заказа. Включает `required_usd` и `settled_usd`. |
+| 402 | `insufficient_balance` | Баланс ниже суммы заказа. |
+| 403 | `external_buy_disabled` | Kill-switch выключен; эндпоинт сейчас недоступен. |
+| 403 | `trading_not_enabled` | Покупки не включены для этого ключа. |
+| 403 | `account_restricted` | Эндпоинт требует аккаунт без истории реверсов. |
+| 409 | `item_unavailable` | Один или несколько предметов больше недоступны. Включает `unavailable_ids[]`. |
+| 409 | `price_moved` | Живой итог превысил верхнюю границу. Включает `quoted_max_usd`, `current_total_usd` и `items[]`. |
+| 409 | `idempotency_in_progress` | Запрос с этим `custom_id` ещё обрабатывается. |
+| 409 | `price_updating` | Цены обновляются; повторите через короткое время. |
+| 429 | `rate_limit_exceeded` | Слишком много запросов. Подождите время, указанное в заголовке `Retry-After`. |
+| 500 | `order_failed` | Покупку не удалось завершить. |
+
+<Note>
+  Средства берутся исключительно из вашего **подтверждённого** баланса. Перед большой партией проверяйте `settled_balance_usd` через [`GET /v1/balance`](/api-reference/get-balance) и всегда передавайте `max_price_usd` в качестве защиты от переплаты.
+</Note>

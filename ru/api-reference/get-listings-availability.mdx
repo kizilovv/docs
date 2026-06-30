@@ -1,0 +1,62 @@
+---
+title: "GET /v1/listings/availability — пакетная проверка доступности"
+sidebarTitle: "GET /listings/availability"
+description: "Проверьте, доступны ли ещё для покупки до 100 листингов CSBoard в одном запросе, с количеством по каждому id и списком недоступных id."
+openapi: "GET /listings/availability"
+---
+
+Перед оформлением пакетного заказа убедитесь, что листинги, которые вы планируете купить, ещё доступны. Передайте до 100 id листингов в параметре `ids` через запятую; в ответе будет указано, сколько копий каждого id сейчас доступно и какие id уже недоступны.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
+
+## Query-параметры
+
+<ParamField query="ids" type="string" required>
+  ID листингов через запятую, например `itm_8841201,itm_8841340`. **Обязательно.** Максимум 100 id за запрос.
+</ParamField>
+
+## Поля ответа
+
+<ResponseField name="data" type="object" required>
+  <Expandable title="data object">
+    <ResponseField name="available" type="object" required>
+      Соответствие id листинга → целое число доступных копий. Здесь появляются id, у которых есть хотя бы одна доступная единица.
+    </ResponseField>
+    <ResponseField name="unavailable_ids" type="string[]" required>
+      ID листингов, которые больше недоступны.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl "https://csboard.com/v1/listings/availability?ids=itm_8841201,itm_8841340,itm_8841999" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "data": {
+    "available": {
+      "itm_8841201": 1,
+      "itm_8841340": 3
+    },
+    "unavailable_ids": ["itm_8841999"]
+  }
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 422 | `invalid_request` | Не передан `ids` или указано более 100 id. |
+| 429 | `rate_limit_exceeded` | Слишком много запросов. Подождите время, указанное в заголовке `Retry-After`. |
+
+<Tip>
+  Доступность — это снимок на момент запроса. ID, отмеченный как доступный, всё ещё может закончиться до момента выполнения покупки — всегда передавайте `max_price_usd` и обрабатывайте `item_unavailable` при вызове покупки.
+</Tip>
