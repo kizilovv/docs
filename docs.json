@@ -149,6 +149,17 @@
               }
             ],
             "openapi": "openapi.json"
+          },
+          {
+            "tab": "Журнал изменений",
+            "groups": [
+              {
+                "group": "Журнал изменений",
+                "pages": [
+                  "ru/changelog/overview"
+                ]
+              }
+            ]
           }
         ]
       },
@@ -213,6 +224,17 @@
               }
             ],
             "openapi": "openapi.json"
+          },
+          {
+            "tab": "更新日志",
+            "groups": [
+              {
+                "group": "更新日志",
+                "pages": [
+                  "zh-Hans/changelog/overview"
+                ]
+              }
+            ]
           }
         ]
       }
