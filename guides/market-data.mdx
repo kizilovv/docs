@@ -6,7 +6,7 @@ description: "Browse live buyable listings, look up minAsk prices, download full
 
 The CSBoard API gives you real-time access to every buyable CS2 skin on the marketplace — individual listings with float values, stickers, and paint seeds, as well as grouped price rows for fast market scans. This guide walks you through all four market-data endpoints and shows you how to combine them effectively.
 
-## Browsing Listings
+## Browsing listings
 
 Use `GET /v1/listings` to fetch live, buyable listings. Every item returned is available to buy right now. The endpoint supports rich filtering so you can narrow results to exactly the skins you care about.
 
@@ -85,7 +85,7 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 ---
 
-## Price List
+## Price list
 
 `GET /v1/prices` returns one row per unique skin group (market hash name + wear + Doppler phase), showing the current cheapest ask and how many are listed. It is designed for fast market scans and price comparisons across thousands of items — not for picking a specific listing to buy.
 
@@ -130,7 +130,7 @@ curl "https://csboard.com/v1/prices?search=AWP%20Asiimov&limit=10" \
 }
 ```
 
-**Listings vs. Price List — at a glance**
+**Listings vs. price list — at a glance**
 
 | | `/v1/listings` | `/v1/prices` |
 |---|---|---|
@@ -142,7 +142,7 @@ curl "https://csboard.com/v1/prices?search=AWP%20Asiimov&limit=10" \
 
 ---
 
-## Bulk Snapshot
+## Bulk snapshot
 
 For full-catalog ingestion — comparison sites, price databases, arbitrage bots — use `GET /v1/prices/snapshot.ndjson.gz`. This endpoint streams the entire price list as a gzipped NDJSON file, one `PriceRow` JSON object per line.
 
@@ -179,7 +179,7 @@ curl -s -w "%{http_code}" \
 
 ---
 
-## FX Conversion
+## FX conversion
 
 Every price in the CSBoard API is denominated in USD. Use `GET /v1/currency` to fetch the same FX rate table the site uses, then convert `price_usd` to any local currency client-side.
 
