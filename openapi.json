@@ -738,7 +738,26 @@
             }
           },
           "400": {
-            "description": "Invalid request (e.g. price moved past your ceiling).",
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "Malformed body",
+                    "value": {
+                      "code": "invalid_request",
+                      "detail": "item_ids must contain 1–10 unique ids."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict — the live price moved past your ceiling (nothing was charged), an item sold out, or a duplicate idempotency key is still processing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -749,8 +768,25 @@
                     "summary": "Live price exceeded max_price_usd",
                     "value": {
                       "code": "price_moved",
-                      "message": "Live total 31.20 exceeds max_price_usd 30.00.",
+                      "detail": "Live total 31.20 exceeds max_price_usd 30.00.",
                       "current_total_usd": 31.2
+                    }
+                  },
+                  "item_unavailable": {
+                    "summary": "Item sold out",
+                    "value": {
+                      "code": "item_unavailable",
+                      "detail": "One or more items are no longer available.",
+                      "unavailable_ids": [
+                        "itm_8841999"
+                      ]
+                    }
+                  },
+                  "idempotency_in_progress": {
+                    "summary": "Earlier request still running",
+                    "value": {
+                      "code": "idempotency_in_progress",
+                      "detail": "A request with this Idempotency-Key is still being processed."
                     }
                   }
                 }

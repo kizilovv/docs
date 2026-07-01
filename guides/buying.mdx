@@ -49,7 +49,7 @@ Buying through the CSBoard API lets you acquire CS2 skins programmatically — s
 
 You are always charged the **live price at execution**, not the price you saw when you browsed listings. Markets move — a listing you fetched 30 seconds ago may have been relisted at a higher price by the time your order lands.
 
-Use `max_price_usd` as a total ceiling. The debit is atomic: if the live total at execution exceeds your ceiling, the entire order is rejected with `400 price_moved` — nothing is charged and no items are transferred.
+Use `max_price_usd` as a total ceiling. The debit is atomic: if the live total at execution exceeds your ceiling, the entire order is rejected with `409 price_moved` — nothing is charged and no items are transferred.
 
 <Tip>
   Always read `price_usd` from `GET /v1/listings` immediately before placing an order — that value is authoritative and equals the exact charge. The `/v1/prices` endpoint returns an indicative grouped snapshot that can lag the live per-item price.
@@ -129,7 +129,7 @@ Each item in the order response includes a `delivery` field:
 
 | Code | HTTP Status | Meaning |
 |------|-------------|---------|
-| `price_moved` | 400 | Live price exceeded `max_price_usd` — response includes `current_total_usd` |
+| `price_moved` | 409 | Live price exceeded `max_price_usd` — response includes `current_total_usd` |
 | `insufficient_balance` | 402 | Your CSBoard balance is below the order total |
 | `steam_account_required` | 400 | No Steam account or trade URL linked to your profile |
 | `trading_not_enabled` | 403 | The API key does not have buying enabled |

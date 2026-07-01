@@ -201,9 +201,9 @@ def place_order(item_ids: list[str], max_price: float) -> dict:
 
 Rate-limited responses include a `Retry-After` header (seconds). Always read that value and sleep for exactly that duration — do not use a fixed backoff, as it may be shorter or longer than required.
 
-**4. Handle `400 price_moved` gracefully**
+**4. Handle `409 price_moved` gracefully**
 
-A `400 price_moved` means the price moved past your ceiling — nothing was charged. Decide whether to re-fetch the listing, update `max_price_usd`, and retry, or abandon the opportunity:
+A `409 price_moved` means the price moved past your ceiling — nothing was charged. Decide whether to re-fetch the listing, update `max_price_usd`, and retry, or abandon the opportunity:
 
 ```python
 def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | None:
@@ -211,7 +211,7 @@ def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | N
         try:
             return place_order([item_id], max_price)
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 400 and e.response.json().get("code") == "price_moved":
+            if e.response.status_code == 409 and e.response.json().get("code") == "price_moved":
                 data = e.response.json()
                 current = data.get("current_total_usd", max_price)
                 print(f"Price moved to ${current:.2f}, was ${max_price:.2f}")
@@ -295,7 +295,7 @@ def refresh_snapshot() -> list[dict] | None:
   - ✅ You generate a fresh UUID v4 `Idempotency-Key` for every order attempt
   - ✅ Your retry logic reuses the same `Idempotency-Key` on network-error retries
   - ✅ Your `429` handler reads and sleeps for `Retry-After`, not a hardcoded value
-  - ✅ Your `400 price_moved` handler decides explicitly whether to retry or abort
+  - ✅ Your `409 price_moved` handler decides explicitly whether to retry or abort
   - ✅ You read `price_usd` from `/v1/listings` (not `/v1/prices`) before placing an order
   - ✅ You use ETags with the snapshot endpoint to avoid redundant downloads
   - ✅ Your API key has trading enabled **only** if your bot is intended to buy

@@ -201,9 +201,9 @@ def place_order(item_ids: list[str], max_price: float) -> dict:
 
 被限流的响应包含一个 `Retry-After` 头部（秒数）。始终读取该值并恰好休眠相应时长——不要使用固定的退避时间，因为它可能比所需时间更短或更长。
 
-**4. 优雅地处理 `400 price_moved`**
+**4. 优雅地处理 `409 price_moved`**
 
-`400 price_moved` 意味着价格已超过您的上限——没有任何扣款发生。决定是重新获取挂单、更新 `max_price_usd` 后重试，还是放弃这次机会：
+`409 price_moved` 意味着价格已超过您的上限——没有任何扣款发生。决定是重新获取挂单、更新 `max_price_usd` 后重试，还是放弃这次机会：
 
 ```python
 def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | None:
@@ -211,7 +211,7 @@ def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | N
         try:
             return place_order([item_id], max_price)
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 400 and e.response.json().get("code") == "price_moved":
+            if e.response.status_code == 409 and e.response.json().get("code") == "price_moved":
                 data = e.response.json()
                 current = data.get("current_total_usd", max_price)
                 print(f"Price moved to ${current:.2f}, was ${max_price:.2f}")
@@ -295,7 +295,7 @@ def refresh_snapshot() -> list[dict] | None:
   - ✅ 每次订单尝试都生成新的 UUID v4 `Idempotency-Key`
   - ✅ 您的重试逻辑在网络错误重试时复用相同的 `Idempotency-Key`
   - ✅ 您的 `429` 处理器读取并休眠 `Retry-After`，而不是硬编码值
-  - ✅ 您的 `400 price_moved` 处理器明确决定是重试还是放弃
+  - ✅ 您的 `409 price_moved` 处理器明确决定是重试还是放弃
   - ✅ 您在下单之前从 `/v1/listings`（而不是 `/v1/prices`）读取 `price_usd`
   - ✅ 您使用 ETag 与快照端点配合以避免冗余下载
   - ✅ 仅当您的机器人确实需要购买时，您的 API 密钥才启用交易

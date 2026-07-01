@@ -201,9 +201,9 @@ def place_order(item_ids: list[str], max_price: float) -> dict:
 
 Ответы с лимитом запросов содержат заголовок `Retry-After` (в секундах). Всегда читайте это значение и спите ровно это время — не используйте фиксированный backoff, так как он может оказаться короче или длиннее необходимого.
 
-**4. Корректно обрабатывайте `400 price_moved`**
+**4. Корректно обрабатывайте `409 price_moved`**
 
-`400 price_moved` означает, что цена превысила ваш потолок — списание не было выполнено. Решайте: повторно получить листинг, обновить `max_price_usd` и повторить, или отказаться от сделки:
+`409 price_moved` означает, что цена превысила ваш потолок — списание не было выполнено. Решайте: повторно получить листинг, обновить `max_price_usd` и повторить, или отказаться от сделки:
 
 ```python
 def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | None:
@@ -211,7 +211,7 @@ def buy_with_retry(item_id: str, max_price: float, retries: int = 3) -> dict | N
         try:
             return place_order([item_id], max_price)
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 400 and e.response.json().get("code") == "price_moved":
+            if e.response.status_code == 409 and e.response.json().get("code") == "price_moved":
                 data = e.response.json()
                 current = data.get("current_total_usd", max_price)
                 print(f"Price moved to ${current:.2f}, was ${max_price:.2f}")
@@ -295,7 +295,7 @@ def refresh_snapshot() -> list[dict] | None:
   - ✅ Вы генерируете свежий UUID v4 `Idempotency-Key` для каждой попытки ордера
   - ✅ Ваша логика повторов использует тот же `Idempotency-Key` при повторе после сетевой ошибки
   - ✅ Ваш обработчик `429` читает `Retry-After` и спит именно столько, а не жёстко заданное значение
-  - ✅ Ваш обработчик `400 price_moved` явно решает: повторить или прервать
+  - ✅ Ваш обработчик `409 price_moved` явно решает: повторить или прервать
   - ✅ Вы читаете `price_usd` из `/v1/listings` (а не `/v1/prices`) перед размещением ордера
   - ✅ Вы используете ETag с эндпоинтом снапшота, чтобы избежать лишних загрузок
   - ✅ У вашего API-ключа торговля включена **только** если ваш бот действительно должен покупать
