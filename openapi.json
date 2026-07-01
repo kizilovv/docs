@@ -1084,7 +1084,9 @@
             "$ref": "#/components/responses/RateLimited"
           }
         }
-      },
+      }
+    },
+    "/orders/{id}/claim": {
       "post": {
         "tags": [
           "Trading"
