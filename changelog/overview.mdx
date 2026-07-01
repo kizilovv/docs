@@ -4,28 +4,22 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
-<Update label="July 1, 2026">
+<Update label="Week of June 29, 2026">
 
 ## New features
 
-**Held-order claim endpoint + `autoclaim` account setting**
+**Claim held orders over the API**
 
-Orders that land under a marketplace hold (`status: "hold"` with a `hold_until` timestamp) can now be released over the API. Once `hold_until` passes, call [`POST /v1/orders/:id/claim`](/api-reference/post-orders-claim) — some held orders deliver automatically (a harmless no-op) while others require this explicit claim. After a successful claim the marketplace sends a Steam trade offer your bot must accept within ~15 minutes.
+Orders that land under a marketplace hold (`status: "hold"` with a `hold_until` timestamp) can now be released programmatically. Once `hold_until` passes, call [`POST /v1/orders/:id/claim`](/api-reference/post-orders-claim) to release the order. After a successful claim the marketplace sends a Steam trade offer your bot must accept within ~15 minutes. Some held orders deliver automatically, in which case the call is a harmless no-op.
 
-Prefer not to claim per order? Set the sticky account flag `autoclaim: true` on [`POST /v1/orders`](/api-reference/post-orders) or [`POST /v1/market/buy`](/api-reference/post-market-buy) and every held order is released automatically the moment its hold clears.
+**`autoclaim` account setting**
 
-</Update>
-
-<Update label="June 30, 2026">
-
-## New features
+Set `autoclaim: true` on [`POST /v1/orders`](/api-reference/post-orders) or [`POST /v1/market/buy`](/api-reference/post-market-buy) and every held order is released automatically the moment its hold clears — no per-order call required. The flag is sticky at the account level.
 
 **Exact `name` filter on listings and prices**
 
-You can now pass a `name` query parameter to `/v1/listings` and `/v1/prices` to fetch a single specific item by its exact `market_hash_name` (case-insensitive). Unlike the existing `search` parameter — which does fuzzy word matching and can collide on overlapping titles (for example, `Spectrum Case` vs `Spectrum 2 Case`) — `name` returns only the item you asked for. When both parameters are supplied, `name` takes precedence.
+Pass a `name` query parameter to [`GET /v1/listings`](/api-reference/get-listings) or [`GET /v1/prices`](/api-reference/get-prices) to fetch a single item by its exact `market_hash_name` (case-insensitive). Unlike `search`, which does fuzzy word matching and can collide on overlapping titles (for example, `Spectrum Case` vs `Spectrum 2 Case`), `name` returns only the item you asked for. When both parameters are supplied, `name` takes precedence — no more post-filtering the response.
 
-This makes it straightforward to pull a single item's live listings or min-ask price without post-filtering the response.
-
-See [Market Data](/guides/market-data), [GET /v1/listings](/api-reference/get-listings), and [GET /v1/prices](/api-reference/get-prices).
+See [Market Data](/guides/market-data) for usage examples.
 
 </Update>
