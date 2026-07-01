@@ -1084,6 +1084,178 @@
             "$ref": "#/components/responses/RateLimited"
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Trading"
+        ],
+        "summary": "Claim a held order",
+        "description": "Release delivery of a held (escrow) order once its hold has cleared. Held orders appear with `status: \"hold\"` and a `hold_until` timestamp; after `hold_until` passes some orders deliver automatically while others require this explicit claim. On a successful claim the marketplace sends a Steam trade offer to your trade URL that your bot must accept within ~15 minutes or it is cancelled and refunded. Idempotent: a duplicate call while one is in flight returns a conflict, never a double-send. Prefer the account-wide `autoclaim` setting if you would rather never call this per order.",
+        "operationId": "claimOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "CSBoard order id of the held order to claim.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim accepted. `claimed: true` means the trade was released now; `claimed: false` means this order delivers automatically and no action was needed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "delivering",
+                        "hold"
+                      ]
+                    },
+                    "claimed": {
+                      "type": "boolean"
+                    },
+                    "steam_trade_offer_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Present when claimed just released a trade offer."
+                    },
+                    "detail": {
+                      "type": "string",
+                      "description": "Present on the auto-delivering no-op case."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "status",
+                    "claimed"
+                  ]
+                },
+                "examples": {
+                  "released": {
+                    "summary": "Manual hold released",
+                    "value": {
+                      "order_id": "ord_01J9Z3K8Q2",
+                      "status": "delivering",
+                      "claimed": true,
+                      "steam_trade_offer_id": "5512345678"
+                    }
+                  },
+                  "auto": {
+                    "summary": "Auto-delivering hold (no-op)",
+                    "value": {
+                      "order_id": "ord_01J9Z3K8Q2",
+                      "status": "hold",
+                      "claimed": false,
+                      "detail": "This order delivers automatically once its hold clears; no claim needed."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No order with that id on this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "order_not_found",
+                  "detail": "No such order on this account."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order is not in a claimable (held) state, or cannot be claimed right now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "not_claimable",
+                  "detail": "Order status is 'completed'; only held orders can be claimed."
+                }
+              }
+            }
+          },
+          "425": {
+            "description": "The item is still under its hold window. Retry after `hold_until`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "hold_until": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "code": "hold_not_cleared",
+                  "hold_until": "2026-07-02T20:00:00Z",
+                  "detail": "Item is still under its hold window; retry after hold_until."
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "502": {
+            "description": "Withdraw was attempted but the marketplace rejected it. If the hold was cancelled upstream your balance was refunded (`refunded: true`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "refunded": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "example": {
+                  "code": "delivery_failed",
+                  "detail": "The hold was cancelled upstream; your balance was refunded.",
+                  "refunded": true
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/market/buy": {
@@ -1610,6 +1782,10 @@
           "idempotency_key": {
             "type": "string",
             "description": "Optional; or send the Idempotency-Key header. Replays the original order on retry."
+          },
+          "autoclaim": {
+            "type": "boolean",
+            "description": "Sticky per-account setting (not per-order). Send `true` once to switch your key into auto-claim mode: every held order is then auto-released the moment its hold clears (your bot must auto-accept the Steam trade offer within ~15 minutes). Send `false` to switch back to manual claiming via `POST /orders/{id}/claim`. Omit to leave the setting unchanged."
           }
         },
         "required": [
@@ -1888,6 +2064,10 @@
             "type": "boolean",
             "default": false,
             "description": "If true, skip items that are no longer available instead of failing the whole request."
+          },
+          "autoclaim": {
+            "type": "boolean",
+            "description": "Sticky per-account setting (not per-order). Send `true` once to switch your key into auto-claim mode: every held order is then auto-released the moment its hold clears (your bot must auto-accept the Steam trade offer within ~15 minutes). Send `false` to switch back to manual claiming via `POST /orders/{id}/claim`. Omit to leave the setting unchanged."
           }
         },
         "required": [

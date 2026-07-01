@@ -28,7 +28,7 @@
                 ]
               },
               {
-                "group": "Guides",
+                "group": "Walkthroughs",
                 "pages": [
                   "guides/market-data",
                   "guides/buying",
@@ -41,18 +41,6 @@
             "tab": "API Reference",
             "groups": [
               {
-                "group": "Status",
-                "pages": [
-                  "api-reference/get-health"
-                ]
-              },
-              {
-                "group": "Account",
-                "pages": [
-                  "api-reference/get-balance"
-                ]
-              },
-              {
                 "group": "Market Data",
                 "pages": [
                   "api-reference/get-listings",
@@ -63,13 +51,26 @@
                 ]
               },
               {
-                "group": "Trading",
+                "group": "Buying",
                 "pages": [
                   "api-reference/post-orders",
                   "api-reference/post-market-buy",
+                  "api-reference/post-orders-claim",
                   "api-reference/get-orders",
                   "api-reference/get-orders-info",
                   "api-reference/get-order"
+                ]
+              },
+              {
+                "group": "Status",
+                "pages": [
+                  "api-reference/get-health"
+                ]
+              },
+              {
+                "group": "Account",
+                "pages": [
+                  "api-reference/get-balance"
                 ]
               }
             ],
@@ -79,7 +80,7 @@
             "tab": "Changelog",
             "groups": [
               {
-                "group": "Changelog",
+                "group": "Releases",
                 "pages": [
                   "changelog/overview"
                 ]
@@ -103,7 +104,7 @@
                 ]
               },
               {
-                "group": "Руководства",
+                "group": "Инструкции",
                 "pages": [
                   "ru/guides/market-data",
                   "ru/guides/buying",
@@ -116,18 +117,6 @@
             "tab": "Справочник API",
             "groups": [
               {
-                "group": "Статус",
-                "pages": [
-                  "ru/api-reference/get-health"
-                ]
-              },
-              {
-                "group": "Аккаунт",
-                "pages": [
-                  "ru/api-reference/get-balance"
-                ]
-              },
-              {
                 "group": "Рыночные данные",
                 "pages": [
                   "ru/api-reference/get-listings",
@@ -138,13 +127,26 @@
                 ]
               },
               {
-                "group": "Торговля",
+                "group": "Покупка",
                 "pages": [
                   "ru/api-reference/post-orders",
                   "ru/api-reference/post-market-buy",
+                  "ru/api-reference/post-orders-claim",
                   "ru/api-reference/get-orders",
                   "ru/api-reference/get-orders-info",
                   "ru/api-reference/get-order"
+                ]
+              },
+              {
+                "group": "Статус",
+                "pages": [
+                  "ru/api-reference/get-health"
+                ]
+              },
+              {
+                "group": "Аккаунт",
+                "pages": [
+                  "ru/api-reference/get-balance"
                 ]
               }
             ],
@@ -154,7 +156,7 @@
             "tab": "Журнал изменений",
             "groups": [
               {
-                "group": "Журнал изменений",
+                "group": "Релизы",
                 "pages": [
                   "ru/changelog/overview"
                 ]
@@ -178,7 +180,7 @@
                 ]
               },
               {
-                "group": "指南",
+                "group": "教程",
                 "pages": [
                   "zh-Hans/guides/market-data",
                   "zh-Hans/guides/buying",
@@ -191,18 +193,6 @@
             "tab": "API 参考",
             "groups": [
               {
-                "group": "状态",
-                "pages": [
-                  "zh-Hans/api-reference/get-health"
-                ]
-              },
-              {
-                "group": "账户",
-                "pages": [
-                  "zh-Hans/api-reference/get-balance"
-                ]
-              },
-              {
                 "group": "市场数据",
                 "pages": [
                   "zh-Hans/api-reference/get-listings",
@@ -213,13 +203,25 @@
                 ]
               },
               {
-                "group": "交易",
+                "group": "购买",
                 "pages": [
                   "zh-Hans/api-reference/post-orders",
                   "zh-Hans/api-reference/post-market-buy",
                   "zh-Hans/api-reference/get-orders",
                   "zh-Hans/api-reference/get-orders-info",
                   "zh-Hans/api-reference/get-order"
+                ]
+              },
+              {
+                "group": "状态",
+                "pages": [
+                  "zh-Hans/api-reference/get-health"
+                ]
+              },
+              {
+                "group": "账户",
+                "pages": [
+                  "zh-Hans/api-reference/get-balance"
                 ]
               }
             ],
@@ -229,7 +231,7 @@
             "tab": "更新日志",
             "groups": [
               {
-                "group": "更新日志",
+                "group": "发布",
                 "pages": [
                   "zh-Hans/changelog/overview"
                 ]

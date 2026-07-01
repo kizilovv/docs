@@ -4,6 +4,18 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="July 1, 2026">
+
+## New features
+
+**Held-order claim endpoint + `autoclaim` account setting**
+
+Orders that land under a marketplace hold (`status: "hold"` with a `hold_until` timestamp) can now be released over the API. Once `hold_until` passes, call [`POST /v1/orders/:id/claim`](/api-reference/post-orders-claim) — some held orders deliver automatically (a harmless no-op) while others require this explicit claim. After a successful claim the marketplace sends a Steam trade offer your bot must accept within ~15 minutes.
+
+Prefer not to claim per order? Set the sticky account flag `autoclaim: true` on [`POST /v1/orders`](/api-reference/post-orders) or [`POST /v1/market/buy`](/api-reference/post-market-buy) and every held order is released automatically the moment its hold clears.
+
+</Update>
+
 <Update label="June 30, 2026">
 
 ## New features

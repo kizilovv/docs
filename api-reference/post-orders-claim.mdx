@@ -1,0 +1,41 @@
+---
+title: "POST /v1/orders/:id/claim — Release a Held Order"
+sidebarTitle: "POST /orders/:id/claim"
+description: "Release delivery of a held (escrow) order once its hold has cleared. Some held orders deliver automatically; others require this explicit claim."
+openapi: "POST /orders/{id}/claim"
+---
+
+Some orders land in a **held** state: the item sits under a marketplace escrow window and cannot be delivered until that window clears. A held order shows `status: "hold"` and a `hold_until` timestamp in `GET /v1/orders` and `GET /v1/orders/{id}`.
+
+Once `hold_until` has passed:
+
+- **Some held orders deliver automatically** — you do nothing, and calling this endpoint returns `claimed: false` as a harmless no-op.
+- **Other held orders must be claimed** — you call this endpoint to release the trade. Without a claim they stay held indefinitely.
+
+Because you cannot tell the two apart from the outside, the safe pattern is: **after `hold_until` passes, call claim once.** If the order was the auto-delivering kind you get a no-op; if it needed a claim, it is released.
+
+<Note>
+Prefer not to poll and claim per order? Set the account-wide [`autoclaim`](/api-reference/post-orders) flag to `true` and every held order is released automatically the moment its hold clears — no claim calls needed.
+</Note>
+
+## Recommended flow
+
+1. Place a buy with `POST /v1/orders` or `POST /v1/market/buy`.
+2. Poll `GET /v1/orders/{id}`. While the order reads `status: "hold"`, check `hold_until`.
+3. Once `hold_until` is in the past, `POST /v1/orders/{id}/claim`.
+4. On `claimed: true`, the marketplace sends a Steam trade offer to your trade URL. **Your bot must accept it within ~15 minutes** or the trade is cancelled and your balance refunded.
+
+## Responses at a glance
+
+| Status | Meaning |
+| --- | --- |
+| `200` `claimed: true` | Trade released now; `steam_trade_offer_id` returned. Accept within ~15 min. |
+| `200` `claimed: false` | This order delivers automatically; nothing to do. |
+| `409 not_claimable` | Order is not in a held state (already delivering/completed/failed). |
+| `425 hold_not_cleared` | Still inside the hold window — retry after the returned `hold_until`. |
+| `502 delivery_failed` | Marketplace rejected the release. If the hold was cancelled upstream, `refunded: true`. |
+| `404 order_not_found` | No such order on this account. |
+
+<Warning>
+The claim is idempotent while a release is in flight — a duplicate call returns a conflict, never a double delivery. Retrying after a network timeout is safe.
+</Warning>
