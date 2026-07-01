@@ -4,6 +4,18 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026 年 7 月 1 日">
+
+## 新功能
+
+**持有订单领取接口 + `autoclaim` 账户设置**
+
+对于进入市场持有状态的订单（`status: "hold"` 并带有 `hold_until` 时间戳），现在可以通过 API 释放它们。当 `hold_until` 过后，调用 [`POST /v1/orders/:id/claim`](/zh-Hans/api-reference/post-orders-claim) —— 部分持有订单会自动交付（此调用是无害的空操作），而其他订单则需要显式领取。成功领取后，市场会发送一个 Steam 交易报价，您的机器人必须在约 15 分钟内接受。
+
+不想为每个订单单独领取？在 [`POST /v1/orders`](/zh-Hans/api-reference/post-orders) 或 [`POST /v1/market/buy`](/zh-Hans/api-reference/post-market-buy) 上设置粘性账户标志 `autoclaim: true`，每个持有订单都会在其持有窗口结束的瞬间自动释放。
+
+</Update>
+
 <Update label="2026 年 6 月 30 日">
 
 ## 新功能

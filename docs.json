@@ -207,6 +207,7 @@
                 "pages": [
                   "zh-Hans/api-reference/post-orders",
                   "zh-Hans/api-reference/post-market-buy",
+                  "zh-Hans/api-reference/post-orders-claim",
                   "zh-Hans/api-reference/get-orders",
                   "zh-Hans/api-reference/get-orders-info",
                   "zh-Hans/api-reference/get-order"

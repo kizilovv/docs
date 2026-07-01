@@ -1,0 +1,41 @@
+---
+title: "POST /v1/orders/:id/claim — 领取处于持有中的订单"
+sidebarTitle: "POST /orders/:id/claim"
+description: "在持有窗口结束后释放处于持有（托管）状态订单的交付。部分持有订单会自动交付，其他订单则需要通过此接口显式领取。"
+openapi: "POST /orders/{id}/claim"
+---
+
+部分订单会进入 **持有** 状态：物品处于市场托管窗口中，在该窗口结束前无法交付。持有中的订单在 `GET /v1/orders` 和 `GET /v1/orders/{id}` 中会显示为 `status: "hold"` 并带有 `hold_until` 时间戳。
+
+当 `hold_until` 已过：
+
+- **部分持有订单会自动交付** —— 您无需做任何事，调用此接口会返回 `claimed: false`（无害的空操作）。
+- **其他持有订单必须被领取** —— 您需要调用此接口来释放交易。如果不领取，它们会一直停留在持有状态。
+
+由于从外部无法区分这两类订单，安全的做法是：**在 `hold_until` 过后调用一次 claim。** 如果订单属于自动交付类型，您会得到一个空操作；如果它需要领取，则会被释放。
+
+<Note>
+不想为每个订单轮询和领取？将账户级 [`autoclaim`](/zh-Hans/api-reference/post-orders) 标志设为 `true`，每个持有订单会在其持有窗口结束的瞬间自动释放 —— 无需调用 claim。
+</Note>
+
+## 推荐流程
+
+1. 使用 `POST /v1/orders` 或 `POST /v1/market/buy` 下单购买。
+2. 轮询 `GET /v1/orders/{id}`。当订单显示为 `status: "hold"` 时，检查 `hold_until`。
+3. 一旦 `hold_until` 已过，调用 `POST /v1/orders/{id}/claim`。
+4. 当返回 `claimed: true` 时，市场会向您的 trade URL 发送一个 Steam 交易报价。**您的机器人必须在约 15 分钟内接受**，否则交易将被取消，余额会退回。
+
+## 响应一览
+
+| 状态 | 含义 |
+| --- | --- |
+| `200` `claimed: true` | 交易已释放；返回 `steam_trade_offer_id`。请在约 15 分钟内接受。 |
+| `200` `claimed: false` | 该订单会自动交付；无需任何操作。 |
+| `409 not_claimable` | 订单不在持有状态（已在交付/已完成/已失败）。 |
+| `425 hold_not_cleared` | 仍在持有窗口内 —— 请在返回的 `hold_until` 之后重试。 |
+| `502 delivery_failed` | 市场拒绝了释放请求。如果上游取消了持有，则 `refunded: true`。 |
+| `404 order_not_found` | 此账户下不存在该订单。 |
+
+<Warning>
+在释放进行中期间，claim 是幂等的 —— 重复调用会返回冲突，绝不会导致重复交付。网络超时后重试是安全的。
+</Warning>
