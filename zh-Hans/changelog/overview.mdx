@@ -4,6 +4,18 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026 年 7 月 1 日">
+
+## 新功能
+
+**holding 状态订单的 claim 接口 + 账户级 `autoclaim` 开关**
+
+进入市场 holding 状态的订单（`status: "hold"`，带 `hold_until` 时间戳）现在可以通过 API 释放。当 `hold_until` 过期后，调用 [`POST /v1/orders/:id/claim`](/api-reference/post-orders-claim) —— 部分 hold 订单会自动交付（此时该调用为无副作用的 no-op），部分则需要显式 claim。成功 claim 后，市场会向您的 bot 发送 Steam 交易报价，需在约 15 分钟内接受。
+
+不想为每个订单单独 claim？在 [`POST /v1/orders`](/zh-Hans/api-reference/post-orders) 或 [`POST /v1/market/buy`](/zh-Hans/api-reference/post-market-buy) 中设置账户级持久标志 `autoclaim: true`，之后每一个 hold 订单在 hold 解除时都会自动释放。
+
+</Update>
+
 <Update label="2026 年 6 月 30 日">
 
 ## 新功能
