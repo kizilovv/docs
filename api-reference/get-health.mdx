@@ -5,7 +5,7 @@ description: "Check whether the CSBoard API is reachable and how stale the price
 openapi: "GET /health"
 ---
 
-The health endpoint is a lightweight probe that confirms the API is reachable and tells you how stale the materialized price list is. It is the **only** endpoint that works without an API key, making it safe to poll from monitoring systems or to gate your application startup on a freshness check before making authenticated calls.
+The health endpoint is a lightweight probe that confirms the API is reachable and tells you how stale the materialized price list is. It is the **only** endpoint that works without an API key. That makes it safe to poll from monitoring systems, or to gate your application startup on a freshness check before making authenticated calls.
 
 ## Response fields
 

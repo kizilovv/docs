@@ -12,7 +12,7 @@ Once `hold_until` has passed:
 - **Some held orders deliver automatically** — you do nothing, and calling this endpoint returns `claimed: false` as a harmless no-op.
 - **Other held orders must be claimed** — you call this endpoint to release the trade. Without a claim they stay held indefinitely.
 
-Because you cannot tell the two apart from the outside, the safe pattern is: **after `hold_until` passes, call claim once.** If the order was the auto-delivering kind you get a no-op; if it needed a claim, it is released.
+Because you cannot tell the two apart from the outside, the safe pattern is: **after `hold_until` passes, call claim once.** If the order was the auto-delivering kind, you get a no-op. If it needed a claim, it is released.
 
 <Note>
 Prefer not to poll and claim per order? Set the account-wide [`autoclaim`](/api-reference/post-orders) flag to `true` and every held order is released automatically the moment its hold clears — no claim calls needed.
