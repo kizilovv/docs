@@ -1417,19 +1417,23 @@
                 },
                 "examples": {
                   "insufficient_settled_balance": {
-                    "summary": "Settled balance too low",
+                    "summary": "Funds are inside the reversal window",
                     "value": {
                       "code": "insufficient_settled_balance",
-                      "detail": "Settled balance is below the order total.",
+                      "detail": "External delivery is payable only from settled (reversal-safe) balance. Wait for in-window credit to settle or top up.",
                       "required_usd": 26.47,
+                      "balance_usd": 30.0,
                       "settled_usd": 10.0
                     }
                   },
                   "insufficient_balance": {
-                    "summary": "Balance too low",
+                    "summary": "Balance too low — top up",
                     "value": {
                       "code": "insufficient_balance",
-                      "detail": "Balance is below the order total."
+                      "detail": "Balance is lower than the order total. Top up and retry.",
+                      "required_usd": 26.47,
+                      "balance_usd": 4.75,
+                      "settled_usd": 4.75
                     }
                   }
                 }

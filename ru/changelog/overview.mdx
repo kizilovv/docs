@@ -4,6 +4,23 @@ sidebarTitle: "Обзор"
 description: "Обновления продукта, новые возможности и исправления CSBoard API."
 ---
 
+<Update label="July 5, 2026">
+
+## Fixes
+
+**Precise 402 error codes on `POST /v1/market/buy`**
+
+The endpoint now distinguishes the two out-of-funds cases instead of always returning `insufficient_settled_balance`:
+
+- `insufficient_balance` — the account balance is simply lower than the order total. Top up and retry.
+- `insufficient_settled_balance` — the balance covers the total, but part of it is still inside the reversal window and cannot fund external delivery yet.
+
+Both responses now include `balance_usd` alongside `required_usd` and `settled_usd`, so a bot can tell the cases apart programmatically. If your integration matched on the `insufficient_settled_balance` code for generic low-funds handling, match on HTTP 402 instead.
+
+Held orders also gained a small post-unlock grace before `claimable` flips to `true` — claiming at the exact unlock instant previously failed on the marketplace side.
+
+</Update>
+
 <Update label="Неделя от 29 июня 2026">
 
 ## Новые возможности
