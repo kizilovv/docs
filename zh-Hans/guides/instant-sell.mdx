@@ -1,0 +1,151 @@
+---
+title: "Instant Sell API — 通过程序化方式出售 CS2 饰品（仅限邀请）"
+sidebarTitle: "Instant Sell"
+description: "通过 CSBoard 机器人网络出售任何 Steam 库存中的 CS2 饰品，在 Steam 交易保护期结束后款项将结算至你的 CSBoard 余额。"
+tag: "仅限邀请"
+---
+
+<Note>
+  **按需开通。** Instant Sell 按账户维度启用。你的 API 密钥开箱即可访问 `GET /v1/sell/status`，但在获得访问权限之前，报价和出售会返回 `selling_not_enabled`。请联系支持团队申请访问权限。
+</Note>
+
+## 工作原理
+
+1. **报价** — `POST /v1/sell/quotes` 传入 Steam 交易链接，会返回该库存中我们愿意收购的每一件物品，并给出每件物品将向你入账的确切美元金额。
+2. **创建订单** — `POST /v1/sell/orders` 传入选定的 `asset_ids`。CSBoard 网络中的一个机器人会向卖家的交易链接发送 Steam 交易报价。较大的篮子可能会拆分为最多 3 个来自不同机器人的报价 — 订单的 `offers[]` 数组会追踪每一个。
+3. **卖家接受** — 订单进入 `received` 状态。Steam 的交易保护期开始（约 8 天）。待结算金额会显示在 `GET /v1/balance` 的 `incoming_hold` 字段中。
+4. **结算** — 保护期结束后，订单完成，全额款项将结算至**你的 CSBoard 余额**。没有其他出款渠道：资金始终结算至创建该订单的 API 密钥所属的余额。
+
+<Warning>
+  款项**仅在结算后**入账，绝不会在报价被接受时立即入账。处于 `received` 状态的订单代表在途资金，而非账户余额。请按 ~8 天的保护期规划现金流。
+</Warning>
+
+## 向你的用户验证报价
+
+每个报价都会暴露发送机器人的资料和 Steam 交易报价 id：
+
+```json
+"bot": {
+  "name": "CSBoard Bot #4",
+  "avatar": "https://…",
+  "steam_id": "7656119…",
+  "profile_url": "https://steamcommunity.com/profiles/7656119…",
+  "level": 30
+},
+"trade_offer_id": "7654321098"
+```
+
+请在你自己的界面中展示这些信息，以便卖家在接受之前，将收到的 Steam 报价与预期的 `trade_offer_id` 和机器人的 `steam_id` 进行比对 — 无论由哪个机器人发出报价，这项校验都能防范假冒诈骗。
+
+## 端点
+
+所有端点都位于 `/v1/sell` 下，并使用与 API 其他部分相同的 `csb_pub_` Bearer 密钥。
+
+### GET /v1/sell/status
+
+功能发现。适用于每个密钥。
+
+```json
+{
+  "enabled": true,
+  "access": "invite_only",
+  "selling_enabled_for_key": false,
+  "min_item_usd": 0.5,
+  "max_items_per_order": 250,
+  "max_active_orders": 10,
+  "hold_days_estimate": 8
+}
+```
+
+### POST /v1/sell/quotes
+
+```json
+{ "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=…&token=…" }
+```
+
+返回可售物品，以及每件物品将入账的确切美元金额：
+
+```json
+{
+  "expires_at": "2026-07-11T18:03:00Z",
+  "items": [
+    {
+      "asset_id": "41165110534",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "price_usd": 21.37,
+      "float": 0.23,
+      "phase": null,
+      "icon_url": "https://…"
+    }
+  ]
+}
+```
+
+报价有效期约为两分钟。若已过期，请在创建订单前重新报价。
+
+### POST /v1/sell/orders
+
+```json
+{
+  "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=…&token=…",
+  "asset_ids": ["41165110534", "41165110599"],
+  "min_total_usd": 30.00,
+  "external_id": "my-shop-order-1017"
+}
+```
+
+- `min_total_usd` — 可选的价格波动下限。如果在报价与执行之间实时总价跌破该值，订单将以 `price_drift` 被拒绝，不会产生任何副作用。
+- `external_id` — 你的幂等 id，在每个密钥下唯一。使用相同 `external_id` 重试会返回原订单，而不会创建重复订单。
+- `Idempotency-Key` 请求头 — 请求级的重放保护，语义与 `POST /v1/orders` 一致。
+
+### GET /v1/sell/orders/:id
+
+也可通过 `GET /v1/sell/orders?external_id=…` 访问。
+
+```json
+{
+  "id": "so_cmqx…",
+  "external_id": "my-shop-order-1017",
+  "status": "received",
+  "total_usd": 30.10,
+  "credited_usd": 0,
+  "unhold_at": "2026-07-19T14:02:11Z",
+  "offers": [
+    {
+      "trade_offer_id": "7654321098",
+      "status": "received",
+      "amount_usd": 30.10,
+      "expires_at": "2026-07-11T14:17:11Z",
+      "items": [ { "asset_id": "…", "market_hash_name": "…", "price_usd": 21.37 } ],
+      "bot": { "name": "…", "avatar": "…", "steam_id": "…", "profile_url": "…", "level": 30 }
+    }
+  ],
+  "fail_reason": null
+}
+```
+
+`credited_usd` 会随着报价结算而增长 — 拆分订单可以部分结算，同时其余报价仍处于保护期。
+
+### POST /v1/sell/orders/:id/cancel
+
+允许在订单状态为 `pending` 或 `offer_sent` 时取消（即卖家接受之前）。此后阶段会返回 `409 not_cancellable`。
+
+## 订单生命周期
+
+| 状态 | 含义 |
+| --- | --- |
+| `pending` | 订单已创建，报价准备中 |
+| `offer_sent` | Steam 交易报价已发送给卖家 |
+| `received` | 卖家已接受；交易保护期进行中（~8 天） |
+| `completed` | 已结算 — 全额款项已入账至你的余额 |
+| `cancelled` | 已取消，或报价已过期 / 被拒绝 |
+| `failed` | 无法执行 — 参见 `fail_reason` |
+
+## 错误
+
+错误遵循标准的 `{ "code", "detail" }` 结构。出售相关的错误码：`invalid_trade_url`、`private_inventory`、`inventory_unavailable`、`item_not_in_inventory`、`item_not_tradable`、`no_eligible_items`、`price_drift`、`too_many_items`、`active_order_exists`、`too_many_active_orders`、`daily_cap_exceeded`、`offer_declined`、`offer_expired`、`sell_disabled`、`selling_not_enabled`、`rate_limited`。
+
+## 限制
+
+- 报价：每个密钥每分钟 10 次请求（库存扫描开销较大）。
+- 订单：每个密钥每分钟 5 次创建，10 个活跃订单，默认每日 \$2,000 的成交额上限。上限可按账户提高 — 请联系支持团队。

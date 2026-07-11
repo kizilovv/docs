@@ -186,7 +186,8 @@
                 "pages": [
                   "zh-Hans/guides/market-data",
                   "zh-Hans/guides/buying",
-                  "zh-Hans/guides/automation"
+                  "zh-Hans/guides/automation",
+                  "zh-Hans/guides/instant-sell"
                 ]
               }
             ]
