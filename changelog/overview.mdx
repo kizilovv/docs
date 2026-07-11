@@ -4,6 +4,24 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="Week of July 6, 2026">
+
+## New features
+
+**Instant Sell API (invite-only)**
+
+Sell CS2 skins programmatically through the CSBoard bot network. Quote a Steam inventory, create a sell order, and funds settle to your CSBoard balance once Steam's trade-protection hold clears (~8 days).
+
+- Quote any Steam inventory with [`POST /v1/sell/quotes`](/guides/instant-sell) — every eligible item comes back with the exact USD amount you'll be credited.
+- Create orders with [`POST /v1/sell/orders`](/guides/instant-sell), with optional `min_total_usd` price-drift protection and `external_id` idempotency.
+- Track lifecycle (`pending` → `offer_sent` → `received` → `completed`) and settled amounts with [`GET /v1/sell/orders/:id`](/guides/instant-sell). Large baskets can split across up to 3 bots.
+- Every offer exposes the sending bot's Steam profile and `trade_offer_id` so you can render anti-impersonation checks to sellers.
+- Access is granted per-account — call [`GET /v1/sell/status`](/guides/instant-sell) to check, and contact support to request access.
+
+See the [Instant Sell guide](/guides/instant-sell) for the full walkthrough.
+
+</Update>
+
 <Update label="July 5, 2026">
 
 ## Fixes

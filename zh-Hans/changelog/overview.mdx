@@ -4,6 +4,24 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026 年 7 月 6 日当周">
+
+## 新功能
+
+**极速出售 API（仅限受邀访问）**
+
+通过 CSBoard 的机器人网络以程序化方式出售 CS2 饰品。对 Steam 库存进行报价、创建出售订单，待 Steam 的交易保护冻结期结束（约 8 天）后，款项将结算到您的 CSBoard 余额。
+
+- 使用 [`POST /v1/sell/quotes`](/guides/instant-sell) 对任意 Steam 库存进行报价 —— 每一件符合条件的物品都会返回您将获得入账的准确美元金额。
+- 使用 [`POST /v1/sell/orders`](/guides/instant-sell) 创建订单，可选传入 `min_total_usd` 以防范价格波动，并通过 `external_id` 实现幂等性。
+- 使用 [`GET /v1/sell/orders/:id`](/guides/instant-sell) 跟踪生命周期（`pending` → `offer_sent` → `received` → `completed`）及结算金额。大批量物品可能被拆分到最多 3 个机器人处理。
+- 每个报价都会公开发送方机器人的 Steam 个人资料和 `trade_offer_id`，方便您向出售方展示防冒充校验信息。
+- 访问权限按账户单独开通 —— 调用 [`GET /v1/sell/status`](/guides/instant-sell) 查询当前状态，如需申请开通请联系客服。
+
+完整流程请参阅 [极速出售指南](/guides/instant-sell)。
+
+</Update>
+
 <Update label="July 5, 2026">
 
 ## Fixes
