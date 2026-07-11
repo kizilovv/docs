@@ -1,0 +1,151 @@
+---
+title: "Instant Sell API — Sell CS2 Skins Programmatically (Invite-Only)"
+sidebarTitle: "Instant Sell"
+description: "Sell CS2 skins from any Steam inventory through the CSBoard bot network and get paid to your CSBoard balance after the trade-protection hold clears."
+tag: "Invite-only"
+---
+
+<Note>
+  **Access on request.** Instant Sell is enabled per-account. Your API key can read `GET /v1/sell/status` out of the box, but quoting and selling return `selling_not_enabled` until access is granted. Contact support to request access.
+</Note>
+
+## How it works
+
+1. **Quote** — `POST /v1/sell/quotes` with a Steam trade URL returns every item in that inventory we are ready to buy, with the exact USD amount you will be credited per item.
+2. **Create an order** — `POST /v1/sell/orders` with the chosen `asset_ids`. A bot from the CSBoard network sends a Steam trade offer to the seller's trade URL. Large baskets may split into up to 3 offers from different bots — the order's `offers[]` array tracks each one.
+3. **Seller accepts** — the order moves to `received`. Steam's trade protection hold now runs (about 8 days). The pending amount is visible in `GET /v1/balance` under `incoming_hold`.
+4. **Settlement** — when the hold clears, the order completes and the full amount is credited to **your CSBoard balance**. There is no other payout destination: funds always settle to the balance of the API key that created the order.
+
+<Warning>
+  Money is credited **only after settlement**, never at offer-accept time. An order showing `received` is money in flight, not money on your balance. Plan cash flow around the ~8-day hold.
+</Warning>
+
+## Verify offers to your users
+
+Every offer exposes the sending bot's profile and the Steam trade offer id:
+
+```json
+"bot": {
+  "name": "CSBoard Bot #4",
+  "avatar": "https://…",
+  "steam_id": "7656119…",
+  "profile_url": "https://steamcommunity.com/profiles/7656119…",
+  "level": 30
+},
+"trade_offer_id": "7654321098"
+```
+
+Render this next to your own UI so the seller can match the incoming Steam offer against the expected `trade_offer_id` and bot `steam_id` before accepting — that check defeats impersonation scams regardless of which bot ships the offer.
+
+## Endpoints
+
+All endpoints live under `/v1/sell` and use the same `csb_pub_` Bearer key as the rest of the API.
+
+### GET /v1/sell/status
+
+Feature discovery. Works for every key.
+
+```json
+{
+  "enabled": true,
+  "access": "invite_only",
+  "selling_enabled_for_key": false,
+  "min_item_usd": 0.5,
+  "max_items_per_order": 250,
+  "max_active_orders": 10,
+  "hold_days_estimate": 8
+}
+```
+
+### POST /v1/sell/quotes
+
+```json
+{ "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=…&token=…" }
+```
+
+Returns sellable items with the exact USD amount credited per item:
+
+```json
+{
+  "expires_at": "2026-07-11T18:03:00Z",
+  "items": [
+    {
+      "asset_id": "41165110534",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "price_usd": 21.37,
+      "float": 0.23,
+      "phase": null,
+      "icon_url": "https://…"
+    }
+  ]
+}
+```
+
+Quotes are valid for about two minutes. Re-quote before creating an order if they expire.
+
+### POST /v1/sell/orders
+
+```json
+{
+  "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=…&token=…",
+  "asset_ids": ["41165110534", "41165110599"],
+  "min_total_usd": 30.00,
+  "external_id": "my-shop-order-1017"
+}
+```
+
+- `min_total_usd` — optional price-drift floor. If the live total drops below it between quote and execution, the order is rejected with `price_drift` and no side effects.
+- `external_id` — your idempotency id, unique per key. Retrying with the same `external_id` returns the original order instead of creating a duplicate.
+- `Idempotency-Key` header — request-level replay protection, same semantics as `POST /v1/orders`.
+
+### GET /v1/sell/orders/:id
+
+Also available as `GET /v1/sell/orders?external_id=…`.
+
+```json
+{
+  "id": "so_cmqx…",
+  "external_id": "my-shop-order-1017",
+  "status": "received",
+  "total_usd": 30.10,
+  "credited_usd": 0,
+  "unhold_at": "2026-07-19T14:02:11Z",
+  "offers": [
+    {
+      "trade_offer_id": "7654321098",
+      "status": "received",
+      "amount_usd": 30.10,
+      "expires_at": "2026-07-11T14:17:11Z",
+      "items": [ { "asset_id": "…", "market_hash_name": "…", "price_usd": 21.37 } ],
+      "bot": { "name": "…", "avatar": "…", "steam_id": "…", "profile_url": "…", "level": 30 }
+    }
+  ],
+  "fail_reason": null
+}
+```
+
+`credited_usd` grows as offers settle — a split order can settle partially while the remaining offers are still in hold.
+
+### POST /v1/sell/orders/:id/cancel
+
+Allowed while the order is `pending` or `offer_sent` (before the seller accepts). Later stages return `409 not_cancellable`.
+
+## Order lifecycle
+
+| Status | Meaning |
+| --- | --- |
+| `pending` | Order created, offers being prepared |
+| `offer_sent` | Steam trade offer(s) delivered to the seller |
+| `received` | Seller accepted; trade-protection hold running (~8 days) |
+| `completed` | Settled — full amount credited to your balance |
+| `cancelled` | Cancelled, or the offer expired / was declined |
+| `failed` | Could not be executed — see `fail_reason` |
+
+## Errors
+
+Errors follow the standard `{ "code", "detail" }` envelope. Sell-specific codes: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`.
+
+## Limits
+
+- Quotes: 10 requests/min per key (inventory scans are expensive).
+- Orders: 5 creations/min per key, 10 active orders, \$2,000/day default volume cap. Caps are raised per-account — ask support.
