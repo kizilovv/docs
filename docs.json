@@ -32,7 +32,8 @@
                 "pages": [
                   "guides/market-data",
                   "guides/buying",
-                  "guides/automation"
+                  "guides/automation",
+                  "guides/instant-sell"
                 ]
               }
             ]
@@ -108,7 +109,8 @@
                 "pages": [
                   "ru/guides/market-data",
                   "ru/guides/buying",
-                  "ru/guides/automation"
+                  "ru/guides/automation",
+                  "ru/guides/instant-sell"
                 ]
               }
             ]
