@@ -31,6 +31,9 @@ The response is a single `Order` object with the same shape as the items in [`GE
 <ResponseField name="charged_total_usd" type="number" required />
 <ResponseField name="item_count" type="integer" required />
 <ResponseField name="hold_until" type="datetime | null" />
+<ResponseField name="refund" type="Refund | null">
+  Money credited back for this order, or `null` if none was. Carries `amount_usd`, `refunded_at`, and `partial`. A `cancelled` or `failed` order is always refunded — read this instead of inferring it from the status.
+</ResponseField>
 <ResponseField name="created_at" type="datetime" required />
 <ResponseField name="updated_at" type="datetime | null" />
 <ResponseField name="items" type="OrderItem[]" required>
@@ -56,6 +59,7 @@ curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
   "charged_total_usd": 26.47,
   "item_count": 2,
   "hold_until": null,
+  "refund": null,
   "created_at": "2026-06-29T17:12:04Z",
   "updated_at": "2026-06-29T17:15:40Z",
   "items": [

@@ -1,0 +1,149 @@
+---
+title: "GET /v1/transactions — Your Balance Ledger"
+sidebarTitle: "GET /transactions"
+description: "Every movement on your CSBoard balance — purchases, refunds, sales, deposits — newest first, keyset paginated. The endpoint to reconcile against."
+openapi: "GET /transactions"
+---
+
+The transactions endpoint is your money ledger: one row per movement on your balance, newest first. It is the endpoint to reconcile against — a failed purchase and the refund that made you whole are two rows carrying the same `order_id`.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Any valid key works; the trading flag is not needed.
+
+<Note>
+  A `cancelled` or `failed` order is **always refunded**, and the credit usually lands within seconds. You do not need to poll this endpoint to find out whether a refund happened — the order itself carries a [`refund`](/api-reference/get-orders) object. Use `/v1/transactions` when you want the full money trail: bookkeeping, an internal statement, or an end-of-day reconciliation.
+</Note>
+
+## Query parameters
+
+<ParamField query="limit" type="integer" default="50">
+  Results per page. Minimum `1`, maximum `100`.
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter by movement type. One of: `purchase`, `refund`, `sale`, `deposit`, `withdrawal`, `bonus`, `fee`.
+</ParamField>
+
+<ParamField query="start_unix_time" type="integer">
+  Only return entries created at or after this Unix timestamp (seconds).
+</ParamField>
+
+<ParamField query="end_unix_time" type="integer">
+  Only return entries created at or before this Unix timestamp (seconds).
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset cursor from a previous response's `meta.next_cursor`. Pass it to fetch the next page.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="data" type="Transaction[]" required>
+  Array of ledger entries for this page.
+
+  <Expandable title="Transaction object">
+    <ResponseField name="id" type="string" required>
+      Ledger entry id.
+    </ResponseField>
+    <ResponseField name="type" type="string" required>
+      What moved the money. One of: `purchase`, `refund`, `sale`, `deposit`, `withdrawal`, `bonus`, `fee`, `adjustment`.
+    </ResponseField>
+    <ResponseField name="amount_usd" type="number" required>
+      Signed. Negative means money left your balance, positive means it came in.
+    </ResponseField>
+    <ResponseField name="balance_after_usd" type="number" required>
+      Your balance immediately after this entry.
+    </ResponseField>
+    <ResponseField name="order_id" type="string | null">
+      The order this movement belongs to. `null` for movements that are not tied to an order (a deposit, a bonus).
+    </ResponseField>
+    <ResponseField name="order_kind" type="string | null">
+      Whether `order_id` refers to a `buy` or a `sell` order.
+    </ResponseField>
+    <ResponseField name="created_at" type="datetime" required>
+      ISO 8601 timestamp.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="meta" type="object" required>
+  <Expandable title="meta object">
+    <ResponseField name="next_cursor" type="string | null" required>
+      Pass back as `cursor` to fetch the next page. `null` on the last page.
+    </ResponseField>
+    <ResponseField name="per_page" type="integer" required>
+      Page size used for this response.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/transactions?type=refund&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+A purchase that could not be delivered, and its refund — same `order_id`, seconds apart:
+
+```json
+{
+  "data": [
+    {
+      "id": "tx_01J9Z3M2A7",
+      "type": "refund",
+      "amount_usd": 1.28,
+      "balance_after_usd": 429.46,
+      "order_id": "cmrkm405x0709yj01b8lmzk62",
+      "order_kind": "buy",
+      "created_at": "2026-07-14T12:13:15Z"
+    },
+    {
+      "id": "tx_01J9Z3M1Q4",
+      "type": "purchase",
+      "amount_usd": -1.28,
+      "balance_after_usd": 428.18,
+      "order_id": "cmrkm405x0709yj01b8lmzk62",
+      "order_kind": "buy",
+      "created_at": "2026-07-14T12:13:15Z"
+    }
+  ],
+  "meta": { "next_cursor": "eyJ0IjoiMjAyNi0wNy0xNFQxMjoxMzoxNVoifQ==", "per_page": 50 }
+}
+```
+
+## Reconciling a day
+
+Walk the ledger with the cursor and sum by type — purchases and refunds net out against the orders you know:
+
+```python
+import requests
+
+HEADERS = {"Authorization": "Bearer csb_pub_..."}
+cursor, totals = None, {}
+
+while True:
+    r = requests.get(
+        "https://csboard.com/v1/transactions",
+        params={"limit": 100, "start_unix_time": 1752451200, "cursor": cursor},
+        headers=HEADERS,
+    ).json()
+
+    for tx in r["data"]:
+        totals[tx["type"]] = round(totals.get(tx["type"], 0) + tx["amount_usd"], 2)
+
+    cursor = r["meta"]["next_cursor"]
+    if not cursor:
+        break
+
+print(totals)  # {'purchase': -524.89, 'refund': 65.09, ...}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 422 | `invalid_request` | Invalid query parameters (unknown `type`, bad cursor, `limit` out of range). |
+| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |

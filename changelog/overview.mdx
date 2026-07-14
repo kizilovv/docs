@@ -4,6 +4,21 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="July 14, 2026">
+
+## New features
+
+**Refunds are now explicit — no more guessing**
+
+An order that ends `cancelled` or `failed` has always been refunded in full, usually within seconds. The API just never said so, which left clients rendering "refund pending" against orders that were already settled. Two additions fix that:
+
+- Every order — in [`GET /v1/orders`](/api-reference/get-orders), [`GET /v1/orders/{id}`](/api-reference/get-order) and [`GET /v1/orders/info`](/api-reference/get-orders-info) — now carries a **`refund`** object: `amount_usd`, `refunded_at`, and `partial` (true when only one leg of a multi-item order came back). It is `null` when nothing was refunded.
+- New endpoint [**`GET /v1/transactions`**](/api-reference/get-transactions) — your full balance ledger, keyset paginated: `purchase`, `refund`, `sale`, `deposit`, `withdrawal`, `bonus`, `fee`, `adjustment`. A purchase and the refund that reversed it share the same `order_id`, so an end-of-day reconciliation is one pass over this feed.
+
+Both are additive — the `status` vocabulary is unchanged, so existing integrations keep working untouched.
+
+</Update>
+
 <Update label="Week of July 6, 2026">
 
 ## New features

@@ -1544,6 +1544,136 @@
           }
         }
       }
+    },
+    "/transactions": {
+      "get": {
+        "summary": "Your balance ledger",
+        "description": "Every movement on your API balance — purchases, refunds, sales, deposits — newest first, keyset paginated. Use it to reconcile: a failed purchase and its refund are two rows sharing the same `order_id`.",
+        "operationId": "getTransactions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Results per page. 1–100. Default 50.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by movement type.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "purchase",
+                "refund",
+                "sale",
+                "deposit",
+                "withdrawal",
+                "bonus",
+                "fee"
+              ]
+            }
+          },
+          {
+            "name": "start_unix_time",
+            "in": "query",
+            "description": "Only entries created at or after this Unix timestamp (seconds).",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "end_unix_time",
+            "in": "query",
+            "description": "Only entries created at or before this Unix timestamp (seconds).",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Keyset cursor from a previous response's `meta.next_cursor`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of ledger entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Transaction"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2039,6 +2169,17 @@
             ],
             "format": "date-time"
           },
+          "refund": {
+            "description": "Refund credited for this order, or `null` if none. A `cancelled` or `failed` order is ALWAYS refunded — this field is the receipt, so you never have to infer it from the status or reconcile against your balance.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Refund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -2203,6 +2344,95 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "Refund": {
+        "type": "object",
+        "description": "Money credited back to your balance for this order. `null` when nothing was refunded.",
+        "properties": {
+          "amount_usd": {
+            "type": "number",
+            "description": "Total credited back, in USD.",
+            "example": 1.28
+          },
+          "refunded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the last refund credit landed."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "true when only part of the order was refunded (one leg of a multi-item order failed and the rest was delivered).",
+            "example": false
+          }
+        },
+        "required": [
+          "amount_usd",
+          "refunded_at",
+          "partial"
+        ]
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Ledger entry id."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "purchase",
+              "refund",
+              "sale",
+              "deposit",
+              "withdrawal",
+              "bonus",
+              "fee",
+              "adjustment"
+            ],
+            "description": "What moved the money."
+          },
+          "amount_usd": {
+            "type": "number",
+            "description": "Signed: negative left your balance, positive came in.",
+            "example": -1.28
+          },
+          "balance_after_usd": {
+            "type": "number",
+            "description": "Your balance right after this entry.",
+            "example": 428.18
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order this movement belongs to, or `null` for non-order movements (deposits, bonuses)."
+          },
+          "order_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "buy",
+              "sell",
+              null
+            ],
+            "description": "Whether `order_id` refers to a buy or a sell order."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "amount_usd",
+          "balance_after_usd",
+          "created_at"
         ]
       }
     }

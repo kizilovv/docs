@@ -71,7 +71,8 @@
               {
                 "group": "Account",
                 "pages": [
-                  "api-reference/get-balance"
+                  "api-reference/get-balance",
+                  "api-reference/get-transactions"
                 ]
               }
             ],

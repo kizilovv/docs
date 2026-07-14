@@ -26,8 +26,12 @@ Use this endpoint to poll the status of many orders in one call. Supply `custom_
 ## Response fields
 
 <ResponseField name="data" type="Order[]" required>
-  Array of matching orders. Each `Order` has the same shape as in [`GET /v1/orders`](/api-reference/get-orders) — including `order_id`, `status`, `charged_total_usd`, and the per-item `items` breakdown.
+  Array of matching orders. Each `Order` has the same shape as in [`GET /v1/orders`](/api-reference/get-orders) — including `order_id`, `status`, `charged_total_usd`, the `refund` object, and the per-item `items` breakdown.
 </ResponseField>
+
+<Note>
+  Polling this endpoint by `custom_id` is the cheapest way to follow a batch. An order that ends `cancelled` or `failed` has already been refunded — `refund.amount_usd` tells you how much came back and `refund.refunded_at` when.
+</Note>
 
 ## Example request
 
@@ -50,8 +54,27 @@ curl "https://csboard.com/v1/orders/info?custom_ids=batch-2026-06-29-01,batch-20
       "charged_total_usd": 26.47,
       "item_count": 2,
       "hold_until": null,
+      "refund": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
+      "items": []
+    },
+    {
+      "order_id": "ord_01J9Z3M0F1",
+      "steam_id": "76561198000000000",
+      "status": "cancelled",
+      "custom_id": "batch-2026-06-29-02",
+      "currency": "USD",
+      "charged_total_usd": 1.28,
+      "item_count": 1,
+      "hold_until": null,
+      "refund": {
+        "amount_usd": 1.28,
+        "refunded_at": "2026-06-29T17:20:11Z",
+        "partial": false
+      },
+      "created_at": "2026-06-29T17:20:10Z",
+      "updated_at": "2026-06-29T17:20:11Z",
       "items": []
     }
   ]

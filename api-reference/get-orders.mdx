@@ -9,6 +9,10 @@ The orders endpoint returns your purchase history, newest first, using keyset pa
 
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
 
+<Note>
+  **A `cancelled` or `failed` order is always refunded — and the `refund` object is the receipt.** An item can disappear from its source between the moment you read it and the moment we buy it; when that happens the order ends `cancelled` and the money is credited straight back, usually within seconds. Read `refund.amount_usd` / `refund.refunded_at` instead of inferring "refund pending" from the status. The full money trail lives at [`GET /v1/transactions`](/api-reference/get-transactions).
+</Note>
+
 ## Query parameters
 
 <ParamField query="limit" type="integer" default="50">
@@ -60,6 +64,21 @@ The orders endpoint returns your purchase history, newest first, using keyset pa
     </ResponseField>
     <ResponseField name="hold_until" type="datetime | null">
       When the order's held items clear, or `null`.
+    </ResponseField>
+    <ResponseField name="refund" type="Refund | null">
+      Money credited back for this order, or `null` if none was.
+
+      <Expandable title="Refund object">
+        <ResponseField name="amount_usd" type="number" required>
+          Total credited back to your balance, in USD.
+        </ResponseField>
+        <ResponseField name="refunded_at" type="datetime" required>
+          When the last refund credit landed.
+        </ResponseField>
+        <ResponseField name="partial" type="boolean" required>
+          `true` when only part of the order came back — one item of a multi-item order failed and the rest was delivered.
+        </ResponseField>
+      </Expandable>
     </ResponseField>
     <ResponseField name="created_at" type="datetime" required>
       ISO 8601 creation timestamp.
@@ -121,6 +140,7 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "charged_total_usd": 26.47,
       "item_count": 2,
       "hold_until": null,
+      "refund": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
       "items": [
@@ -132,6 +152,34 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
           "return_reason": null,
           "steam_trade_offer_id": "5512345678",
           "steam_trade_offer_finished_at": "2026-06-29T17:15:40Z"
+        }
+      ]
+    },
+    {
+      "order_id": "ord_01J9Z3M0F1",
+      "steam_id": "76561198000000000",
+      "status": "cancelled",
+      "custom_id": "batch-2026-06-29-02",
+      "currency": "USD",
+      "charged_total_usd": 1.28,
+      "item_count": 1,
+      "hold_until": null,
+      "refund": {
+        "amount_usd": 1.28,
+        "refunded_at": "2026-06-29T17:20:11Z",
+        "partial": false
+      },
+      "created_at": "2026-06-29T17:20:10Z",
+      "updated_at": "2026-06-29T17:20:11Z",
+      "items": [
+        {
+          "market_hash_name": "Prisma Case",
+          "price_usd": 1.28,
+          "status": "returned",
+          "tradable_at": null,
+          "return_reason": "unavailable",
+          "steam_trade_offer_id": null,
+          "steam_trade_offer_finished_at": null
         }
       ]
     }
