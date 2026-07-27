@@ -55,8 +55,14 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
   纪念品过滤。`only` 仅返回纪念品商品；`exclude` 将其从结果中移除。
 </ParamField>
 
+<ParamField query="available_after" type="string (ISO 8601)">
+  仅返回在该时间戳之后进入目录的挂单——增量轮询参数。与 `sort=newest` 搭配使用时，通常的响应是一个空页面，这正是让频繁轮询变得廉价、而不是每次都全量重扫的原因。
+
+  **请将水位线回退约 60 秒，并按 `id` 去重。** 请发送 `max(listed_at) - 60s`，而不是那个裸的最大值。时间戳取自发布该挂单的数据库事务的**开始**时刻，因此一个大批次可能提交出时间戳*更早*的行，而一个更小、更晚的批次却已经提交完毕；把水位线精确推进到最大值，会永久跳过这些挂单。
+</ParamField>
+
 <ParamField query="sort" type="string" default="id">
-  排序方式。可选值：`id`（稳定的默认值）、`newest`、`price_asc`、`price_desc` 之一。
+  排序方式。可选值：`id`（稳定的默认值）、`newest`、`price_asc`、`price_desc` 之一。`newest` 按 `listed_at` 排序，因此重新上架的商品会与真正的新库存一起浮现。
 </ParamField>
 
 <ParamField query="cursor" type="string">
@@ -147,6 +153,10 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
     <ResponseField name="delivery" type="string" required>
       预期的交付模式：`instant`（即时转移）或 `hold`（受 Steam 交易冻结约束）。
     </ResponseField>
+
+    <ResponseField name="listed_at" type="datetime | null">
+      该商品进入目录的时间。这与记录的创建时间**并不相同**：商品会不断回到目录——已取消的订单、过期的交易报价、解除的冻结——重新上架的商品对您而言就是新的，即使它此前已经存在。这个值就是要回传给 `available_after` 的值。
+    </ResponseField>
   </Expandable>
 </ResponseField>
 
@@ -210,7 +220,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
 | 401 | `unauthorized` | API 密钥缺失或无效。 |
-| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请按照 `Retry-After` 响应头中的秒数退避。 |
+| 429 | `rate_limit_exceeded` | 超过该密钥的每分钟限额（默认 100 次/分钟）。请按照 `Retry-After` 响应头中的秒数退避。 |
 
 <Tip>
   每条挂单上的 `price_usd` 是**权威购买价格**——它反映了查询时刻的实时报价，也正是您将被扣除的金额。请不要将 `/prices` 端点中的 `min_price_usd` 用作购买价格估算；该值可能滞后。

@@ -4,6 +4,30 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="July 27, 2026">
+
+## New features
+
+**Stop polling for new listings — subscribe to them**
+
+Until today the only way to notice new inventory was to poll [`GET /v1/listings`](/api-reference/get-listings) harder, and that cost does not divide across clients: ten integrators at 300 requests/minute is ten separate deep scans of the same table returning almost identical rows. Worse, the thing everyone was polling could not answer the question — `sort=newest` ordered by when the *row* was created, so items returning to the catalogue from cancelled orders, expired trade offers and released holds never surfaced at the top, no matter how fast anyone polled.
+
+Three additions, all backward compatible:
+
+- New endpoint [**`GET /v1/listings/stream`**](/api-reference/get-listings-stream) — Server-Sent Events. One connection replaces any polling loop, and it emits **`gone`** events as well as `new` ones. That second half is what polling cannot express: a poller only discovers an item sold by trying to buy it and failing. Reconnects are gap-free via the standard `Last-Event-ID` header, including across our deploys.
+- New query parameter **`available_after`** on `GET /v1/listings` — turns a poll into a delta read. The usual response is an empty page. Overlap your watermark by ~60 seconds and dedupe by `id`; the parameter docs explain why that overlap is not optional.
+- New field **`listed_at`** on every `Listing` — when the item entered the catalogue, which is what `sort=newest` now orders by. Re-listings surface alongside genuinely new inventory.
+
+Nothing existing changes shape: `sort=newest` keeps its name and its ordering direction, it simply stopped hiding re-listings.
+
+## Fixes
+
+**Corrected rate limits in the docs**
+
+The published limits were wrong in the direction that costs you throughput: pointed reads are **100 requests/minute**, not 30, and `POST /v1/orders` is **250/minute**, not 30. If you sized your client against the old numbers, you have more headroom than you thought — and if you were about to ask for a raise, try `available_after` or the stream first.
+
+</Update>
+
 <Update label="July 14, 2026">
 
 ## New features

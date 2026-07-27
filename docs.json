@@ -45,6 +45,7 @@
                 "group": "Market Data",
                 "pages": [
                   "api-reference/get-listings",
+                  "api-reference/get-listings-stream",
                   "api-reference/get-listings-availability",
                   "api-reference/get-prices",
                   "api-reference/get-prices-snapshot",
@@ -123,6 +124,7 @@
                 "group": "Рыночные данные",
                 "pages": [
                   "ru/api-reference/get-listings",
+                  "ru/api-reference/get-listings-stream",
                   "ru/api-reference/get-listings-availability",
                   "ru/api-reference/get-prices",
                   "ru/api-reference/get-prices-snapshot",
@@ -200,6 +202,7 @@
                 "group": "市场数据",
                 "pages": [
                   "zh-Hans/api-reference/get-listings",
+                  "zh-Hans/api-reference/get-listings-stream",
                   "zh-Hans/api-reference/get-listings-availability",
                   "zh-Hans/api-reference/get-prices",
                   "zh-Hans/api-reference/get-prices-snapshot",

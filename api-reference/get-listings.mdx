@@ -55,8 +55,14 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
   Souvenir filter. `only` returns only Souvenir items; `exclude` removes them from results.
 </ParamField>
 
+<ParamField query="available_after" type="string (ISO 8601)">
+  Only return listings that entered the catalogue after this timestamp — the delta-poll parameter. Pair it with `sort=newest` and the usual response is an empty page, which is what makes frequent polling cheap instead of a full rescan every tick.
+
+  **Overlap your watermark by ~60 seconds and dedupe by `id`.** Send `max(listed_at) - 60s`, never the bare maximum. Timestamps come from the start of the database transaction that published the listing, so a large batch can commit rows stamped *earlier* than rows a smaller, later batch already committed — a watermark advanced to the exact maximum steps over those listings permanently.
+</ParamField>
+
 <ParamField query="sort" default="id" type="string">
-  Sort order. One of: `id` (stable default), `newest`, `price_asc`, `price_desc`.
+  Sort order. One of: `id` (stable default), `newest`, `price_asc`, `price_desc`. `newest` orders by `listed_at`, so re-listings surface alongside genuinely new inventory.
 </ParamField>
 
 <ParamField query="cursor" type="string">
@@ -150,6 +156,10 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
     <ResponseField name="delivery" type="string" required>
       Expected delivery mode: `instant` (transferred right away) or `hold` (subject to Steam trade hold).
     </ResponseField>
+
+    <ResponseField name="listed_at" type="datetime | null">
+      When this item entered the catalogue. **Not** the same as when the row was created: items return to the catalogue constantly — cancelled orders, expired trade offers, released holds — and a re-listed item is new to you even though it existed before. This is the value to feed back as `available_after`.
+    </ResponseField>
   </Expandable>
 </ResponseField>
 
@@ -213,7 +223,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 | HTTP status | Code | Meaning |
 | --- | --- | --- |
 | 401 | `unauthorized` | Missing or invalid API key. |
-| 429 | `rate_limit_exceeded` | Over 30 requests/min. Back off for the number of seconds in the `Retry-After` header. |
+| 429 | `rate_limit_exceeded` | Over your key's per-minute limit (100/min by default). Back off for the number of seconds in the `Retry-After` header. |
 
 <Tip>
   `price_usd` on each listing is the **authoritative buy price** — it reflects the live asking price at query time and is exactly what you'll be charged. Do not use the `min_price_usd` from the `/prices` endpoint as a buy-price estimate; that value can lag.

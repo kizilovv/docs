@@ -1,0 +1,140 @@
+---
+title: "GET /v1/listings/stream — Live Feed of New and Sold Listings"
+sidebarTitle: "GET /listings/stream"
+description: "Subscribe to CS2 listings the moment they appear and the moment they sell, over Server-Sent Events. Replaces polling, and tells you when items disappear."
+openapi: "GET /listings/stream"
+---
+
+A Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.
+
+Polling cannot answer *"what is new?"* cheaply — every client that tries ends up re-reading the same first page on a timer, and the answer is almost always "nothing". It also cannot answer *"what is gone?"* at all: a poller only discovers an item sold by trying to buy it and failing. This endpoint pushes both.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+Filters are applied on our side, before anything is sent to you. They exist to save your bandwidth — one stream already carries the whole catalogue, so you never need several connections to cover different segments.
+
+<ParamField query="min_price" type="number">
+  Only stream listings at or above this USD price.
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  Only stream listings at or below this USD price.
+</ParamField>
+
+<ParamField query="category" type="string">
+  Only stream this category, e.g. `Rifle`, `Knife`, `Gloves`.
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  Only stream this rarity tier, e.g. `Classified`, `Covert`.
+</ParamField>
+
+<ParamField query="wear" type="string">
+  Only stream this wear bucket: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+</ParamField>
+
+<ParamField query="name" type="string">
+  Exact `market_hash_name` (case-insensitive) — stream one specific item.
+</ParamField>
+
+<ParamField query="stat_trak" type="string">
+  StatTrak™ filter. `only` or `exclude`.
+</ParamField>
+
+<ParamField query="souvenir" type="string">
+  Souvenir filter. `only` or `exclude`.
+</ParamField>
+
+<ParamField query="last_event_id" type="string">
+  Resume after this event id. Use only if your client cannot send the `Last-Event-ID` header — the header is the standard mechanism and is preferred.
+</ParamField>
+
+## Events
+
+<ResponseField name="new" type="Listing">
+  A listing entered the catalogue. The payload is exactly the `Listing` object `GET /v1/listings` returns, including `listed_at`.
+
+  This fires for genuinely new inventory **and** for re-listings — items returning from cancelled orders, expired trade offers, or released holds. A re-listed item is new to you even though it existed before.
+</ResponseField>
+
+<ResponseField name="gone" type="object">
+  A listing left the catalogue — sold, reserved, or withdrawn. The payload is `{ "id": "..." }`.
+
+  **Act on this one.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone. This is the half of the picture polling cannot give you at any frequency.
+</ResponseField>
+
+<ResponseField name="resync" type="object">
+  Your `Last-Event-ID` is older than the retained history, so a replay would be incomplete. Payload is `{ "reason": "last_event_id_expired", "detail": "..." }`.
+
+  Re-read `GET /v1/listings?sort=newest` to rebuild your view, then reconnect without `Last-Event-ID`. We send this rather than silently handing you a partial replay you would mistake for a complete one.
+</ResponseField>
+
+## Reconnecting without gaps
+
+Every event carries an `id`. Send the last id you processed back as the `Last-Event-ID` header on reconnect and you receive exactly what you missed — including across our deploys, which drop open connections by design.
+
+A `: heartbeat` comment arrives every 25 seconds. Treat a longer silence as a dead connection and reconnect; browsers' `EventSource` does this and resends `Last-Event-ID` for you.
+
+## Limits
+
+Three concurrent streams per API key. The connection itself is not rate-limited — once open, events flow as fast as the catalogue changes.
+
+## Example request
+
+```bash
+curl -N "https://csboard.com/v1/listings/stream?max_price=250" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Accept: text/event-stream"
+```
+
+## Example stream
+
+```
+: connected
+
+id: 1785312840123-0
+event: new
+data: {"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f","market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","float_value":0.2418,"price_usd":31.2,"category":"Rifle","rarity":"Classified","tradable":true,"delivery":"instant","listed_at":"2026-07-27T09:14:02.481Z"}
+
+id: 1785312851904-0
+event: gone
+data: {"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f"}
+
+: heartbeat
+```
+
+## Example client
+
+```javascript
+const es = new EventSource("https://csboard.com/v1/listings/stream?max_price=250");
+const live = new Map();
+
+es.addEventListener("new", (e) => {
+  const listing = JSON.parse(e.data);
+  live.set(listing.id, listing);
+});
+
+es.addEventListener("gone", (e) => {
+  live.delete(JSON.parse(e.data).id);
+});
+
+es.addEventListener("resync", () => {
+  live.clear();
+  // re-read /v1/listings?sort=newest, then let EventSource reconnect
+});
+```
+
+`EventSource` cannot set an `Authorization` header — in a server-side runtime use an SSE client that can (or pass the key however your HTTP client allows). The snippet above shows the event handling, not the auth.
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+| --- | --- | --- |
+| 401 | `unauthorized` | Missing or invalid API key. |
+| 429 | `too_many_streams` | More than 3 concurrent streams for this key. Close an existing connection first. |
+
+<Tip>
+  If you are streaming, you do not need to poll `/v1/listings` on a timer at all — keep it for your initial catalogue load and for recovering after a `resync`. If you cannot hold a long-lived connection, the next best thing is `GET /v1/listings` with `available_after`, which turns each poll into a delta read.
+</Tip>

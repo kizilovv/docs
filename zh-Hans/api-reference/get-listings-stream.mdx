@@ -1,0 +1,140 @@
+---
+title: "GET /v1/listings/stream — 上架与售出的实时推送"
+sidebarTitle: "GET /listings/stream"
+description: "通过 Server-Sent Events 在 CS2 挂单出现和售出的那一刻订阅它们。取代轮询，并告诉您商品何时消失。"
+openapi: "GET /listings/stream"
+---
+
+通过 Server-Sent Events 推送目录变化的实时流。一个连接即可取代任何轮询循环。
+
+轮询无法廉价地回答*“有什么新的？”*——每个尝试轮询的客户端最终都在定时重复读取同一个首页，而答案几乎总是“没有”。轮询更完全无法回答*“什么消失了？”*：轮询方只能在尝试购买并失败后才发现商品已售出。本端点会主动推送这两者。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
+
+## 查询参数
+
+过滤在我们这一侧完成，在发送给您之前生效。它们的作用是节省您的带宽——一个流已经承载整个目录，因此您无需为不同细分开启多个连接。
+
+<ParamField query="min_price" type="number">
+  仅推送价格不低于该美元金额的挂单。
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  仅推送价格不高于该美元金额的挂单。
+</ParamField>
+
+<ParamField query="category" type="string">
+  仅推送该类别，例如 `Rifle`、`Knife`、`Gloves`。
+</ParamField>
+
+<ParamField query="rarity" type="string">
+  仅推送该稀有度档位，例如 `Classified`、`Covert`。
+</ParamField>
+
+<ParamField query="wear" type="string">
+  仅推送该磨损档位：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred`。
+</ParamField>
+
+<ParamField query="name" type="string">
+  精确的 `market_hash_name`（不区分大小写）——只推送某一个特定商品。
+</ParamField>
+
+<ParamField query="stat_trak" type="string">
+  StatTrak™ 过滤。`only` 或 `exclude`。
+</ParamField>
+
+<ParamField query="souvenir" type="string">
+  纪念品过滤。`only` 或 `exclude`。
+</ParamField>
+
+<ParamField query="last_event_id" type="string">
+  从该事件 id 之后继续。仅在您的客户端无法发送 `Last-Event-ID` 请求头时使用——该请求头是标准机制，且更受推荐。
+</ParamField>
+
+## 事件
+
+<ResponseField name="new" type="Listing">
+  有挂单进入目录。负载正是 `GET /v1/listings` 返回的 `Listing` 对象，包含 `listed_at`。
+
+  该事件既会在真正的新库存出现时触发，**也会**在重新上架时触发——来自已取消订单、已过期交易报价或已解除冻结的商品。重新上架的商品对您而言就是新的，即使它此前已经存在。
+</ResponseField>
+
+<ResponseField name="gone" type="object">
+  有挂单离开目录——售出、被预留或被下架。负载为 `{ "id": "..." }`。
+
+  **请务必处理该事件。** 在商品售出的那一刻将其移除，正是您的购买请求成功与购买请求发现商品已消失之间的区别。这是轮询在任何频率下都无法提供的那一半信息。
+</ResponseField>
+
+<ResponseField name="resync" type="object">
+  您的 `Last-Event-ID` 早于保留的历史记录，因此重放将不完整。负载为 `{ "reason": "last_event_id_expired", "detail": "..." }`。
+
+  请重新读取 `GET /v1/listings?sort=newest` 以重建您的视图，然后在不带 `Last-Event-ID` 的情况下重连。我们发送该事件，而不是默默地给您一份您会误认为完整的部分重放。
+</ResponseField>
+
+## 无缝重连
+
+每个事件都带有 `id`。重连时把您处理过的最后一个 id 通过 `Last-Event-ID` 请求头发回，您就会收到恰好遗漏的那部分——包括我们发布新版本期间（发布会按设计断开已打开的连接）。
+
+每 25 秒会收到一个 `: heartbeat` 注释帧。若静默时间更长，请视为连接已死并重连；浏览器的 `EventSource` 会自动完成这件事并自动重发 `Last-Event-ID`。
+
+## 限制
+
+每个 API 密钥最多 3 个并发流。连接本身不受速率限制——一旦建立，事件将以目录变化的速度推送。
+
+## 示例请求
+
+```bash
+curl -N "https://csboard.com/v1/listings/stream?max_price=250" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Accept: text/event-stream"
+```
+
+## 示例流
+
+```
+: connected
+
+id: 1785312840123-0
+event: new
+data: {"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f","market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","float_value":0.2418,"price_usd":31.2,"category":"Rifle","rarity":"Classified","tradable":true,"delivery":"instant","listed_at":"2026-07-27T09:14:02.481Z"}
+
+id: 1785312851904-0
+event: gone
+data: {"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f"}
+
+: heartbeat
+```
+
+## 客户端示例
+
+```javascript
+const es = new EventSource("https://csboard.com/v1/listings/stream?max_price=250");
+const live = new Map();
+
+es.addEventListener("new", (e) => {
+  const listing = JSON.parse(e.data);
+  live.set(listing.id, listing);
+});
+
+es.addEventListener("gone", (e) => {
+  live.delete(JSON.parse(e.data).id);
+});
+
+es.addEventListener("resync", () => {
+  live.clear();
+  // 重新读取 /v1/listings?sort=newest，然后让 EventSource 重连
+});
+```
+
+`EventSource` 无法设置 `Authorization` 请求头——在服务端运行时请使用支持该功能的 SSE 客户端（或以您的 HTTP 客户端允许的方式传递密钥）。上面的代码片段展示的是事件处理，而非鉴权。
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 429 | `too_many_streams` | 该密钥的并发流超过 3 个。请先关闭已有连接。 |
+
+<Tip>
+  如果您使用流式订阅，就完全不需要定时轮询 `/v1/listings`——请将其保留用于首次加载目录，以及在收到 `resync` 后的恢复。如果您无法维持长连接，次优方案是带 `available_after` 参数的 `GET /v1/listings`，它能把每次轮询变成一次增量读取。
+</Tip>

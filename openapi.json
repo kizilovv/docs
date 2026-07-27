@@ -181,9 +181,20 @@
             }
           },
           {
+            "name": "available_after",
+            "in": "query",
+            "required": false,
+            "description": "ISO-8601 timestamp. Returns only listings that entered the catalogue after it — the delta-poll parameter. Pair with `sort=newest`; the usual response is an empty page, which is what makes frequent polling cheap instead of a full rescan every tick.\n\n**Overlap your watermark by ~60 seconds and dedupe by `id`.** Send `max(listed_at) - 60s`, never the bare maximum. Timestamps come from the start of the database transaction that published the listing, so a large batch can commit rows stamped *earlier* than rows a smaller, later batch already committed; a watermark advanced to the exact maximum steps over those listings permanently.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2026-07-27T09:13:02.481Z"
+          },
+          {
             "name": "sort",
             "in": "query",
-            "description": "Sort order. Default id.",
+            "description": "Sort order. Default id. `newest` orders by `listed_at` (when the item entered the catalogue), so re-listings surface too.",
             "schema": {
               "type": "string",
               "enum": [
@@ -279,6 +290,147 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/listings/stream": {
+      "get": {
+        "tags": [
+          "Market data"
+        ],
+        "summary": "Stream listings as they appear and disappear",
+        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n```",
+        "operationId": "streamListings",
+        "parameters": [
+          {
+            "name": "min_price",
+            "in": "query",
+            "required": false,
+            "description": "Only stream listings at or above this USD price.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "max_price",
+            "in": "query",
+            "required": false,
+            "description": "Only stream listings at or below this USD price.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "description": "e.g. Rifle, Knife, Gloves.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rarity",
+            "in": "query",
+            "required": false,
+            "description": "e.g. Classified, Covert.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "wear",
+            "in": "query",
+            "required": false,
+            "description": "Exact wear name.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Factory New",
+                "Minimal Wear",
+                "Field-Tested",
+                "Well-Worn",
+                "Battle-Scarred"
+              ]
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "description": "Exact market_hash_name (case-insensitive).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stat_trak",
+            "in": "query",
+            "required": false,
+            "description": "Filter StatTrak™ items.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "only",
+                "exclude"
+              ]
+            }
+          },
+          {
+            "name": "souvenir",
+            "in": "query",
+            "required": false,
+            "description": "Filter Souvenir items.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "only",
+                "exclude"
+              ]
+            }
+          },
+          {
+            "name": "last_event_id",
+            "in": "query",
+            "required": false,
+            "description": "Resume after this event id. Use only if your client cannot send the `Last-Event-ID` header.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1785312840123-0"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An open SSE stream. Stays open until you disconnect.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many concurrent streams for this key (max 3).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -1858,6 +2010,15 @@
               "instant",
               "hold"
             ]
+          },
+          "listed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When this item entered the catalogue. Not the same as when the row was created: items return to the catalogue constantly (cancelled orders, expired trade offers, released holds), and a re-listed item is new to you even though it existed before. `sort=newest` orders by this field, and it is the value to feed back as `available_after`.",
+            "example": "2026-07-27T09:14:02.481Z"
           }
         },
         "required": [
