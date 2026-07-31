@@ -1,0 +1,12 @@
+---
+title: "GET /v1/webhooks — List Your Webhook Endpoints"
+sidebarTitle: "GET /webhooks"
+description: "List every webhook endpoint on your account with its delivery health — last success, last failure, and the endpoint's own error text."
+openapi: "GET /webhooks"
+---
+
+Returns your registered endpoints together with the health fields that tell you whether push is actually working: `last_success_at`, `last_failure_at`, the verbatim `last_error` your server produced, and `consecutive_failures`. At 50 consecutive failures an endpoint is auto-disabled, so a rising counter here is the early warning.
+
+See the [Webhooks guide](/guides/webhooks) for signature verification and the payload schema.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.

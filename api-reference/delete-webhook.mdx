@@ -1,0 +1,10 @@
+---
+title: "DELETE /v1/webhooks/{id} — Remove a Webhook Endpoint"
+sidebarTitle: "DELETE /webhooks/{id}"
+description: "Delete a webhook endpoint and its delivery history."
+openapi: "DELETE /webhooks/{id}"
+---
+
+Removes the endpoint permanently, along with its delivery records. To pause deliveries without losing history, `PATCH` it with `enabled: false` instead.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.

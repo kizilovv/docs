@@ -1,0 +1,14 @@
+---
+title: "POST /v1/webhooks — Register a Webhook Endpoint"
+sidebarTitle: "POST /webhooks"
+description: "Register an HTTPS endpoint to receive signed order updates. Returns the signing secret once."
+openapi: "POST /webhooks"
+---
+
+Registers an endpoint and returns its signing `secret` — **once**. There is no endpoint that reads it back; if you lose it, rotate.
+
+The URL must be publicly routable HTTPS. Anything resolving to a private, loopback, link-local or CGNAT address is rejected here and re-checked before every send, because DNS can be re-pointed after registration. Maximum 5 endpoints per account.
+
+Verify the signature as shown in the [Webhooks guide](/guides/webhooks).
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.

@@ -1,0 +1,12 @@
+---
+title: "GET /v1/webhooks/{id}/deliveries — Delivery History"
+sidebarTitle: "GET /webhooks/{id}/deliveries"
+description: "Inspect what we sent, how many attempts it took, and exactly what your server answered."
+openapi: "GET /webhooks/{id}/deliveries"
+---
+
+The self-serve answer to "did you actually send it?". Every attempt is recorded with the payload we POSTed, the response status, the error text, and — for anything still pending — when the next retry is due.
+
+Filter with `?status=pending`, `delivered`, or `failed`.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.

@@ -1,0 +1,10 @@
+---
+title: "PATCH /v1/webhooks/{id} — Update a Webhook Endpoint"
+sidebarTitle: "PATCH /webhooks/{id}"
+description: "Change a webhook's URL, subscribed events, label, or enabled state."
+openapi: "PATCH /webhooks/{id}"
+---
+
+Updates an endpoint in place. Re-enabling (`enabled: true`) also resets the consecutive-failure counter, so an endpoint that was auto-disabled after an outage is not disabled again by its very next hiccup.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.

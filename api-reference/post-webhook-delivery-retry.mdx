@@ -1,0 +1,12 @@
+---
+title: "POST /v1/webhooks/{id}/deliveries/{deliveryId}/retry — Retry a Delivery"
+sidebarTitle: "POST …/retry"
+description: "Re-arm a failed delivery with a fresh attempt budget and an immediate first try."
+openapi: "POST /webhooks/{id}/deliveries/{deliveryId}/retry"
+---
+
+The replay path for events lost to an outage on your side: re-queues a delivery that exhausted its retries, resetting the attempt counter so it gets the full ladder again rather than one attempt at the far end of it.
+
+A delivery that already succeeded returns `409 already_delivered`.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.

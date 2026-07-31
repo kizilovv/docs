@@ -47,6 +47,12 @@ Filters are applied on our side, before anything is sent to you. They exist to s
   Souvenir filter. `only` or `exclude`.
 </ParamField>
 
+<ParamField query="delivery" type="string">
+  `instant` or `hold`. Narrows `new` events to one delivery bucket — a withdrawal bot subscribing with `delivery=instant` never sees an item it cannot ship today.
+
+  `gone` events are never filtered: you may be holding the item from before your filter existed, and a missed removal is the ghost listing this feed exists to prevent.
+</ParamField>
+
 <ParamField query="last_event_id" type="string">
   Resume after this event id. Use only if your client cannot send the `Last-Event-ID` header — the header is the standard mechanism and is preferred.
 </ParamField>

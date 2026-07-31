@@ -36,6 +36,10 @@
     {
       "name": "Account",
       "description": "Your balance, settled funds, and trading status."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Register an endpoint and receive signed order updates instead of polling."
     }
   ],
   "paths": {
@@ -154,6 +158,18 @@
             "description": "Maximum float value.",
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "name": "delivery",
+            "in": "query",
+            "description": "Delivery bucket. `instant` = ships in seconds-to-minutes; `hold` = still inside a Steam trade lock until its `tradable_at`. Use `instant` for any flow that must deliver now — without it the cheapest ask can be a held row that is buyable but will not arrive for hours. Any other value is a 400.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "hold"
+              ]
             }
           },
           {
@@ -387,6 +403,18 @@
               "enum": [
                 "only",
                 "exclude"
+              ]
+            }
+          },
+          {
+            "name": "delivery",
+            "in": "query",
+            "description": "Narrow `new` events to one delivery bucket (`instant` or `hold`). `gone` events are never filtered — a missed removal is the ghost listing this feed exists to prevent.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "hold"
               ]
             }
           },
@@ -1823,6 +1851,647 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List your webhook endpoints",
+        "operationId": "listWebhooks",
+        "description": "Your registered endpoints with their delivery health — last success, last failure, the endpoint's own error text, and the consecutive-failure counter that drives auto-disable.",
+        "responses": {
+          "200": {
+            "description": "Your endpoints.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "events": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "order.updated",
+                                "webhook.test"
+                              ]
+                            },
+                            "description": "Subscribed event types. An empty request value means all of them; the response always lists them explicitly."
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "description": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "last_success_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "last_failure_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "last_error": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Verbatim reason the last attempt failed — HTTP status, timeout, or URL rejection."
+                          },
+                          "consecutive_failures": {
+                            "type": "integer",
+                            "description": "Reset on any success. At 50 the endpoint is auto-disabled."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Register a webhook endpoint",
+        "operationId": "createWebhook",
+        "description": "Register an HTTPS endpoint. The response carries the signing `secret` ONCE — there is no endpoint that returns it again, only `rotate-secret`. Maximum 5 endpoints per account. The URL must be publicly routable: anything resolving to a private, loopback, link-local or CGNAT address is rejected, and re-checked before every send because DNS can be re-pointed after registration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Public HTTPS endpoint that will receive POSTs."
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "order.updated",
+                        "webhook.test"
+                      ]
+                    },
+                    "description": "Omit or leave empty to receive every event type."
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "Your own label, e.g. `prod` or `staging`."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created. `secret` is shown only here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "order.updated",
+                                  "webhook.test"
+                                ]
+                              },
+                              "description": "Subscribed event types. An empty request value means all of them; the response always lists them explicitly."
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "description": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "last_success_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "last_failure_at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "last_error": {
+                              "type": "string",
+                              "nullable": true,
+                              "description": "Verbatim reason the last attempt failed — HTTP status, timeout, or URL rejection."
+                            },
+                            "consecutive_failures": {
+                              "type": "integer",
+                              "description": "Reset on any success. At 50 the endpoint is auto-disabled."
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "secret": {
+                              "type": "string",
+                              "description": "HMAC signing secret, `csb_whsec_…`. Shown once."
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_webhook_url` — not https, embeds credentials, or resolves to a private address."
+          },
+          "409": {
+            "description": "`too_many_webhooks` — 5 endpoints already registered."
+          }
+        }
+      }
+    },
+    "/webhooks/{id}": {
+      "patch": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update a webhook endpoint",
+        "operationId": "updateWebhook",
+        "description": "Change the URL, the subscribed events, the label, or enable/disable it. Re-enabling also clears the consecutive-failure counter, so an endpoint that was auto-disabled is not disabled again by its next single hiccup.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "order.updated",
+                        "webhook.test"
+                      ]
+                    }
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "order.updated",
+                              "webhook.test"
+                            ]
+                          },
+                          "description": "Subscribed event types. An empty request value means all of them; the response always lists them explicitly."
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "last_success_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "last_failure_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "last_error": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Verbatim reason the last attempt failed — HTTP status, timeout, or URL rejection."
+                        },
+                        "consecutive_failures": {
+                          "type": "integer",
+                          "description": "Reset on any success. At 50 the endpoint is auto-disabled."
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such webhook on your account."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete a webhook endpoint",
+        "operationId": "deleteWebhook",
+        "description": "Remove the endpoint and its delivery history.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "404": {
+            "description": "`not_found`."
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a test event",
+        "operationId": "testWebhook",
+        "description": "Delivers a `webhook.test` event synchronously and returns the real HTTP status and error text your server produced. The point is to find out NOW whether your signature check passes and your endpoint answers, instead of inferring it from your own logs.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attempt result (a failed test is still a 200 here — read `delivered`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "delivered": {
+                          "type": "boolean"
+                        },
+                        "response_status": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "error": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "sent": {
+                          "type": "object",
+                          "description": "The exact envelope we POSTed."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`."
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/rotate-secret": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Rotate the signing secret",
+        "operationId": "rotateWebhookSecret",
+        "description": "Issues a new signing secret and returns it once. Deliveries already queued are signed with whichever secret is current at SEND time, so accept both values for a minute or rotate during a quiet window.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "secret": {
+                          "type": "string"
+                        },
+                        "note": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`."
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/deliveries": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List delivery attempts",
+        "operationId": "listWebhookDeliveries",
+        "description": "What we sent, how many times we tried, and what your server answered — including the failed attempts and their error text. This is the self-serve answer to \"did you actually send it?\".",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by delivery state.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "delivered",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100, default 50.",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Most recent attempts first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "event_id": {
+                            "type": "string",
+                            "description": "Stable per (order, state). Dedupe on this."
+                          },
+                          "event_type": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "delivered",
+                              "failed"
+                            ]
+                          },
+                          "attempts": {
+                            "type": "integer"
+                          },
+                          "response_status": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "last_error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "next_attempt_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "delivered_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "description": "The exact envelope we POSTed."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`."
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/deliveries/{deliveryId}/retry": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Retry a failed delivery",
+        "operationId": "retryWebhookDelivery",
+        "description": "Re-arms a delivery that exhausted its attempts, with a fresh budget and an immediate first try. The replay path for events lost to an outage on your side.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Re-queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`."
+          },
+          "409": {
+            "description": "`already_delivered` — that delivery already succeeded."
           }
         }
       }

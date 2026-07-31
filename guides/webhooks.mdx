@@ -1,0 +1,268 @@
+---
+title: "CSBoard Webhooks — Signed Order Push Notifications"
+sidebarTitle: "Webhooks"
+description: "Register an HTTPS endpoint and receive signed order updates the moment they happen — HMAC-SHA256 verification, retry policy, hold end times, and self-serve replay."
+---
+
+Register an endpoint and CSBoard POSTs order state to it as it changes, instead of you polling for it. The body is byte-identical to what `GET /v1/orders/:id` returns, so if you have already integrated the pull API there is no second format to learn.
+
+**Authentication for management calls:** any valid read key. Registering an endpoint moves no money, so it does not need a trading key.
+
+---
+
+## Quick start
+
+<Steps>
+  <Step title="Register your endpoint">
+    ```bash
+    curl -X POST https://csboard.com/v1/webhooks \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -d '{"url":"https://your-app.example.com/csboard/hook","description":"prod"}'
+    ```
+
+    The response contains a `secret` starting `csb_whsec_`. **It is shown once.** Store it before you close the terminal — there is no endpoint that returns it again, only one that rotates it.
+  </Step>
+  <Step title="Send yourself a test event">
+    ```bash
+    curl -X POST https://csboard.com/v1/webhooks/{id}/test \
+      -H "Authorization: Bearer csb_pub_..."
+    ```
+
+    This delivers inline and hands you back the real HTTP status and error text we saw from your server, so a failing endpoint is diagnosable in one call rather than by reading your own logs.
+  </Step>
+  <Step title="Verify the signature and ACK fast">
+    Return `2xx` as soon as you have verified and persisted the event. Do the actual work afterwards — see [Respond fast](#respond-fast) below.
+  </Step>
+</Steps>
+
+---
+
+## Verifying the signature
+
+Every request carries:
+
+| Header | Meaning |
+|---|---|
+| `X-CSBoard-Signature` | `t=<unix_seconds>,v1=<hex_hmac_sha256>` |
+| `X-CSBoard-Event-Id` | The event id, also present as `id` in the body |
+| `X-CSBoard-Delivery-Timestamp` | Same `t` as in the signature, for convenience |
+
+The signed material is `"{t}.{raw_request_body}"` and the algorithm is HMAC-SHA256 keyed with your webhook secret. Compare in constant time, and reject anything whose `t` is more than 5 minutes from your clock.
+
+<Warning>
+  Verify against the **raw request body bytes**, before any JSON parse. A framework that re-serialises the body (reordering keys, changing whitespace) will produce a different MAC and every event will look forged. In Express, that means `express.raw({ type: 'application/json' })` on this route.
+</Warning>
+
+<CodeGroup>
+```javascript Node.js
+import crypto from 'node:crypto'
+
+function verify(rawBody, header, secret, toleranceSec = 300) {
+  const parts = Object.fromEntries(
+    header.split(',').map((kv) => {
+      const i = kv.indexOf('=')
+      return [kv.slice(0, i).trim(), kv.slice(i + 1).trim()]
+    })
+  )
+  const t = Number(parts.t)
+  if (!Number.isFinite(t)) return false
+  if (Math.abs(Date.now() / 1000 - t) > toleranceSec) return false
+
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(`${t}.${rawBody}`)
+    .digest('hex')
+
+  const got = parts.v1 ?? ''
+  if (got.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(got, 'hex'), Buffer.from(expected, 'hex'))
+}
+```
+
+```php PHP
+function csboard_verify(string $rawBody, string $header, string $secret, int $tolerance = 300): bool {
+    $parts = [];
+    foreach (explode(',', $header) as $kv) {
+        $i = strpos($kv, '=');
+        if ($i === false) continue;
+        $parts[trim(substr($kv, 0, $i))] = trim(substr($kv, $i + 1));
+    }
+    if (!isset($parts['t'], $parts['v1']) || !is_numeric($parts['t'])) return false;
+    if (abs(time() - (int) $parts['t']) > $tolerance) return false;
+
+    $expected = hash_hmac('sha256', $parts['t'] . '.' . $rawBody, $secret);
+    return hash_equals($expected, $parts['v1']);
+}
+```
+
+```python Python
+import hmac, hashlib, time
+
+def verify(raw_body: bytes, header: str, secret: str, tolerance: int = 300) -> bool:
+    parts = dict(kv.split("=", 1) for kv in header.split(",") if "=" in kv)
+    try:
+        t = int(parts["t"])
+    except (KeyError, ValueError):
+        return False
+    if abs(time.time() - t) > tolerance:
+        return False
+
+    expected = hmac.new(
+        secret.encode(), f"{t}.".encode() + raw_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, parts.get("v1", ""))
+```
+</CodeGroup>
+
+The timestamp is inside the signed material on purpose: an attacker who captures a delivery cannot refresh `t` to get past your tolerance check without also forging the MAC.
+
+---
+
+## Event payload
+
+Every delivery has the same envelope. `data` is exactly the object `GET /v1/orders/:id` returns.
+
+```json
+{
+  "id": "order.updated:cmd7x2p9k0001mk01abcd1234:9f2a1c4b7e8d0a35",
+  "type": "order.updated",
+  "created_at": "2026-07-31T12:04:11.482Z",
+  "data": {
+    "order_id": "cmd7x2p9k0001mk01abcd1234",
+    "steam_id": "76561198000000000",
+    "status": "hold",
+    "custom_id": "your-idempotency-key",
+    "currency": "USD",
+    "charged_total_usd": 41.9,
+    "item_count": 2,
+    "hold_until": "2026-08-08T12:03:58.000Z",
+    "refund": null,
+    "created_at": "2026-07-31T12:03:58.000Z",
+    "updated_at": "2026-07-31T12:04:11.000Z",
+    "items": [
+      {
+        "market_hash_name": "AK-47 | Redline (Field-Tested)",
+        "price_usd": 31.2,
+        "status": "hold",
+        "tradable_at": "2026-08-08T12:03:58.000Z",
+        "return_reason": null,
+        "steam_trade_offer_id": null,
+        "steam_trade_offer_finished_at": null
+      },
+      {
+        "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+        "price_usd": 10.7,
+        "status": "delivered",
+        "tradable_at": null,
+        "return_reason": null,
+        "steam_trade_offer_id": "7654321098",
+        "steam_trade_offer_finished_at": "2026-07-31T12:04:10.000Z"
+      }
+    ]
+  }
+}
+```
+
+### Envelope fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Event id. Stable — the same order in the same state always produces the same id. Use it to dedupe. |
+| `type` | string | `order.updated` or `webhook.test`. |
+| `created_at` | string (ISO 8601, UTC) | When the event was generated. |
+| `data` | object | The order, in the `GET /v1/orders/:id` shape. |
+
+### Order fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `order_id` | string | CSBoard order id. |
+| `steam_id` | string \| null | Where the skins went. For `POST /v1/market/buy` this is your end user's Steam ID, not yours. |
+| `status` | string | `pending` · `delivering` · `hold` · `completed` · `cancelled` · `failed`. |
+| `custom_id` | string \| null | The `Idempotency-Key` / `custom_id` you sent at order time. |
+| `currency` | string | Always `USD`. |
+| `charged_total_usd` | number | What was actually debited, to 2 decimals. |
+| `item_count` | integer | Number of entries in `items`. |
+| `hold_until` | string \| null | **The order-level hold end time.** Set when any item is still trade-locked; null once nothing is held. Derived from the items, not from a coarse internal flag. |
+| `refund` | object \| null | `{ amount_usd, refunded_at, partial }` once money has gone back. `null` means no refund credited — not "refund pending". `partial: true` means one leg of a basket died and we returned less than the full charge. |
+| `created_at` / `updated_at` | string (ISO 8601, UTC) | Order timestamps. |
+| `items` | array | Per-item detail, below. |
+
+### Item fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `market_hash_name` | string \| null | Steam market hash name. |
+| `price_usd` | number \| null | Per-item charge. |
+| `status` | string | `delivering` · `hold` · `delivered` · `returned`. |
+| `tradable_at` | string \| null | **Per-item hold end time** — when this specific skin leaves its Steam trade lock. Null unless `status` is `hold`. |
+| `return_reason` | string \| null | On `returned`: `trade_timeout` · `declined` · `expired` · `rolled_back` · `unavailable`. |
+| `steam_trade_offer_id` | string \| null | The Steam trade offer id, once one exists. |
+| `steam_trade_offer_finished_at` | string (ISO 8601) \| null | When that offer was accepted or closed. |
+
+<Note>
+  A `hold` order is not a stuck order. The items are bought and paid for; Steam will not let them move until `hold_until`. If the account is set to auto-claim they release on their own, otherwise call `POST /v1/orders/{id}/claim` once `hold_until` has passed.
+</Note>
+
+---
+
+## Delivery semantics
+
+**At-least-once, deduped by `id`.** We may deliver the same event more than once — after a restart, or when your endpoint ACKs a request we had already timed out on. The `id` is stable per (order, state), so storing processed ids and ignoring repeats is the entire integration. It is also echoed in `X-CSBoard-Event-Id`, so you can dedupe before parsing the body.
+
+**Ordering is not guaranteed.** Retries mean an older state can arrive after a newer one. Do not treat the webhook as a state machine you advance — treat each event as a snapshot and compare `data.updated_at` against what you have stored, discarding anything older. Every event carries the complete order, so a single event is always enough to render the current truth.
+
+**Retries.** Any response outside `2xx`, a redirect, a connection failure, or no answer within 10 seconds counts as a failure. Failed deliveries retry on a widening ladder — 10s, 30s, 1m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h — up to 12 attempts, spanning roughly 24 hours. An endpoint down for a working day still receives everything once it comes back.
+
+**Auto-disable.** After 50 consecutive failures the endpoint is switched off and we stop attempting. Nothing is deleted — re-enable with `PATCH /v1/webhooks/{id}` and queued events resume.
+
+<a id="respond-fast" />
+### Respond fast
+
+ACK within 10 seconds. Verify the signature, write the event to your own queue or table, return `200`, and do the real work asynchronously. If you process inline — updating a user balance, calling Steam, sending a message — a slow dependency turns into a timeout on our side, a retry, and a duplicate you now have to handle under load.
+
+---
+
+## Security
+
+- **HTTPS only.** The payload carries order and delivery data.
+- **Endpoints must be publicly routable.** URLs that resolve to private, loopback, link-local or CGNAT ranges are rejected at registration and re-checked before every send, because DNS can be re-pointed after the fact.
+- **Redirects are not followed.** A `3xx` counts as a failure — register the final URL.
+- **Rotating the secret:** `POST /v1/webhooks/{id}/rotate-secret`. Queued deliveries are signed with whichever secret is current at send time, so accept both values for a minute or rotate during a quiet window.
+- **The secret is a signing key, not a credential.** It grants no access to your account. It still belongs in your secret store, not your repo.
+
+---
+
+## Managing endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/webhooks` | List your endpoints with health (last success, last failure, last error, consecutive failures). |
+| `POST` | `/v1/webhooks` | Register one. Returns the secret, once. Max 5 per account. |
+| `PATCH` | `/v1/webhooks/{id}` | Change `url`, `events`, `description`, or `enabled`. Re-enabling clears the failure counter. |
+| `DELETE` | `/v1/webhooks/{id}` | Remove it. |
+| `POST` | `/v1/webhooks/{id}/test` | Synchronous test event; returns the real status and error we saw. |
+| `POST` | `/v1/webhooks/{id}/rotate-secret` | New signing secret. |
+| `GET` | `/v1/webhooks/{id}/deliveries` | What we sent, how many attempts, what your server answered. Filter with `?status=pending\|delivered\|failed`. |
+| `POST` | `/v1/webhooks/{id}/deliveries/{deliveryId}/retry` | Re-arm a failed delivery with a fresh attempt budget. |
+
+`GET /v1/webhooks/{id}/deliveries` is the self-serve answer to "did you actually send it?" — including the failed attempts and the exact error text your endpoint returned. Check it before opening a ticket; it is usually faster than we are.
+
+---
+
+## Errors
+
+| HTTP | `code` | When |
+|---|---|---|
+| 400 | `invalid_webhook_url` | Not absolute, not https, embeds credentials, or resolves to a private address. |
+| 400 | `invalid_request` | Malformed body or an unknown event type. |
+| 404 | `not_found` | No such webhook or delivery on your account. |
+| 409 | `too_many_webhooks` | You already have 5 endpoints. |
+| 409 | `already_delivered` | You tried to retry a delivery that already succeeded. |
+
+---
+
+## Still want to poll?
+
+Nothing is removed. `GET /v1/orders` and `GET /v1/orders/info` carry the same fields, including `hold_until` and per-item `tradable_at`, and remain the right tool for reconciliation sweeps. The recommended shape is push for latency and a periodic pull for truth — a nightly `GET /v1/orders` over the last 24 hours catches anything a permanently broken endpoint would otherwise have lost.

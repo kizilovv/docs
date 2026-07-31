@@ -31,6 +31,14 @@ Once connected, the agent can call any CSBoard endpoint as a tool — browsing l
 
 ---
 
+## Tracking order state
+
+Do not poll for it. Register a [webhook](/guides/webhooks) and we POST the order to you the moment its state changes — the same object `GET /v1/orders/:id` returns, HMAC-signed, retried for 24 hours if your endpoint is down. A withdrawal flow that has to react to `delivered`, `hold` or `returned` is the case push exists for: polling every open order is a cost that grows with your order book rather than with the number of things that actually happened.
+
+Keep a periodic `GET /v1/orders` sweep as a reconciliation backstop, not as your primary signal.
+
+---
+
 ## Polling for new listings
 
 To detect new listings as they appear without re-scanning the entire catalog, use `sort=newest` combined with cursor pagination. On each poll cycle, walk pages until you reach a listing ID you have already seen, then stop.
@@ -299,6 +307,9 @@ def refresh_snapshot() -> list[dict] | None:
   - ✅ You read `price_usd` from `/v1/listings` (not `/v1/prices`) before placing an order
   - ✅ You use ETags with the snapshot endpoint to avoid redundant downloads
   - ✅ Your API key has trading enabled **only** if your bot is intended to buy
+  - ✅ Order state comes from a webhook (or the SSE stream), with polling kept as a reconciliation sweep
+  - ✅ Your webhook handler verifies the signature against the **raw** body and ACKs within 10s
+  - ✅ Your webhook handler dedupes on the event `id` and ignores events older than what you have stored
 </Tip>
 
 ---
@@ -310,4 +321,5 @@ def refresh_snapshot() -> list[dict] | None:
 - [API Reference — GET /v1/listings](/api-reference/get-listings)
 - [API Reference — GET /v1/prices](/api-reference/get-prices)
 - [API Reference — POST /v1/orders](/api-reference/post-orders)
+- [Webhooks — signed order push](/guides/webhooks)
 - [Authentication](/authentication)

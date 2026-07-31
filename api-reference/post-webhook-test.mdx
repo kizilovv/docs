@@ -1,0 +1,12 @@
+---
+title: "POST /v1/webhooks/{id}/test — Send a Test Event"
+sidebarTitle: "POST /webhooks/{id}/test"
+description: "Deliver a test event synchronously and see the exact HTTP status and error your server returned."
+openapi: "POST /webhooks/{id}/test"
+---
+
+Sends a `webhook.test` event inline and hands back what actually happened — the real response status and error text. Use it to confirm your signature check passes before you depend on push in production.
+
+A failed test still returns HTTP 200 here; read the `delivered` field, not the status code.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. A read key is enough — managing webhooks moves no money.
