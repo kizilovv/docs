@@ -163,13 +163,24 @@
           {
             "name": "delivery",
             "in": "query",
-            "description": "Delivery bucket. `instant` = ships in seconds-to-minutes; `hold` = still inside a Steam trade lock until its `tradable_at`. Use `instant` for any flow that must deliver now — without it the cheapest ask can be a held row that is buyable but will not arrive for hours. Any other value is a 400.",
+            "description": "Delivery bucket, the same three the site's grid shows. `instant` = bot fulfilment (seconds to minutes); `up_to_12h` = a human seller on the source market must send the trade; `hold` = inside a Steam trade lock until the item's tradable_at. Any other value is a 400.",
             "schema": {
               "type": "string",
               "enum": [
                 "instant",
+                "up_to_12h",
                 "hold"
               ]
+            }
+          },
+          {
+            "name": "min_refund_percent",
+            "in": "query",
+            "description": "Only listings whose refund_percent is at least this (0-100). Listings with no published figure are EXCLUDED, not assumed. Combine with delivery=instant for a pool that ships now and is fully refundable on a Steam reversal.",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
             }
           },
           {
@@ -414,6 +425,7 @@
               "type": "string",
               "enum": [
                 "instant",
+                "up_to_12h",
                 "hold"
               ]
             }
@@ -427,6 +439,16 @@
               "type": "string"
             },
             "example": "1785312840123-0"
+          },
+          {
+            "name": "min_refund_percent",
+            "in": "query",
+            "description": "Narrow `new` events to listings whose refund_percent is at least this (0-100). `gone` events are never filtered.",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
           }
         ],
         "responses": {
@@ -2492,6 +2514,95 @@
           },
           "409": {
             "description": "`already_delivered` — that delivery already succeeded."
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Your own delivery and refund record",
+        "operationId": "getStats",
+        "description": "Orders you placed, how many were delivered, how many were refunded, and how long delivery actually took — computed from your rows at request time. Held orders you cancelled yourself are excluded from the refund rate: changing your mind before a hold clears is the feature working, not a failure. The rate is null until you have a settled order; we do not invent one from zero samples.",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "description": "Window in days, 1-365 (default 30).",
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "minimum": 1,
+              "maximum": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your record over the window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "window_days": {
+                          "type": "integer"
+                        },
+                        "since": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "orders_total": {
+                          "type": "integer"
+                        },
+                        "delivered": {
+                          "type": "integer"
+                        },
+                        "refunded": {
+                          "type": "integer"
+                        },
+                        "cancelled_by_you": {
+                          "type": "integer",
+                          "description": "Held orders you cancelled. Excluded from the rate."
+                        },
+                        "in_flight": {
+                          "type": "integer"
+                        },
+                        "refund_rate_pct": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "refunded / (delivered + refunded). Null with no settled orders."
+                        },
+                        "delivery_minutes": {
+                          "type": "object",
+                          "properties": {
+                            "median": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "p90": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "samples": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request` — days out of range."
           }
         }
       }

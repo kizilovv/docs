@@ -1,0 +1,17 @@
+---
+title: "GET /v1/stats — Your Delivery and Refund Record"
+sidebarTitle: "GET /stats"
+description: "Your own order outcomes: delivered, refunded, refund rate, and measured delivery times — computed from your rows, not quoted from a slide."
+openapi: "GET /stats"
+---
+
+"What is your refund rate?" is worth nothing as a number we tell you — you cannot check it, and it describes our traffic rather than yours. This returns **your** outcomes over a window you choose: orders placed, delivered, refunded, and how long delivery actually took.
+
+Two things about what the numbers mean:
+
+- **Held orders you cancelled yourself are not failures.** Buying a held item and changing your mind before the hold clears is the feature working. They are reported separately as `cancelled_by_you` and excluded from `refund_rate_pct`.
+- **The denominator is settled orders only.** An order still in flight has no outcome yet; counting it would make your rate drift down simply because you ordered recently. `refund_rate_pct` is `null` until you have at least one settled order.
+
+Delivery timing is median and p90 over completed orders, never a mean — one order that sat in a week-long Steam hold would otherwise swamp a thousand one-minute ones.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.

@@ -48,9 +48,19 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 </ParamField>
 
 <ParamField query="delivery" type="string">
-  Delivery bucket. `instant` returns only items that are free of a Steam trade lock right now; `hold` returns only items still inside one, which cannot move until their `tradable_at`.
+  Delivery bucket — the same three the site's own grid shows. One of:
 
-  **Use `delivery=instant` for any flow that must deliver now** — a withdrawal, a bot payout, a user waiting on a screen. Without it the cheapest ask for an item can be a held row: genuinely buyable, but it will not arrive for hours. Any other value is a `400`, so a typo fails loudly instead of quietly widening your results.
+  - `instant` — bot fulfilment. Seconds to a few minutes.
+  - `up_to_12h` — a human seller on the source market has to send the trade. Displayed as ≤12h on the site.
+  - `hold` — inside a Steam trade lock until the item's `tradable_at`.
+
+  **Use `delivery=instant` for any flow that must deliver now** — a withdrawal, a bot payout, a user waiting on a screen. Any other value is a `400`, so a typo fails loudly instead of quietly widening your results.
+</ParamField>
+
+<ParamField query="min_refund_percent" type="number">
+  Only listings whose `refund_percent` is at least this (0–100). Listings with no published figure are **excluded**, not assumed.
+
+  `?delivery=instant&min_refund_percent=100` is the pool a withdrawal flow wants: ships immediately, and a Steam reversal costs nobody anything.
 </ParamField>
 
 <ParamField query="stat_trak" type="string">
@@ -160,7 +170,13 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
     </ResponseField>
 
     <ResponseField name="delivery" type="string" required>
-      Expected delivery mode: `instant` (transferred right away) or `hold` (subject to Steam trade hold).
+      Expected delivery mode: `instant` (bot, seconds to minutes), `up_to_12h` (a human seller on the source market must send the trade), or `hold` (inside a Steam trade lock until `tradable_at`).
+    </ResponseField>
+
+    <ResponseField name="refund_percent" type="number | null">
+      How much of the purchase comes back if Valve reverses the Steam trade. This is a property of the market the listing came from, not a support policy, and it ranges from 0 to 100 across our sources.
+
+      `null` means we have no published figure for that listing — treat it as unknown, never as 100. Filter with `min_refund_percent` to build a pool where every item is made whole.
     </ResponseField>
 
     <ResponseField name="listed_at" type="datetime | null">

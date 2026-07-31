@@ -238,3 +238,21 @@ FX rates are cached approximately every hour. For display purposes this is more 
 - [Automate price monitoring and buying bots](/guides/automation)
 - [API Reference — GET /v1/listings](/api-reference/get-listings)
 - [API Reference — GET /v1/prices](/api-reference/get-prices)
+
+---
+
+## Picking a pool you can promise on
+
+Two fields decide whether a listing is safe to put behind a user-facing withdrawal, and both are per-listing rather than per-account:
+
+- `delivery` — `instant` (bot, seconds to minutes), `up_to_12h` (a human seller on the source market has to send the trade), `hold` (Steam trade lock until `tradable_at`).
+- `refund_percent` — how much comes back if Valve reverses the trade. It is a property of the source market, not a support policy, and it ranges from 0 to 100 across our catalogue. `null` means no published figure; treat it as unknown, never as 100.
+
+For a withdrawal flow, ask for both:
+
+```bash
+curl "https://csboard.com/v1/listings?delivery=instant&min_refund_percent=100&sort=price_asc" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+Every item that comes back ships immediately and is fully covered if the trade is later reversed. Drop `min_refund_percent` and the catalogue gets several times larger and cheaper — which is the right call for a display case or a price index, and the wrong one for something a user is waiting on.
