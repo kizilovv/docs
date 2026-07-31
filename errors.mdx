@@ -25,6 +25,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 401 | `missing_api_key` | No key sent, or it does not start with `csb_pub_`. | Send `Authorization: Bearer csb_pub_...`. |
 | 401 | `invalid_api_key` | Key unrecognised or revoked. | Generate a new key at `/profile?tab=api`. Do not retry. |
 | 401 | `too_many_failed_auth` | More than 30 bad keys from one IP in a minute — 5-minute IP ban. | Stop, fix the key, wait out the cooldown. Retrying extends nothing but your own outage. |
+| 403 | `ip_not_allowed` | The key is restricted to an IP allowlist and your address is not on it. | The response quotes the address we saw — add it (or its range) at `/profile?tab=api`, or clear the list. |
 | 403 | `trading_not_enabled` | Valid key, but trading was never enabled on it. | Toggle trading on that key at `/profile?tab=api`. |
 | 403 | `account_restricted` | The account is restricted. | Contact support — retrying will not clear it. |
 | 403 | `steam_account_required` | No Steam account linked, and the order delivers to you. | Link Steam, or use `POST /v1/market/buy` with an explicit trade URL. |

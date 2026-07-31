@@ -55,6 +55,16 @@ Prefer the `Authorization` header in production; query parameters are more likel
   Create separate keys for separate workloads (e.g. one read key for your price dashboard, one trading key for your buy bot) so you can revoke them independently without disrupting everything at once.
 </Tip>
 
+## Restricting a key to your servers
+
+A key can optionally be bound to a set of IP addresses or CIDR ranges, set at [csboard.com/profile?tab=api](https://csboard.com/profile?tab=api). Requests from anywhere else are refused with `403 ip_not_allowed`, and the response quotes the address we saw so you can tell a wrong entry from a moved egress IP.
+
+An empty list means no restriction. Saving a list that would not admit your own current address is refused rather than accepted — locking yourself out of your own integration is the one failure this feature could plausibly cause.
+
+<Tip>
+  This is the cheapest protection against the most common way keys leak: a log line, a screenshot, a committed `.env`. A key bound to your production egress range is useless to anyone who copies it.
+</Tip>
+
 ## Security and storage
 
 We store only `SHA256(key)` — never the raw secret. This means:
@@ -76,6 +86,7 @@ Every error from the API returns a JSON body in this format:
 | 401 | `invalid_api_key` | Key is not recognised or has been revoked |
 | 401 | `too_many_failed_auth` | Too many invalid keys from your IP — 5-minute ban applied |
 | 403 | `trading_not_enabled` | Key is valid but trading has not been enabled for it |
+| 403 | `ip_not_allowed` | Key is restricted to an IP allowlist that does not include your address |
 | 429 | `rate_limit_exceeded` | You have exceeded your per-key request limit |
 
 For details on the 429 error and how to back off correctly, see [Rate Limits](/rate-limits).
