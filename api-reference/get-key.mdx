@@ -1,0 +1,12 @@
+---
+title: "GET /v1/key — Inspect Your API Key"
+sidebarTitle: "GET /key"
+description: "What this key can do: rate limit, trading and selling capabilities, IP allowlist, and the address we saw for your request."
+openapi: "GET /key"
+---
+
+Returns the capabilities attached to the key you authenticated with, plus `your_ip` — the address this request arrived from.
+
+`your_ip` exists for one reason: editing an IP allowlist from a machine whose egress address you are not certain of is otherwise guesswork, and getting it wrong locks the key out. Read it here first, then apply the list.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.

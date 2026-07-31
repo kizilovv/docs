@@ -1,0 +1,18 @@
+---
+title: "PUT /v1/key/allowed-ips — Restrict a Key to Your Servers"
+sidebarTitle: "PUT /key/allowed-ips"
+description: "Bind an API key to specific IP addresses or CIDR ranges so a leaked key is useless from anywhere else."
+openapi: "PUT /key/allowed-ips"
+---
+
+Binds the key to the addresses your servers actually call from. Requests from anywhere else are refused with `403 ip_not_allowed`. An empty array clears the restriction.
+
+This is the cheapest protection against the most common way keys leak: a log line, a screenshot, a committed `.env`.
+
+<Warning>
+  A list that does not include the address you are calling from is **refused, not applied** — setting an allowlist you are not inside is indistinguishable from revoking your own key. The error echoes the address we saw. To hand a key to servers you are not on, include your own address, apply, then remove it once they are connecting.
+</Warning>
+
+The same setting is available in the account panel at [csboard.com/profile?tab=api](https://csboard.com/profile?tab=api). Neither is the only way in.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.

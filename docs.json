@@ -76,7 +76,9 @@
                 "pages": [
                   "api-reference/get-balance",
                   "api-reference/get-transactions",
-                  "api-reference/get-stats"
+                  "api-reference/get-stats",
+                  "api-reference/get-key",
+                  "api-reference/put-key-allowed-ips"
                 ]
               },
               {

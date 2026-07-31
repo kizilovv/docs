@@ -2606,6 +2606,126 @@
           }
         }
       }
+    },
+    "/key": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Inspect this key",
+        "operationId": "getKey",
+        "description": "What this key is allowed to do: its prefix, issue date, rate limit, trading and selling capabilities, and its IP allowlist. Also reports `your_ip` — the address we saw for this request, which is what you need before editing an allowlist from a machine whose egress address you are unsure of.",
+        "responses": {
+          "200": {
+            "description": "Key capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "key_prefix": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "issued_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "rate_limit_per_min": {
+                          "type": "integer"
+                        },
+                        "trading_enabled": {
+                          "type": "boolean"
+                        },
+                        "selling_enabled": {
+                          "type": "boolean"
+                        },
+                        "allowed_ips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Empty means unrestricted."
+                        },
+                        "your_ip": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/key/allowed-ips": {
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Restrict this key to your own addresses",
+        "operationId": "putKeyAllowedIps",
+        "description": "Bind the key to a set of addresses or CIDR ranges, v4 or v6. An empty array clears the restriction. Requests from anywhere else are refused with 403 ip_not_allowed.\\n\\nA list that would not admit the calling address is refused rather than applied — setting an allowlist you are not inside is indistinguishable from revoking your own key. The same operation is available from the account panel.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ips"
+                ],
+                "properties": {
+                  "ips": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Addresses or CIDR ranges. Empty clears the restriction. Max 20."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "allowed_ips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "your_ip": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request` for a malformed entry, or `would_lock_you_out` when the list excludes the calling address (which is echoed back)."
+          }
+        }
+      }
     }
   },
   "components": {
