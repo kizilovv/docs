@@ -24,6 +24,7 @@
                 "pages": [
                   "introduction",
                   "authentication",
+                  "errors",
                   "rate-limits"
                 ]
               },

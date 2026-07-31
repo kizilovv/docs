@@ -1,0 +1,106 @@
+---
+title: "CSBoard API Error Reference — Every Code and What To Do About It"
+sidebarTitle: "Errors"
+description: "Complete list of CSBoard API error codes with HTTP status, cause, and the correct client response — authentication, rate limits, buying, instant sell, and webhooks."
+---
+
+Every error returns the same JSON shape:
+
+```json
+{ "code": "item_unavailable", "detail": "One or more items are no longer available." }
+```
+
+Note the field is **`detail`**, not `message`. Match on `code` — it is stable and safe to branch on. `detail` is human-readable and may be reworded without notice.
+
+<Note>
+  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, and `item_unavailable` may include `unavailable_ids`. Ignore unknown fields rather than rejecting the body.
+</Note>
+
+---
+
+## Authentication
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 401 | `missing_api_key` | No key sent, or it does not start with `csb_pub_`. | Send `Authorization: Bearer csb_pub_...`. |
+| 401 | `invalid_api_key` | Key unrecognised or revoked. | Generate a new key at `/profile?tab=api`. Do not retry. |
+| 401 | `too_many_failed_auth` | More than 30 bad keys from one IP in a minute — 5-minute IP ban. | Stop, fix the key, wait out the cooldown. Retrying extends nothing but your own outage. |
+| 403 | `trading_not_enabled` | Valid key, but trading was never enabled on it. | Toggle trading on that key at `/profile?tab=api`. |
+| 403 | `account_restricted` | The account is restricted. | Contact support — retrying will not clear it. |
+| 403 | `steam_account_required` | No Steam account linked, and the order delivers to you. | Link Steam, or use `POST /v1/market/buy` with an explicit trade URL. |
+
+## Rate limits
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 429 | `rate_limit_exceeded` | Per-key limit exceeded. | Sleep for `Retry-After` seconds, then retry. See [Rate Limits](/rate-limits). |
+| 429 | `snapshot_rate_limited` | Bulk snapshot polled more than once a minute. | Cache the snapshot; use ETags to avoid re-downloading it. |
+| 429 | `too_many_streams` | More than 3 concurrent SSE streams on one key. | Close an idle stream. One stream carries the whole catalogue. |
+
+## Reading market data
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 400 | `invalid_param` | A query parameter is malformed — a bad `available_after` timestamp, or a `delivery` value that is not `instant` or `hold`. | Fix the parameter. This is deliberately an error rather than a silently ignored filter. |
+| 402 | `insufficient_settled_balance` | The price feed requires a funded account. | Top up. `GET /v1/health` and `GET /v1/balance` stay open so you can integrate before funding. |
+
+## Buying
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 400 | `invalid_request` | Malformed body or parameters. | Fix the request; do not retry unchanged. |
+| 400 | `unsupported_item` | The item cannot be bought through the API. | Skip it. |
+| 400 | `invalid_trade_url` | The trade URL on `POST /v1/market/buy` is malformed or private. | Have the end user re-copy their trade URL. |
+| 400 | `cannot_mix_sources` | One order mixed external-market and platform items. | Split into separate orders. |
+| 400 | `one_external_per_order` | More than one external-market item in a single order. | One per order. |
+| 402 | `insufficient_balance` | Balance does not cover the order. | Top up on the site — there is no card or crypto rail through the API. |
+| 403 | `external_buy_disabled` | Deliver-to-any-trade-URL buying is not enabled for you. | Ask us to enable it for your account. |
+| 403 | `kyc_required` | The purchase tripped a KYC threshold. | The account owner completes verification on the site. |
+| 409 | `price_moved` | Live price rose past your `max_price_usd`. **Nothing was charged.** | Re-read `price_usd` from `/v1/listings`, decide, retry. The response carries the current total. |
+| 409 | `item_unavailable` | The listing sold before your order landed. | Pick another listing. Subscribe to the [SSE stream](/api-reference/get-listings-stream) — `gone` events remove sold items before you try to buy them. |
+| 409 | `pending_trades_limit` | The recipient has too many unaccepted Steam offers. | Have them accept pending offers first. `limit` is in the body. |
+| 409 | `idempotency_in_progress` | A request with the same `Idempotency-Key` / `custom_id` is still running. | Wait and poll `GET /v1/orders/info`; do not re-send with a new key or you will double-buy. |
+| 409 | `price_updating` | Prices are mid-refresh. | Retry in a moment. |
+| 409 | `not_claimable` | The order is not in a claimable state. | Read `status` — it is already delivering, completed, or failed. |
+| 503 | `market_unavailable` | The upstream source for that item is temporarily down. **No charge was made.** | Retry shortly, or pick a listing from elsewhere in the catalogue. |
+| 500 | `order_failed` | Unexpected failure. | Check `GET /v1/orders/info` with your `custom_id` before retrying — the order may exist. |
+
+## Webhooks
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 400 | `invalid_webhook_url` | Not absolute HTTPS, embeds credentials, or resolves to a private address. | Register a publicly routable HTTPS URL. |
+| 404 | `not_found` | No such webhook or delivery on your account. | Check the id with `GET /v1/webhooks`. |
+| 409 | `too_many_webhooks` | 5 endpoints already registered. | Delete one first. |
+| 409 | `already_delivered` | You retried a delivery that already succeeded. | Nothing to do. |
+
+## Not available through the API
+
+| HTTP | `code` | Meaning |
+|---|---|---|
+| 501 | `not_implemented` | Withdrawals are site-only by design. Manage payouts at [csboard.com/profile](https://csboard.com/profile). |
+
+---
+
+## Retry rules
+
+The distinction that matters is whether money moved.
+
+<CardGroup cols={2}>
+  <Card title="Safe to retry" icon="rotate">
+    `429` (after `Retry-After`), `price_updating`, `market_unavailable`, `503`, and network timeouts. Nothing was charged. Reuse the **same** `Idempotency-Key` so a request that actually succeeded replays instead of buying twice.
+  </Card>
+  <Card title="Do not retry unchanged" icon="ban">
+    `400`, `401`, `403`, `invalid_webhook_url`, `unsupported_item`. The request is wrong; repeating it produces the same error and, on auth failures, an IP ban.
+  </Card>
+  <Card title="Decide, then retry" icon="scale-balanced">
+    `price_moved` and `item_unavailable`. The market changed under you. Re-read the listing, apply your own pricing rule, and issue a **new** order with a **new** idempotency key.
+  </Card>
+  <Card title="Check before retrying" icon="magnifying-glass">
+    `order_failed`, `idempotency_in_progress`, and any timeout on `POST`. Call `GET /v1/orders/info` with your `custom_id` first — the order may already exist.
+  </Card>
+</CardGroup>
+
+<Warning>
+  A timeout is not a failure. `POST /v1/orders` and `POST /v1/market/buy` are idempotent on `Idempotency-Key` / `custom_id`: retrying with the same value replays the original order. Retrying with a **new** value after a timeout is how you buy the same skin twice.
+</Warning>
