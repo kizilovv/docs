@@ -42,7 +42,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 
 | HTTP | `code` | Cause | What to do |
 |---|---|---|---|
-| 400 | `invalid_param` | A query parameter is malformed — a bad `available_after` timestamp, or a `delivery` value that is not `instant` or `hold`. | Fix the parameter. This is deliberately an error rather than a silently ignored filter. |
+| 400 | `invalid_param` | A query parameter is malformed — a bad `available_after` timestamp, or a `delivery` value outside `instant` / `up_to_12h` / `hold`, or a `min_refund_percent` outside 0-100. | Fix the parameter. This is deliberately an error rather than a silently ignored filter. |
 | 402 | `insufficient_settled_balance` | The price feed requires a funded account. | Top up. `GET /v1/health` and `GET /v1/balance` stay open so you can integrate before funding. |
 
 ## Buying
