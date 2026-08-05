@@ -990,6 +990,13 @@
                       "code": "idempotency_in_progress",
                       "detail": "A request with this Idempotency-Key is still being processed."
                     }
+                  },
+                  "concurrent_update": {
+                    "summary": "Lost a concurrent-update race",
+                    "value": {
+                      "code": "concurrent_update",
+                      "detail": "Another order touched the same items at the same moment and this one was rolled back. Nothing was charged — retry."
+                    }
                   }
                 }
               }
@@ -1735,6 +1742,13 @@
                     "value": {
                       "code": "price_updating",
                       "detail": "Prices are updating; retry shortly."
+                    }
+                  },
+                  "concurrent_update": {
+                    "summary": "Lost a concurrent-update race",
+                    "value": {
+                      "code": "concurrent_update",
+                      "detail": "Another order touched the same items at the same moment and this one was rolled back. Nothing was charged — retry."
                     }
                   }
                 }

@@ -12,6 +12,8 @@ description: "Product updates, new features, and fixes for the CSBoard API."
 
 Crucially, the idempotency claim is **held** instead of released. Re-sending the identical `custom_id` / `Idempotency-Key` replays the original outcome rather than buying a second time; a retry sent while the original is still unresolved returns `409 idempotency_in_progress`. Poll the order list before treating a `504` as a failure. Deterministic errors (price moved, insufficient balance, item unavailable) are unchanged.
 
+
+**Lost concurrency races answer `409 concurrent_update`.** When two orders touch the same items at the same instant the loser's transaction is rolled back whole — nothing charged, nothing reserved. That used to surface as `500`; it is now a `409` with `Retry-After`, because retrying is exactly the right move.
 </Update>
 
 <Update label="July 27, 2026">
