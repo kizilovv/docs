@@ -1028,6 +1028,20 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "504": {
+            "description": "Upstream marketplace did not answer in time. The outcome of the purchase is UNKNOWN — it may still have completed. Do NOT re-send blindly: poll the order list, or re-send the identical custom_id / Idempotency-Key, which replays the original result instead of buying again. A retry sent while the original is still unresolved returns 409 idempotency_in_progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "upstream_timeout",
+                  "detail": "The marketplace did not answer in time, so the outcome of this purchase is UNKNOWN — it may still have gone through. Do not re-send blindly: poll the order list (or re-send the identical custom_id, which replays rather than buys) before treating it as failed."
+                }
+              }
+            }
           }
         }
       }
@@ -1740,6 +1754,20 @@
                 "example": {
                   "code": "order_failed",
                   "detail": "The purchase could not be completed."
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Upstream marketplace did not answer in time. The outcome of the purchase is UNKNOWN — it may still have completed. Do NOT re-send blindly: poll the order list, or re-send the identical custom_id / Idempotency-Key, which replays the original result instead of buying again. A retry sent while the original is still unresolved returns 409 idempotency_in_progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "upstream_timeout",
+                  "detail": "The marketplace did not answer in time, so the outcome of this purchase is UNKNOWN — it may still have gone through. Do not re-send blindly: poll the order list (or re-send the identical custom_id, which replays rather than buys) before treating it as failed."
                 }
               }
             }

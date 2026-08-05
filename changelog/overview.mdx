@@ -4,6 +4,16 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="August 5, 2026">
+
+## Fixes
+
+**Purchases that time out now answer `504`, not `500`.** When a marketplace stops responding mid-purchase the outcome is genuinely unknown — the buy may still have completed. `POST /market/buy` and `POST /orders` now return `504 upstream_timeout` for that case and say so explicitly.
+
+Crucially, the idempotency claim is **held** instead of released. Re-sending the identical `custom_id` / `Idempotency-Key` replays the original outcome rather than buying a second time; a retry sent while the original is still unresolved returns `409 idempotency_in_progress`. Poll the order list before treating a `504` as a failure. Deterministic errors (price moved, insufficient balance, item unavailable) are unchanged.
+
+</Update>
+
 <Update label="July 27, 2026">
 
 ## New features

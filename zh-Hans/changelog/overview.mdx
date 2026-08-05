@@ -4,6 +4,16 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年8月5日">
+
+## 修复
+
+**购买超时现在返回 `504` 而非 `500`。** 当市场在购买过程中停止响应时，结果确实是未知的——购买仍可能已经完成。`POST /market/buy` 和 `POST /orders` 现在为此返回 `504 upstream_timeout`，并明确说明这一点。
+
+关键在于：幂等声明现在会被**保留**而不是释放。重新发送相同的 `custom_id` / `Idempotency-Key` 会重放原始结果，而不会再次购买；在原请求尚未确定时发送的重试将返回 `409 idempotency_in_progress`。在将 `504` 视为失败之前，请先轮询订单列表。确定性错误（价格变动、余额不足、商品不可用）保持不变。
+
+</Update>
+
 <Update label="2026年7月27日">
 
 ## 新功能
