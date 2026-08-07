@@ -55,7 +55,7 @@
                 ]
               },
               {
-                "group": "Buying",
+                "group": "Trading",
                 "pages": [
                   "api-reference/post-orders",
                   "api-reference/post-market-buy",
@@ -63,12 +63,6 @@
                   "api-reference/get-orders",
                   "api-reference/get-orders-info",
                   "api-reference/get-order"
-                ]
-              },
-              {
-                "group": "Status",
-                "pages": [
-                  "api-reference/get-health"
                 ]
               },
               {
@@ -93,9 +87,14 @@
                   "api-reference/get-webhook-deliveries",
                   "api-reference/post-webhook-delivery-retry"
                 ]
+              },
+              {
+                "group": "Status",
+                "pages": [
+                  "api-reference/get-health"
+                ]
               }
-            ],
-            "openapi": "openapi.json"
+            ]
           },
           {
             "tab": "Changelog",
@@ -150,7 +149,7 @@
                 ]
               },
               {
-                "group": "Покупка",
+                "group": "Торговля",
                 "pages": [
                   "ru/api-reference/post-orders",
                   "ru/api-reference/post-market-buy",
@@ -161,19 +160,18 @@
                 ]
               },
               {
-                "group": "Статус",
-                "pages": [
-                  "ru/api-reference/get-health"
-                ]
-              },
-              {
                 "group": "Аккаунт",
                 "pages": [
                   "ru/api-reference/get-balance"
                 ]
+              },
+              {
+                "group": "Статус",
+                "pages": [
+                  "ru/api-reference/get-health"
+                ]
               }
-            ],
-            "openapi": "openapi.json"
+            ]
           },
           {
             "tab": "Журнал изменений",
@@ -228,7 +226,7 @@
                 ]
               },
               {
-                "group": "购买",
+                "group": "交易",
                 "pages": [
                   "zh-Hans/api-reference/post-orders",
                   "zh-Hans/api-reference/post-market-buy",
@@ -239,19 +237,18 @@
                 ]
               },
               {
-                "group": "状态",
-                "pages": [
-                  "zh-Hans/api-reference/get-health"
-                ]
-              },
-              {
                 "group": "账户",
                 "pages": [
                   "zh-Hans/api-reference/get-balance"
                 ]
+              },
+              {
+                "group": "状态",
+                "pages": [
+                  "zh-Hans/api-reference/get-health"
+                ]
               }
-            ],
-            "openapi": "openapi.json"
+            ]
           },
           {
             "tab": "更新日志",

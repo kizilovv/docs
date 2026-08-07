@@ -1791,6 +1791,9 @@
     },
     "/transactions": {
       "get": {
+        "tags": [
+          "Account"
+        ],
         "summary": "Your balance ledger",
         "description": "Every movement on your API balance — purchases, refunds, sales, deposits — newest first, keyset paginated. Use it to reconcile: a failed purchase and its refund are two rows sharing the same `order_id`.",
         "operationId": "getTransactions",
