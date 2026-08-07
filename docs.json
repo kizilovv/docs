@@ -45,7 +45,6 @@
             "groups": [
               {
                 "group": "Market Data",
-                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-listings",
                   "api-reference/get-listings-stream",
@@ -57,7 +56,6 @@
               },
               {
                 "group": "Trading",
-                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/post-orders",
                   "api-reference/post-market-buy",
@@ -69,7 +67,6 @@
               },
               {
                 "group": "Account",
-                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-balance",
                   "api-reference/get-transactions",
@@ -80,7 +77,6 @@
               },
               {
                 "group": "Webhooks",
-                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-webhooks",
                   "api-reference/post-webhooks",
@@ -94,7 +90,6 @@
               },
               {
                 "group": "Status",
-                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-health"
                 ]
@@ -144,7 +139,6 @@
             "groups": [
               {
                 "group": "Рыночные данные",
-                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/get-listings",
                   "ru/api-reference/get-listings-stream",
@@ -156,7 +150,6 @@
               },
               {
                 "group": "Торговля",
-                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/post-orders",
                   "ru/api-reference/post-market-buy",
@@ -168,14 +161,12 @@
               },
               {
                 "group": "Аккаунт",
-                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/get-balance"
                 ]
               },
               {
                 "group": "Статус",
-                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/get-health"
                 ]
@@ -225,7 +216,6 @@
             "groups": [
               {
                 "group": "市场数据",
-                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/get-listings",
                   "zh-Hans/api-reference/get-listings-stream",
@@ -237,7 +227,6 @@
               },
               {
                 "group": "交易",
-                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/post-orders",
                   "zh-Hans/api-reference/post-market-buy",
@@ -249,14 +238,12 @@
               },
               {
                 "group": "账户",
-                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/get-balance"
                 ]
               },
               {
                 "group": "状态",
-                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/get-health"
                 ]
