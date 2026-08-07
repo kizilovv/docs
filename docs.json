@@ -45,6 +45,7 @@
             "groups": [
               {
                 "group": "Market Data",
+                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-listings",
                   "api-reference/get-listings-stream",
@@ -55,7 +56,8 @@
                 ]
               },
               {
-                "group": "Buying",
+                "group": "Trading",
+                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/post-orders",
                   "api-reference/post-market-buy",
@@ -66,13 +68,8 @@
                 ]
               },
               {
-                "group": "Status",
-                "pages": [
-                  "api-reference/get-health"
-                ]
-              },
-              {
                 "group": "Account",
+                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-balance",
                   "api-reference/get-transactions",
@@ -83,6 +80,7 @@
               },
               {
                 "group": "Webhooks",
+                "openapi": "openapi.json",
                 "pages": [
                   "api-reference/get-webhooks",
                   "api-reference/post-webhooks",
@@ -93,9 +91,15 @@
                   "api-reference/get-webhook-deliveries",
                   "api-reference/post-webhook-delivery-retry"
                 ]
+              },
+              {
+                "group": "Status",
+                "openapi": "openapi.json",
+                "pages": [
+                  "api-reference/get-health"
+                ]
               }
-            ],
-            "openapi": "openapi.json"
+            ]
           },
           {
             "tab": "Changelog",
@@ -140,6 +144,7 @@
             "groups": [
               {
                 "group": "Рыночные данные",
+                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/get-listings",
                   "ru/api-reference/get-listings-stream",
@@ -150,7 +155,8 @@
                 ]
               },
               {
-                "group": "Покупка",
+                "group": "Торговля",
+                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/post-orders",
                   "ru/api-reference/post-market-buy",
@@ -161,19 +167,20 @@
                 ]
               },
               {
-                "group": "Статус",
-                "pages": [
-                  "ru/api-reference/get-health"
-                ]
-              },
-              {
                 "group": "Аккаунт",
+                "openapi": "openapi.json",
                 "pages": [
                   "ru/api-reference/get-balance"
                 ]
+              },
+              {
+                "group": "Статус",
+                "openapi": "openapi.json",
+                "pages": [
+                  "ru/api-reference/get-health"
+                ]
               }
-            ],
-            "openapi": "openapi.json"
+            ]
           },
           {
             "tab": "Журнал изменений",
@@ -218,6 +225,7 @@
             "groups": [
               {
                 "group": "市场数据",
+                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/get-listings",
                   "zh-Hans/api-reference/get-listings-stream",
@@ -228,7 +236,8 @@
                 ]
               },
               {
-                "group": "购买",
+                "group": "交易",
+                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/post-orders",
                   "zh-Hans/api-reference/post-market-buy",
@@ -239,19 +248,20 @@
                 ]
               },
               {
-                "group": "状态",
-                "pages": [
-                  "zh-Hans/api-reference/get-health"
-                ]
-              },
-              {
                 "group": "账户",
+                "openapi": "openapi.json",
                 "pages": [
                   "zh-Hans/api-reference/get-balance"
                 ]
+              },
+              {
+                "group": "状态",
+                "openapi": "openapi.json",
+                "pages": [
+                  "zh-Hans/api-reference/get-health"
+                ]
               }
-            ],
-            "openapi": "openapi.json"
+            ]
           },
           {
             "tab": "更新日志",
