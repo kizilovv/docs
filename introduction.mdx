@@ -4,7 +4,7 @@ sidebarTitle: "Introduction"
 description: "Access live CS2 skin listings, floats, sticker data, and min-ask prices — plus opt-in automated buying — through a single REST API."
 ---
 
-The CSBoard API is a developer- and AI-agent-friendly REST interface over the CSBoard marketplace. Whether you're building a price tracker, powering an AI trading agent, or automating purchases from your balance, the API delivers live listings, float values, sticker details, minAsk prices, and FX conversion rates. It also supports opt-in buying straight from your CSBoard balance. All endpoints are key-gated except the health check, and buying capability requires a separately enabled trading key.
+The CSBoard API is a developer- and AI-agent-friendly REST interface over the CSBoard marketplace. Whether you're building a price tracker, powering an AI trading agent, or automating purchases from your balance, the API delivers live listings, float values, sticker details, minAsk prices, and FX conversion rates. It also supports opt-in buying straight from your CSBoard balance. All endpoints are key-gated except the health check and the public price feed, and buying capability requires a separately enabled trading key. CS2 is the default game; pass `appId` to work with Dota 2 or Rust.
 
 ## Base URL
 
@@ -14,7 +14,7 @@ https://csboard.com/v1
 
 ## Key concepts
 
-- **Health** — [`GET /v1/health`](/api-reference/get-health) is the only unauthenticated endpoint. Use it to verify the API is up and the price list is fresh before starting a session.
+- **Health** — [`GET /v1/health`](/api-reference/get-health) works without a key. Use it to verify the API is up and the price list is fresh before starting a session.
 - **Listings** — [`GET /v1/listings`](/api-reference/get-listings) returns live buyable items with float, paint seed, stickers, and ask price in USD. Supports keyset pagination and rich filters.
 - **Prices** — [`GET /v1/prices`](/api-reference/get-prices) delivers grouped minAsk prices per skin group. [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) provides a full gzipped NDJSON dump for bulk catalog ingestion.
 - **Orders** — [`POST /v1/orders`](/api-reference/post-orders) places buy orders debited from your CSBoard balance. Requires a trading-enabled key.
@@ -24,7 +24,7 @@ Pagination across all list endpoints uses a **keyset cursor** — pass the `curs
 
 ## Quick start
 
-Only [`GET /v1/health`](/api-reference/get-health) works without a key. Every other endpoint requires a `csb_pub_` Bearer token in the `Authorization` header:
+Only [`GET /v1/health`](/api-reference/get-health) and [`GET /v1/public/prices`](/api-reference/get-public-prices) work without a key. Every other endpoint requires a `csb_pub_` Bearer token in the `Authorization` header:
 
 ```bash
 curl https://csboard.com/v1/listings \

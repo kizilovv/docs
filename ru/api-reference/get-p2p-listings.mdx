@@ -1,0 +1,58 @@
+---
+title: "GET /v1/p2p/listings — ваши P2P-листинги"
+sidebarTitle: "GET /p2p/listings"
+description: "Ваши листинги на P2P-маркете CSBoard, которые продаются или находятся в процессе продажи, — от новых к старым, с выплатой за каждую продажу."
+openapi: "GET /p2p/listings"
+---
+
+Возвращает ваши листинги, которые выставлены на продажу или находятся в процессе продажи, — от новых к старым. В каждом есть `seller_payout_usd` — ровно та сумма, которую продажа зачислит на ваш баланс после нашей комиссии.
+
+| `status` | Значение |
+|---|---|
+| `active` | В продаже. Можно изменить цену или снять с продажи. |
+| `trade_pending`, `trade_sent`, `verification_hold` | Продан и доставляется. Изменить его уже нельзя. |
+| `reconciliation_required` | Снят с витрины, потому что полное чтение инвентаря больше не нашло предмет (`needs_resync: true`). Опубликуйте его заново, когда предмет вернётся. |
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`. Бесплатно — подойдёт любой действующий ключ, требований к балансу нет.
+
+## Пример запроса
+
+```bash
+curl https://csboard.com/v1/p2p/listings \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "data": [
+    {
+      "id": "cm1xq8z4k0003ab12cd34ef56",
+      "status": "active",
+      "price_usd": 12.34,
+      "currency": "USD",
+      "commission_usd": 0.25,
+      "seller_payout_usd": 12.09,
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "item_name": "AK-47 | Redline (Field-Tested)",
+      "asset_id": "38451927734",
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "float_value": 0.2711,
+      "needs_resync": false,
+      "created_at": "2026-10-02T12:04:11.000Z",
+      "updated_at": "2026-10-02T12:04:11.000Z"
+    }
+  ]
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 403 | `account_banned` | Аккаунт заблокирован. |
+| 403 | `ip_not_allowed` | Запрос пришёл с адреса вне IP-allowlist ключа. |
+| 429 | `rate_limit_exceeded` | Превышен поминутный лимит вашего ключа. Подождите время, указанное в заголовке `Retry-After`. |
+| 503 | `p2p_disabled` | P2P-маркет сейчас отключён. |

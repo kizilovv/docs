@@ -1,7 +1,7 @@
 ---
 title: "CSBoard API Error Reference — Every Code and What To Do About It"
 sidebarTitle: "Errors"
-description: "Complete list of CSBoard API error codes with HTTP status, cause, and the correct client response — authentication, rate limits, buying, instant sell, and webhooks."
+description: "Complete list of CSBoard API error codes with HTTP status, cause, and the correct client response — authentication, rate limits, games, buying, P2P listing, and webhooks."
 ---
 
 Every error returns the same JSON shape:
@@ -13,7 +13,7 @@ Every error returns the same JSON shape:
 Note the field is **`detail`**, not `message`. Match on `code` — it is stable and safe to branch on. `detail` is human-readable and may be reworded without notice.
 
 <Note>
-  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, and `item_unavailable` may include `unavailable_ids`. Ignore unknown fields rather than rejecting the body.
+  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, `item_unavailable` may include `unavailable_ids`, `unsupported_game` includes `supported_app_ids`, and `price_below_market` includes `market_usd` and `floor_usd`. Ignore unknown fields rather than rejecting the body.
 </Note>
 
 ---
@@ -37,12 +37,14 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 429 | `rate_limit_exceeded` | Per-key limit exceeded. | Sleep for `Retry-After` seconds, then retry. See [Rate Limits](/rate-limits). |
 | 429 | `snapshot_rate_limited` | Bulk snapshot polled more than once a minute. | Cache the snapshot; use ETags to avoid re-downloading it. |
 | 429 | `too_many_streams` | More than 3 concurrent SSE streams on one key. | Close an idle stream. One stream carries the whole catalogue. |
+| 429 | — | More than 1 request a minute to the keyless `GET /v1/public/prices` from one IP. This body is `{ "error": "...", "statusCode": 429 }`, with no `code`. | Sleep for `Retry-After` seconds. The feed only changes once a minute anyway. |
 
 ## Reading market data
 
 | HTTP | `code` | Cause | What to do |
 |---|---|---|---|
-| 400 | `invalid_param` | A query parameter is malformed — a bad `available_after` timestamp, or a `delivery` value outside `instant` / `up_to_12h` / `hold`, or a `min_refund_percent` outside 0-100. | Fix the parameter. This is deliberately an error rather than a silently ignored filter. |
+| 400 | `invalid_param` | A query parameter is malformed — a bad `available_after` timestamp, or a `delivery` value outside `instant` / `up_to_12h` / `hold`, or a `min_refund_percent` outside 0-100. Also a CS2-only filter (`wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after`, `sort=newest`) sent with a Dota 2 or Rust `appId`, and an unavailable `appId` on `GET /v1/public/prices`. | Fix the parameter. This is deliberately an error rather than a silently ignored filter. |
+| 400 | `unsupported_game` | The `appId` is unknown, switched off, or not open to your key. On `POST /v1/orders` it also means your key cannot buy in that game. | Use one of `supported_app_ids` from the body, or check [`GET /v1/games`](/api-reference/get-games). Do not retry unchanged. |
 | 402 | `insufficient_settled_balance` | The price feed requires a funded account. | Top up. `GET /v1/health` and `GET /v1/balance` stay open so you can integrate before funding. |
 
 ## Buying
@@ -65,6 +67,22 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 409 | `not_claimable` | The order is not in a claimable state. | Read `status` — it is already delivering, completed, or failed. |
 | 503 | `market_unavailable` | The upstream source for that item is temporarily down. **No charge was made.** | Retry shortly, or pick a listing from elsewhere in the catalogue. |
 | 500 | `order_failed` | Unexpected failure. | Check `GET /v1/orders/info` with your `custom_id` before retrying — the order may exist. |
+
+## P2P listing
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 400 | `idempotency_key_required` | `POST /v1/p2p/listings` without an `Idempotency-Key` header of 8–128 characters. | Send one, unique per publish request. |
+| 400 | `no_capable_client` | Nothing on your side can send the Steam trade. | Run the CSBoard extension or app, then retry. |
+| 403 | `contact_required` | No verified email and no linked Telegram to tell you about a sale. | Add one on the site. |
+| 403 | `shop_locked` / `p2p_cooldown` / `p2p_suspended` / `trading_banned` | Selling on P2P is locked for this account. | Wait until the time in the body, where there is one. Retrying sooner changes nothing. |
+| 409 | `asset_revision_changed` | The item changed after you read the inventory. | Read [`GET /v1/p2p/inventory`](/api-reference/get-p2p-inventory) again and resend with the new `asset_revision`. |
+| 409 | `snapshot_stale` | Our read of your inventory is out of date. The body carries `inventory_proof`. | Poll the inventory after `retry_after_ms`, then resend. |
+| 409 | `listing_not_active` | The listing has sold, is mid-sale or was removed. | Nothing to remove. Read [`GET /v1/p2p/listings`](/api-reference/get-p2p-listings). |
+| 409 | `idempotency_key_mismatch` / `idempotency_key_consumed` | The key was used with different details, or an earlier attempt with it failed. | Resend with a **new** `Idempotency-Key`. |
+| 422 | `price_below_market` | The price is under half of our market price for the item. Over a key it cannot be confirmed past. | Raise `price_usd` to at least `floor_usd` from the body. The `Idempotency-Key` is not spent. |
+| 503 | `p2p_disabled` | The P2P market is switched off. | Retry later. |
+| 503 | `p2p_reprice_disabled` | Price changes on the P2P market are switched off. | Retry later. |
 
 ## Webhooks
 

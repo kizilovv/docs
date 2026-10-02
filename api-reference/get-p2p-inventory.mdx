@@ -1,0 +1,81 @@
+---
+title: "GET /v1/p2p/inventory — Your CS2 Inventory, Ready to List"
+sidebarTitle: "GET /p2p/inventory"
+description: "Your CS2 items, one row per copy, with whether each can be listed on the CSBoard P2P market right now and why not."
+openapi: "GET /p2p/inventory"
+---
+
+The first step of listing over the API. It returns every CS2 item we have seen in your Steam inventory, one row per copy — `asset_id` tells two copies of the same skin apart. `listable` says whether a copy can be published right now; when it cannot, `reasons` says why. `listed` marks copies that already have a listing.
+
+Pass `operational_asset_id` and `asset_revision` from this response, unchanged, to [`POST /v1/p2p/listings`](/api-reference/post-p2p-listings).
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Free — any valid key, no balance requirement.
+
+## The inventory read
+
+Publishing needs a current read of your Steam inventory. `inventory_proof` tells you where that stands:
+
+| `inventory_proof.status` | Meaning | What to do |
+|---|---|---|
+| `ready` | We hold a current read. | List the rows with `listable: true`. |
+| `pending` | This call started a new read. | Call again after `retry_after_ms`. |
+| `blocked` | We cannot read your inventory. | Fix what `code` names — for example a private inventory or a missing trade URL — and call again. |
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/p2p/inventory \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": [
+    {
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+      "asset_id": "38451927734",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "context_id": "2",
+      "listable": true,
+      "reasons": [],
+      "listed": false,
+      "listing_id": null,
+      "listing_status": null,
+      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+    },
+    {
+      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+      "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+      "asset_id": "38451927990",
+      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+      "context_id": "16",
+      "listable": false,
+      "reasons": [
+        { "code": "hold_not_ended", "message": "The Steam trade hold has not ended yet." }
+      ],
+      "listed": false,
+      "listing_id": null,
+      "listing_status": null,
+      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+    }
+  ],
+  "inventory_proof": {
+    "status": "ready",
+    "completed_at": "2026-10-02T11:58:03.000Z",
+    "asset_count": 2
+  }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 403 | `account_banned` | The account is banned. |
+| 403 | `ip_not_allowed` | The request came from outside the key's IP allowlist. |
+| 429 | `rate_limit_exceeded` | Over your key's per-minute limit. Wait for the `Retry-After` header value. |
+| 503 | `p2p_disabled` | The P2P market is switched off right now. |

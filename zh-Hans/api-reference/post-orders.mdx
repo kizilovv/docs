@@ -39,6 +39,10 @@ orders 端点允许您在单次原子请求中购买 1 到 10 件挂单。扣款
   `Idempotency-Key` 请求头的替代方案。如果两者都提供，则以请求头为准。请二选一使用，不要同时使用。
 </ParamField>
 
+<ParamField body="appId" default="730" type="integer">
+  `item_ids` 所属的游戏：`730` = CS2，`570` = Dota 2，`252490` = Rust。不传则为 CS2。请使用您从 `GET /v1/listings` 读取这些 id 时所用的同一个 `appId`。查看 [`GET /v1/games`](/zh-Hans/api-reference/get-games) 中的 `tradable`，了解您的密钥可以在哪些游戏中购买。
+</ParamField>
+
 ## 响应字段
 
 <ResponseField name="order_id" type="string" required>
@@ -122,6 +126,7 @@ curl -X POST https://csboard.com/v1/orders \
 | 402 | `insufficient_balance` | 余额过低，无法覆盖订单总额。 |
 | 400 | `steam_account_required` | 您的 CSBoard 账户上未绑定 Steam 账户或没有有效的交易链接。 |
 | 403 | `trading_not_enabled` | 该 API 密钥未启用购买功能。请在您的个人资料中启用。 |
+| 400 | `unsupported_game` | 您的密钥无法在该 `appId` 中购买。`supported_app_ids` 列出了它可以购买的游戏。 |
 | 401 | `unauthorized` | API 密钥缺失或无效。 |
 | 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请在重试前等待 `Retry-After` 响应头中的秒数。 |
 
@@ -131,4 +136,8 @@ curl -X POST https://csboard.com/v1/orders \
 
 <Note>
   通过 `hold` 交付的商品受 Steam 交易冻结约束。请查看原始挂单（来自 `GET /v1/listings`）上的 `tradable_at` 字段，了解被冻结的商品何时能在您的 Steam 库存中可交易。
+</Note>
+
+<Note>
+  **Dota 2 和 Rust。** `appId` 为 `570` 或 `252490` 的订单会进入交付队列，并返回 `delivery: "pending"` 和 `expected_minutes: null`。请通过 [`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 跟踪。价格上限、余额检查和幂等性与 CS2 完全相同。
 </Note>

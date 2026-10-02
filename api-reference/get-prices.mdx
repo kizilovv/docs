@@ -9,7 +9,15 @@ The prices endpoint returns a grouped price snapshot of the CSBoard marketplace.
 
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
 
+<Note>
+  Pass `appId=570` for Dota 2 or `appId=252490` for Rust. For those games each row is one `market_hash_name`, with `wear` and `doppler_phase` set to `null`. See [Games](/api-reference/get-games). Only need one number per name? [`GET /v1/public/prices`](/api-reference/get-public-prices) works without a key.
+</Note>
+
 ## Query parameters
+
+<ParamField query="appId" default="730" type="integer">
+  Game to read: `730` = CS2, `570` = Dota 2, `252490` = Rust. Omit it for CS2. See [`GET /v1/games`](/api-reference/get-games) for the games your key can use.
+</ParamField>
 
 <ParamField query="search" type="string">
   Fuzzy match on `market_hash_name` — splits the query into words and substring-matches each. A name that is a word-subset of a longer item's name (e.g. `Spectrum Case` vs `Spectrum 2 Case`) cannot be isolated this way; use `name` for an exact lookup.
@@ -24,7 +32,7 @@ The prices endpoint returns a grouped price snapshot of the CSBoard marketplace.
 </ParamField>
 
 <ParamField query="wear" type="string">
-  Filter by wear bucket. One of: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+  Filter by wear bucket. One of: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -107,6 +115,8 @@ curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
 
 | HTTP status | Code | Meaning |
 | --- | --- | --- |
+| 400 | `invalid_param` | `wear` sent with a Dota 2 or Rust `appId`. |
+| 400 | `unsupported_game` | Your key cannot use this `appId`. `supported_app_ids` lists the ones it can. |
 | 401 | `unauthorized` | Missing or invalid API key. |
 | 429 | `rate_limit_exceeded` | Over 30 requests/min. Wait for the `Retry-After` header value before retrying. |
 

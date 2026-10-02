@@ -4,6 +4,38 @@ sidebarTitle: "Обзор"
 description: "Обновления продукта, новые возможности и исправления CSBoard API."
 ---
 
+<Update label="2 октября 2026">
+
+## Новые возможности
+
+**Dota 2 и Rust через тот же API — игра выбирается параметром `appId`**
+
+Теперь CSBoard продаёт не только CS2, но и предметы Dota 2 и Rust, а API добирается до них через один новый параметр. Передайте appId из Steam — `570` для Dota 2, `252490` для Rust, — и эндпоинт ответит по этой игре. Без параметра вы получаете CS2 — байт в байт как раньше.
+
+- `appId` работает как query-параметр в [`GET /v1/listings`](/ru/api-reference/get-listings), [`GET /v1/prices`](/ru/api-reference/get-prices) и [`GET /v1/listings/availability`](/ru/api-reference/get-listings-availability) и как поле тела в [`POST /v1/orders`](/ru/api-reference/post-orders).
+- У строк Dota 2 и Rust те же ключи, что и у строк CS2. Поля, которые есть только в CS2, равны `null`, а `stickers` — `[]`, так что один парсер читает все три игры.
+- Фильтры только для CS2 (`wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after`, `sort=newest`) с другой игрой дают `400 invalid_param`, а не молча игнорируются.
+- `appId`, который ваш ключ использовать не может, получает `400 unsupported_game` со списком `supported_app_ids`. Новый эндпоинт [**`GET /v1/games`**](/ru/api-reference/get-games) показывает игры, доступные ключу, и можно ли в них покупать.
+- Заказы Dota 2 и Rust отвечают `delivery: "pending"` и `expected_minutes: null`.
+
+SSE-стрим, массовый снапшот и `POST /v1/market/buy` остаются только для CS2.
+
+**Фид цен без ключа: `GET /v1/public/prices`**
+
+[**`GET /v1/public/prices`**](/ru/api-reference/get-public-prices) возвращает одну минимальную цену на каждый `market_hash_name` в CS2, Dota 2 или Rust. Ни API-ключ, ни баланс не нужны. Фазы CS2 Doppler объединены под базовым названием Steam, поэтому каждый ключ совпадает с реальным названием в Steam. Фид пересобирается раз в минуту, лимит — 1 запрос в минуту с одного IP.
+
+**Выставляйте свои скины на P2P-маркет через API — бесплатно**
+
+Пять новых эндпоинтов позволяют ключу выставлять CS2-предметы своего владельца на P2P-маркет CSBoard. Без требований к балансу и без торгового доступа — подойдёт любой действующий ключ.
+
+- [`GET /v1/p2p/inventory`](/ru/api-reference/get-p2p-inventory) — ваши предметы: какие можно выставить сейчас и почему нельзя остальные.
+- [`POST /v1/p2p/listings`](/ru/api-reference/post-p2p-listings) — публикация одного предмета или до 50 сразу; `Idempotency-Key` обязателен.
+- [`GET /v1/p2p/listings`](/ru/api-reference/get-p2p-listings), [`PATCH /v1/p2p/listings/{id}`](/ru/api-reference/patch-p2p-listing) и [`DELETE /v1/p2p/listings/{id}`](/ru/api-reference/delete-p2p-listing) — просмотр, изменение цены и снятие с продажи.
+
+Правила для продавца с сайта действуют без изменений, а проданный предмет по-прежнему нужно отправить через Steam и подтвердить в Steam Guard, прежде чем выплата попадёт на баланс. Одно сознательное отличие: цена ниже половины нашей рыночной отклоняется с `422 price_below_market`. Через ключ это нельзя обойти подтверждением, поэтому утёкшим ключом не получится слить ваш инвентарь. Запись ограничена 30 запросами в минуту на ключ. Весь процесс по шагам — в [руководстве по P2P-листингу](/ru/guides/p2p-listing).
+
+</Update>
+
 <Update label="5 августа 2026">
 
 ## Исправления

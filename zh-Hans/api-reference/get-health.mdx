@@ -1,11 +1,11 @@
 ---
 title: "GET /v1/health — CSBoard API 存活与新鲜度探针"
 sidebarTitle: "GET /health"
-description: "检查 CSBoard API 是否可达，以及价格列表的陈旧程度。这是唯一无需 API 密钥即可调用的端点——可以安全地匿名轮询。"
+description: "检查 CSBoard API 是否可达，以及价格列表的陈旧程度。无需 API 密钥即可调用——可以安全地匿名轮询。"
 openapi: "GET /health"
 ---
 
-health 端点是一个轻量级探针，用于确认 API 是否可达，并告诉您实体化的价格列表有多陈旧。它是**唯一**无需 API 密钥即可工作的端点，因此非常适合从监控系统轮询，或在执行已认证调用前在应用启动阶段进行新鲜度检查。
+health 端点是一个轻量级探针，用于确认 API 是否可达，并告诉您实体化的价格列表有多陈旧。它无需 API 密钥即可工作——另一个无需密钥的端点是[公开价格数据源](/zh-Hans/api-reference/get-public-prices)——因此非常适合从监控系统轮询，或在执行已认证调用前在应用启动阶段进行新鲜度检查。
 
 ## 响应字段
 

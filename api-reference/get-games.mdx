@@ -1,0 +1,71 @@
+---
+title: "GET /v1/games — Games You Can Pass as appId"
+sidebarTitle: "GET /games"
+description: "List the games your key can read with appId — CS2, Dota 2 and Rust — and whether it can also buy in each one."
+openapi: "GET /games"
+---
+
+CSBoard sells CS2, Dota 2 and Rust items. You choose the game with the `appId` parameter, using Steam's own appIds: `730` for CS2, `570` for Dota 2, `252490` for Rust. This endpoint lists the games your key can use and, for each one, whether it can buy there too (`tradable`).
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. No balance is needed, so you can check this before you fund the account.
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/games \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "games": [
+    { "appId": 730, "name": "CS2", "tradable": true },
+    { "appId": 570, "name": "Dota 2", "tradable": true },
+    { "appId": 252490, "name": "Rust", "tradable": true }
+  ]
+}
+```
+
+A game with `tradable: false` can be read through the market data endpoints but not bought yet.
+
+## Where `appId` works
+
+| Endpoint | How to pass it |
+|---|---|
+| [`GET /v1/listings`](/api-reference/get-listings) | Query parameter `appId` |
+| [`GET /v1/prices`](/api-reference/get-prices) | Query parameter `appId` |
+| [`GET /v1/listings/availability`](/api-reference/get-listings-availability) | Query parameter `appId` |
+| [`POST /v1/orders`](/api-reference/post-orders) | Body field `appId` |
+| [`GET /v1/public/prices`](/api-reference/get-public-prices) | Query parameter `appId` (no key needed) |
+
+Leave `appId` out and every endpoint answers for CS2, exactly as it did before the parameter existed.
+
+## What changes for Dota 2 and Rust
+
+- **Same response shape.** Dota 2 and Rust rows have the same keys as CS2 rows, so one parser reads all three. The CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at` — are `null`, and `stickers` is `[]`.
+- **CS2-only filters are refused, not ignored.** Sending `wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after` or `sort=newest` with a Dota 2 or Rust `appId` answers `400 invalid_param`. On `GET /v1/prices` only `wear` is CS2-only.
+- **Orders are queued.** A Dota 2 or Rust order answers `delivery: "pending"` and `expected_minutes: null`. Follow it with [`GET /v1/orders/{id}`](/api-reference/get-order).
+- **Ids belong to their game.** Buy and check ids under the same `appId` you read them with.
+
+These endpoints stay **CS2 only** and do not read `appId`: [`GET /v1/listings/stream`](/api-reference/get-listings-stream), [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) and [`POST /v1/market/buy`](/api-reference/post-market-buy).
+
+## Error codes
+
+An `appId` your key cannot use — unknown, switched off, or not open to you — answers `400 unsupported_game`. The body lists what you can use:
+
+```json
+{
+  "code": "unsupported_game",
+  "detail": "appId 440 is not available to this key. Supported: 730 (CS2), 570 (Dota 2), 252490 (Rust).",
+  "supported_app_ids": [730, 570, 252490]
+}
+```
+
+On `POST /v1/orders`, `supported_app_ids` lists the games you can **buy** in.
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Over your key's per-minute limit. Wait for the `Retry-After` header value. |

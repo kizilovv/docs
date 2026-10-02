@@ -1,0 +1,123 @@
+---
+title: "POST /v1/p2p/listings — List Your CS2 Items on the P2P Market"
+sidebarTitle: "POST /p2p/listings"
+description: "Put one CS2 item, or up to 50, up for sale on the CSBoard P2P market at your own price. Free with any API key; Idempotency-Key required."
+openapi: "POST /p2p/listings"
+---
+
+Publishes your own CS2 items on the CSBoard P2P market at your price. Send one item, or a batch of up to 50 as `{ "items": [...] }`. Take `operational_asset_id` and `asset_revision` from [`GET /v1/p2p/inventory`](/api-reference/get-p2p-inventory) and send them unchanged.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Free — any valid key, no balance requirement and no trading permission.
+
+## Seller rules
+
+The same rules as on the website apply:
+
+- a verified email or a linked Telegram, so we can tell you when an item sells;
+- the CSBoard extension or app able to send the Steam trade, and Steam Mobile Authenticator on the account;
+- no P2P cooldown, suspension or shop lock;
+- a current read of your inventory (see `inventory_proof` in [`GET /v1/p2p/inventory`](/api-reference/get-p2p-inventory)).
+
+## Price floor
+
+The price may not be under **half of our market price** for the item. On the website a seller can confirm a lower price after a warning. Over an API key there is no such confirmation: a lower price answers `422 price_below_market` with `market_usd` and `floor_usd`, so you can adjust and resend. This refusal does not spend your `Idempotency-Key`. When we have no market price for an item, no floor applies.
+
+Prices are in USD, from `0.10` to `100000`, in whole cents. `12.345` is refused, not rounded.
+
+## Idempotency
+
+`Idempotency-Key` is **required** (8–128 characters, unique per publish request). If you resend the same request with the same key, every item that was already published comes back as it is instead of being listed twice. A single replayed item answers `200` with the header `Idempotent-Replay: true`.
+
+- Reusing a key with a different price or revision answers `409 idempotency_key_mismatch`.
+- After `409 idempotency_key_consumed`, an earlier attempt failed part-way — retry with a new key.
+
+## Responses
+
+- **One item:** `201` with the listing, or `200` on a replay.
+- **A batch:** always `200`, with one result per item in `data`. One item that fails does not stop the others; a failed item carries the `status` and `code` it would have answered on its own.
+
+Writes are limited to **30 requests per minute per key**, shared with price changes and removals.
+
+## Example request
+
+```bash
+curl -X POST https://csboard.com/v1/p2p/listings \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 0b7d4c1e-6f2a-4b9e-8c3d-5a1f2e9b7c40" \
+  -d '{
+    "items": [
+      {
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+        "price_usd": 12.34
+      },
+      {
+        "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+        "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+        "price_usd": 3.5
+      }
+    ]
+  }'
+```
+
+## Example response
+
+```json
+{
+  "data": [
+    {
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "success": true,
+      "replay": false,
+      "listing": {
+        "id": "cm1xq8z4k0003ab12cd34ef56",
+        "status": "active",
+        "price_usd": 12.34,
+        "currency": "USD",
+        "commission_usd": 0.25,
+        "seller_payout_usd": 12.09,
+        "market_hash_name": "AK-47 | Redline (Field-Tested)",
+        "item_name": "AK-47 | Redline (Field-Tested)",
+        "asset_id": "38451927734",
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "float_value": 0.2711,
+        "needs_resync": false,
+        "created_at": "2026-10-02T12:04:11.000Z",
+        "updated_at": "2026-10-02T12:04:11.000Z"
+      }
+    },
+    {
+      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+      "success": false,
+      "status": 409,
+      "code": "hold_not_ended",
+      "detail": "The Steam trade hold has not ended yet."
+    }
+  ],
+  "success_count": 1,
+  "total_requested": 2
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 400 | `idempotency_key_required` | No `Idempotency-Key` header, or it is not 8–128 characters. |
+| 400 | `invalid_request` | Malformed body — a missing field, an unknown field, or a price outside `0.10`–`100000` or with more than two decimals. |
+| 400 | `no_capable_client` | Nothing on your side can send the trade. Run the CSBoard extension or app. |
+| 403 | `contact_required` | Add a verified email or link Telegram first. |
+| 403 | `shop_locked`, `p2p_cooldown`, `p2p_suspended`, `trading_banned` | Selling on P2P is locked for this account. Where the lock expires, the body says when. |
+| 403 | `account_banned` / `ip_not_allowed` | The account is banned, or the request came from outside the key's IP allowlist. |
+| 404 | `operational_asset_not_found` | The `operational_asset_id` is not in your synced inventory. |
+| 409 | `asset_revision_changed` | The item changed since you read it. Read the inventory again. |
+| 409 | `snapshot_stale` and other `reasons` codes | The item is not listable — the code is the first of its `reasons`. `snapshot_stale` carries `inventory_proof` to poll. |
+| 409 | `already_listed` | The item already has a listing. |
+| 409 | `idempotency_in_progress` | A request with this key is still running. Wait and resend the same request. |
+| 409 | `idempotency_key_mismatch` / `idempotency_key_consumed` | The key was used with different details, or an earlier attempt failed. Use a new key. |
+| 422 | `price_below_market` | The price is under half of our market price. See `market_usd` and `floor_usd`. |
+| 429 | `rate_limit_exceeded` | Over 30 P2P writes this minute, or over your key's general limit. Wait for the `Retry-After` header value. |
+| 503 | `p2p_disabled` | The P2P market is switched off right now. |
+
+See the [P2P listing guide](/guides/p2p-listing) for what happens after an item sells.

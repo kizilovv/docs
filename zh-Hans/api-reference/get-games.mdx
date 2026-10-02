@@ -1,0 +1,71 @@
+---
+title: "GET /v1/games — 可作为 appId 传入的游戏"
+sidebarTitle: "GET /games"
+description: "列出您的密钥可以通过 appId 读取的游戏——CS2、Dota 2 和 Rust——以及在每个游戏中是否也可以购买。"
+openapi: "GET /games"
+---
+
+CSBoard 销售 CS2、Dota 2 和 Rust 的商品。您通过 `appId` 参数选择游戏，取值即 Steam 自己的 appId：CS2 为 `730`，Dota 2 为 `570`，Rust 为 `252490`。该端点列出您的密钥可以使用的游戏，并对每个游戏标明是否也可以在其中购买（`tradable`）。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。无需余额，因此您可以在充值之前先调用它。
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/games \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "games": [
+    { "appId": 730, "name": "CS2", "tradable": true },
+    { "appId": 570, "name": "Dota 2", "tradable": true },
+    { "appId": 252490, "name": "Rust", "tradable": true }
+  ]
+}
+```
+
+`tradable: false` 的游戏可以通过市场数据端点读取，但暂时还不能购买。
+
+## 哪些端点支持 `appId`
+
+| 端点 | 传递方式 |
+|---|---|
+| [`GET /v1/listings`](/zh-Hans/api-reference/get-listings) | 查询参数 `appId` |
+| [`GET /v1/prices`](/zh-Hans/api-reference/get-prices) | 查询参数 `appId` |
+| [`GET /v1/listings/availability`](/zh-Hans/api-reference/get-listings-availability) | 查询参数 `appId` |
+| [`POST /v1/orders`](/zh-Hans/api-reference/post-orders) | 请求体字段 `appId` |
+| [`GET /v1/public/prices`](/zh-Hans/api-reference/get-public-prices) | 查询参数 `appId`（无需密钥） |
+
+不传 `appId` 时，所有端点都按 CS2 返回，与引入该参数之前完全一致。
+
+## Dota 2 和 Rust 有哪些不同
+
+- **响应结构相同。** Dota 2 和 Rust 的行与 CS2 的行键名完全一致，一个解析器即可读取三个游戏。仅 CS2 才有的字段——`wear`、`doppler_phase`、`float_value`、`paint_seed`、`inspect_link`、`tradable_at`、`listed_at`——为 `null`，`stickers` 为 `[]`。
+- **仅限 CS2 的过滤参数会被拒绝，而不是被忽略。** 在 Dota 2 或 Rust 的 `appId` 下发送 `wear`、`min_float`、`max_float`、`stat_trak`、`souvenir`、`available_after` 或 `sort=newest`，会返回 `400 invalid_param`。在 `GET /v1/prices` 上，只有 `wear` 仅限 CS2。
+- **订单进入队列。** Dota 2 或 Rust 订单返回 `delivery: "pending"` 和 `expected_minutes: null`。请通过 [`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 跟踪。
+- **id 归属于各自的游戏。** 购买和检查 id 时，请使用读取它们时所用的同一个 `appId`。
+
+以下端点仍然**仅支持 CS2**，不读取 `appId`：[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream)、[`GET /v1/prices/snapshot.ndjson.gz`](/zh-Hans/api-reference/get-prices-snapshot) 和 [`POST /v1/market/buy`](/zh-Hans/api-reference/post-market-buy)。
+
+## 错误代码
+
+您的密钥无法使用的 `appId`——未知、已关闭或未向您开放——会返回 `400 unsupported_game`。响应体会列出您可以使用的值：
+
+```json
+{
+  "code": "unsupported_game",
+  "detail": "appId 440 is not available to this key. Supported: 730 (CS2), 570 (Dota 2), 252490 (Rust).",
+  "supported_app_ids": [730, 570, 252490]
+}
+```
+
+在 `POST /v1/orders` 上，`supported_app_ids` 列出的是您可以**购买**的游戏。
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 超过该密钥的每分钟限额。请等待 `Retry-After` 响应头中的秒数。 |

@@ -1,0 +1,57 @@
+---
+title: "GET /v1/public/prices — Keyless Min-Ask Feed for CS2, Dota 2 and Rust"
+sidebarTitle: "GET /public/prices"
+description: "One cheapest price per item name, for CS2, Dota 2 or Rust. No API key, no balance requirement — limited to one request per minute per IP."
+openapi: "GET /public/prices"
+---
+
+The public price feed answers one question: what is the cheapest ask on CSBoard for each item, right now? You get a single object that maps every `market_hash_name` on sale in one game to its minimum price in USD. There is no depth, no listing count, no wear split and no paging.
+
+**No API key required.** Send no `Authorization` header and no balance is needed. That makes it the endpoint for price-comparison sites, spreadsheets and scrapers that only need one number per name.
+
+## What you get
+
+- **One game per request.** `appId=730` is CS2 (the default), `570` is Dota 2, `252490` is Rust.
+- **Steam's own names.** CS2 Doppler and Gamma Doppler phases are merged into the base name Steam uses, so `Karambit | Doppler (Factory New)` carries the price of its cheapest phase. Every key matches a real Steam `market_hash_name`.
+- **Sorted keys, prices rounded to the cent.** Only names with at least one listing on sale appear.
+- **`updatedAt`** is when the payload was built.
+
+## Limits and freshness
+
+The feed is rebuilt at most **once a minute** and served with `Cache-Control: public, max-age=60`. Requests are limited to **1 per minute per IP address**. Polling faster cannot get you newer data — it only gets you a `429` with a `Retry-After` header.
+
+<Note>
+  The `429` here comes from the per-IP limiter, not the per-key one, so its body is `{ "error": "...", "statusCode": 429 }` and has no `code` field. Branch on the HTTP status and wait `Retry-After` seconds.
+</Note>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/public/prices?appId=730"
+```
+
+## Example response
+
+```json
+{
+  "appId": 730,
+  "currency": "USD",
+  "updatedAt": "2026-10-02T12:00:41.512Z",
+  "items": {
+    "AK-47 | Redline (Field-Tested)": 11.92,
+    "AWP | Asiimov (Field-Tested)": 96.4,
+    "Karambit | Doppler (Factory New)": 812.5
+  }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_param` | The `appId` is not one of the games we serve. `detail` lists the ones you can use. |
+| 429 | — | More than one request this minute from your IP. Wait for the `Retry-After` header value. |
+
+<Tip>
+  Need wear and phase splits, listing counts, filters or paging? Use the keyed [`GET /v1/prices`](/api-reference/get-prices). Need the exact listing to buy? Use [`GET /v1/listings`](/api-reference/get-listings) — this feed is indicative and can be up to a minute old.
+</Tip>

@@ -1,0 +1,57 @@
+---
+title: "GET /v1/public/prices — 无需密钥的 CS2、Dota 2 与 Rust 最低价数据源"
+sidebarTitle: "GET /public/prices"
+description: "按商品名称返回 CS2、Dota 2 或 Rust 的最低报价，每个名称一个价格。无需 API 密钥、无余额要求——每个 IP 每分钟限一次请求。"
+openapi: "GET /public/prices"
+---
+
+公开价格数据源只回答一个问题：此刻 CSBoard 上每件商品的最低报价是多少？您会得到一个对象，把某个游戏中所有在售的 `market_hash_name` 映射到其美元最低价。没有深度、没有挂单数量、不按磨损拆分，也没有分页。
+
+**无需 API 密钥。** 请求时不要带 `Authorization` 头，也不需要任何余额。因此，它最适合只需要“每个名称一个数字”的比价网站、电子表格和抓取程序。
+
+## 返回内容
+
+- **每次请求一个游戏。** `appId=730` 为 CS2（默认），`570` 为 Dota 2，`252490` 为 Rust。
+- **使用 Steam 自己的名称。** CS2 的多普勒和伽马多普勒相位会合并到 Steam 使用的基础名称下，因此 `Karambit | Doppler (Factory New)` 的价格取其最便宜的相位。每个键都对应一个真实的 Steam `market_hash_name`。
+- **键名有序，价格精确到美分。** 只有至少有一条在售挂单的名称才会出现。
+- **`updatedAt`** 是该数据生成的时间。
+
+## 限制与新鲜度
+
+数据源**每分钟最多重建一次**，并以 `Cache-Control: public, max-age=60` 返回。请求限制为**每个 IP 地址每分钟 1 次**。更频繁地轮询拿不到更新的数据——只会得到一个带 `Retry-After` 头的 `429`。
+
+<Note>
+  这里的 `429` 来自按 IP 的限流器，而不是按密钥的限流器，因此响应体是 `{ "error": "...", "statusCode": 429 }`，没有 `code` 字段。请根据 HTTP 状态码分支处理，并等待 `Retry-After` 秒。
+</Note>
+
+## 示例请求
+
+```bash
+curl "https://csboard.com/v1/public/prices?appId=730"
+```
+
+## 示例响应
+
+```json
+{
+  "appId": 730,
+  "currency": "USD",
+  "updatedAt": "2026-10-02T12:00:41.512Z",
+  "items": {
+    "AK-47 | Redline (Field-Tested)": 11.92,
+    "AWP | Asiimov (Field-Tested)": 96.4,
+    "Karambit | Doppler (Factory New)": 812.5
+  }
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 400 | `invalid_param` | `appId` 不是我们提供的游戏之一。`detail` 会列出可用的值。 |
+| 429 | — | 您的 IP 本分钟内的请求超过一次。请等待 `Retry-After` 响应头中的秒数。 |
+
+<Tip>
+  需要按磨损和相位拆分、挂单数量、过滤或分页？请使用需要密钥的 [`GET /v1/prices`](/zh-Hans/api-reference/get-prices)。需要可以直接购买的具体挂单？请使用 [`GET /v1/listings`](/zh-Hans/api-reference/get-listings)——该数据源仅供参考，数据最多可能滞后一分钟。
+</Tip>

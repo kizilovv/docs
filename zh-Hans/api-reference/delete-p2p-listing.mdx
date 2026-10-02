@@ -1,0 +1,37 @@
+---
+title: "DELETE /v1/p2p/listings/{id} — 下架 P2P 挂单"
+sidebarTitle: "DELETE /p2p/listings/{id}"
+description: "将您的一条在售挂单从 CSBoard P2P 市场下架。"
+openapi: "DELETE /p2p/listings/{id}"
+---
+
+将您的一条 `active` 挂单下架。下架时会再次检查挂单状态，因此一秒前刚售出的挂单会被拒绝下架，而不会在买家不知情的情况下被取消：已售出或正在交易中的挂单返回 `409 listing_not_active`。对同一条挂单重复下架，也会返回同样的 `409`。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。计入该密钥每分钟 30 次的 P2P 写操作限额。
+
+## 示例请求
+
+```bash
+curl -X DELETE https://csboard.com/v1/p2p/listings/cm1xq8z4k0003ab12cd34ef56 \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "id": "cm1xq8z4k0003ab12cd34ef56",
+  "status": "cancelled"
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 403 | `listing_owner_mismatch` | 该挂单属于其他账户。 |
+| 403 | `account_banned` / `ip_not_allowed` | 账户已被封禁，或请求来自该密钥 IP 白名单之外的地址。 |
+| 404 | `listing_not_found` | 不存在该 id 的挂单。 |
+| 409 | `listing_not_active` | 该挂单已售出、正在交易中或已被下架。 |
+| 429 | `rate_limit_exceeded` | 本分钟内 P2P 写操作超过 30 次，或超过该密钥的通用限额。请等待 `Retry-After` 响应头中的秒数。 |
+| 503 | `p2p_disabled` | P2P 市场目前已关闭。 |

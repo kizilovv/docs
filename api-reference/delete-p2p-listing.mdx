@@ -1,0 +1,37 @@
+---
+title: "DELETE /v1/p2p/listings/{id} — Remove a P2P Listing"
+sidebarTitle: "DELETE /p2p/listings/{id}"
+description: "Take one of your active listings off the CSBoard P2P market."
+openapi: "DELETE /p2p/listings/{id}"
+---
+
+Takes one of your `active` listings off sale. The listing is checked again at the moment of removal, so one that sold a second earlier is refused rather than cancelled under its buyer: a listing that has sold or is mid-sale answers `409 listing_not_active`. Removing the same listing twice answers the same `409`.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Counts toward the 30 requests/minute P2P write limit of the key.
+
+## Example request
+
+```bash
+curl -X DELETE https://csboard.com/v1/p2p/listings/cm1xq8z4k0003ab12cd34ef56 \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "id": "cm1xq8z4k0003ab12cd34ef56",
+  "status": "cancelled"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 403 | `listing_owner_mismatch` | The listing belongs to another account. |
+| 403 | `account_banned` / `ip_not_allowed` | The account is banned, or the request came from outside the key's IP allowlist. |
+| 404 | `listing_not_found` | No listing with this id. |
+| 409 | `listing_not_active` | The listing has sold, is mid-sale or was already removed. |
+| 429 | `rate_limit_exceeded` | Over 30 P2P writes this minute, or over your key's general limit. Wait for the `Retry-After` header value. |
+| 503 | `p2p_disabled` | The P2P market is switched off right now. |

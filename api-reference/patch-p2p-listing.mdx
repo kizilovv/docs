@@ -1,0 +1,55 @@
+---
+title: "PATCH /v1/p2p/listings/{id} — Change a Listing's Price"
+sidebarTitle: "PATCH /p2p/listings/{id}"
+description: "Move the asking price of one of your active CSBoard P2P listings. The same price floor as publishing applies."
+openapi: "PATCH /p2p/listings/{id}"
+---
+
+Changes the price of one of your `active` listings. Send the new `price_usd` in whole cents, from `0.10` to `100000`. The response is the updated listing, with `commission_usd` and `seller_payout_usd` worked out for the new price.
+
+The same floor as publishing applies, and it cannot be confirmed past: a price under half of our market price for the item answers `422 price_below_market` with `market_usd` and `floor_usd`. A listing that has sold or is mid-sale can no longer be repriced.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Counts toward the 30 requests/minute P2P write limit of the key.
+
+## Example request
+
+```bash
+curl -X PATCH https://csboard.com/v1/p2p/listings/cm1xq8z4k0003ab12cd34ef56 \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "price_usd": 11.50 }'
+```
+
+## Example response
+
+```json
+{
+  "id": "cm1xq8z4k0003ab12cd34ef56",
+  "status": "active",
+  "price_usd": 11.5,
+  "currency": "USD",
+  "commission_usd": 0.23,
+  "seller_payout_usd": 11.27,
+  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+  "item_name": "AK-47 | Redline (Field-Tested)",
+  "asset_id": "38451927734",
+  "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+  "float_value": 0.2711,
+  "needs_resync": false,
+  "created_at": "2026-10-02T12:04:11.000Z",
+  "updated_at": "2026-10-02T13:20:00.000Z"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Malformed body, or a price outside `0.10`–`100000` or with more than two decimals. |
+| 400 | `listing_not_active` | The listing has sold, is mid-sale or was removed. |
+| 403 | `not_owner` | The listing belongs to another account. |
+| 403 | `account_banned` / `ip_not_allowed` | The account is banned, or the request came from outside the key's IP allowlist. |
+| 404 | `listing_not_found` | No listing with this id. |
+| 422 | `price_below_market` | The price is under half of our market price. See `market_usd` and `floor_usd`. |
+| 429 | `rate_limit_exceeded` | Over 30 P2P writes this minute, or over your key's general limit. Wait for the `Retry-After` header value. |
+| 503 | `p2p_disabled` / `p2p_reprice_disabled` | The P2P market, or price changes on it, are switched off right now. |

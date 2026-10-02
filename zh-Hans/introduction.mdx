@@ -4,7 +4,7 @@ sidebarTitle: "简介"
 description: "通过单一 REST API 访问实时 CS2 皮肤挂单、float 值、贴纸数据和最低询价——以及可选的自动化购买。"
 ---
 
-CSBoard API 是一个面向开发者和 AI 智能体友好的 REST 接口，作为 CSBoard 市场的访问入口。无论您是在构建价格追踪器、为 AI 交易智能体提供动力，还是从余额中自动化购买，该 API 都能提供实时挂单、float 值、贴纸详情、minAsk 价格和汇率转换——以及可选的从 CSBoard 余额直接购买功能。所有端点都需要密钥（健康检查除外），而购买能力需要单独启用的交易密钥。
+CSBoard API 是一个面向开发者和 AI 智能体友好的 REST 接口，作为 CSBoard 市场的访问入口。无论您是在构建价格追踪器、为 AI 交易智能体提供动力，还是从余额中自动化购买，该 API 都能提供实时挂单、float 值、贴纸详情、minAsk 价格和汇率转换——以及可选的从 CSBoard 余额直接购买功能。除健康检查和公开价格数据源外，所有端点都需要密钥，而购买能力需要单独启用的交易密钥。CS2 是默认游戏；传入 `appId` 即可使用 Dota 2 或 Rust。
 
 ## 基础 URL
 
@@ -14,7 +14,7 @@ https://csboard.com/v1
 
 ## 关键概念
 
-- **健康检查** — [`GET /v1/health`](/api-reference/get-health) 是唯一不需要身份验证的端点。在开始会话前，用它来验证 API 是否运行正常以及价格列表是否为最新。
+- **健康检查** — [`GET /v1/health`](/api-reference/get-health) 无需身份验证即可调用。在开始会话前，用它来验证 API 是否运行正常以及价格列表是否为最新。
 - **挂单** — [`GET /v1/listings`](/api-reference/get-listings) 返回实时可购买物品，包括 float、paint seed、贴纸和以美元计价的询价。支持基于键的分页和丰富的过滤器。
 - **价格** — [`GET /v1/prices`](/api-reference/get-prices) 提供按皮肤分组的 minAsk 价格。[`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) 提供完整的 gzip 压缩 NDJSON 转储，用于批量目录摄入。
 - **订单** — [`POST /v1/orders`](/api-reference/post-orders) 下达购买订单，从您的 CSBoard 余额扣款。需要启用了交易的密钥。
@@ -24,7 +24,7 @@ https://csboard.com/v1
 
 ## 快速开始
 
-只有 [`GET /v1/health`](/api-reference/get-health) 无需密钥即可工作。其他所有端点都需要在 `Authorization` 头中提供 `csb_pub_` Bearer 令牌：
+只有 [`GET /v1/health`](/api-reference/get-health) 和 [`GET /v1/public/prices`](/zh-Hans/api-reference/get-public-prices) 无需密钥即可工作。其他所有端点都需要在 `Authorization` 头中提供 `csb_pub_` Bearer 令牌：
 
 ```bash
 curl https://csboard.com/v1/listings \

@@ -1,0 +1,55 @@
+---
+title: "PATCH /v1/p2p/listings/{id} — изменение цены листинга"
+sidebarTitle: "PATCH /p2p/listings/{id}"
+description: "Измените цену одного из ваших активных листингов на P2P-маркете CSBoard. Действует та же нижняя граница цены, что и при публикации."
+openapi: "PATCH /p2p/listings/{id}"
+---
+
+Меняет цену одного из ваших листингов в статусе `active`. Передайте новую `price_usd` в целых центах, от `0.10` до `100000`. В ответе — обновлённый листинг, где `commission_usd` и `seller_payout_usd` пересчитаны под новую цену.
+
+Действует та же нижняя граница, что и при публикации, и обойти её подтверждением нельзя: цена ниже половины нашей рыночной цены на предмет получает `422 price_below_market` с `market_usd` и `floor_usd`. Цену проданного или продающегося листинга изменить уже нельзя.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`. Учитывается в лимите P2P-записей ключа — 30 запросов в минуту.
+
+## Пример запроса
+
+```bash
+curl -X PATCH https://csboard.com/v1/p2p/listings/cm1xq8z4k0003ab12cd34ef56 \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "price_usd": 11.50 }'
+```
+
+## Пример ответа
+
+```json
+{
+  "id": "cm1xq8z4k0003ab12cd34ef56",
+  "status": "active",
+  "price_usd": 11.5,
+  "currency": "USD",
+  "commission_usd": 0.23,
+  "seller_payout_usd": 11.27,
+  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+  "item_name": "AK-47 | Redline (Field-Tested)",
+  "asset_id": "38451927734",
+  "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+  "float_value": 0.2711,
+  "needs_resync": false,
+  "created_at": "2026-10-02T12:04:11.000Z",
+  "updated_at": "2026-10-02T13:20:00.000Z"
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 400 | `invalid_request` | Некорректное тело или цена вне диапазона `0.10`–`100000` либо с более чем двумя знаками после запятой. |
+| 400 | `listing_not_active` | Листинг продан, находится в процессе продажи или снят. |
+| 403 | `not_owner` | Листинг принадлежит другому аккаунту. |
+| 403 | `account_banned` / `ip_not_allowed` | Аккаунт заблокирован или запрос пришёл с адреса вне IP-allowlist ключа. |
+| 404 | `listing_not_found` | Листинга с таким id нет. |
+| 422 | `price_below_market` | Цена ниже половины нашей рыночной цены. См. `market_usd` и `floor_usd`. |
+| 429 | `rate_limit_exceeded` | Больше 30 P2P-записей за эту минуту или превышен общий лимит ключа. Подождите время, указанное в заголовке `Retry-After`. |
+| 503 | `p2p_disabled` / `p2p_reprice_disabled` | P2P-маркет или изменение цен на нём сейчас отключены. |

@@ -1,0 +1,81 @@
+---
+title: "GET /v1/p2p/inventory — 可上架的 CS2 库存"
+sidebarTitle: "GET /p2p/inventory"
+description: "列出您的 CS2 物品，每个副本一行，并说明每件物品现在能否在 CSBoard P2P 市场上架，以及不能上架的原因。"
+openapi: "GET /p2p/inventory"
+---
+
+这是通过 API 上架的第一步。它返回我们在您的 Steam 库存中见到的每一件 CS2 物品，每个副本一行——`asset_id` 用来区分同一款皮肤的两个副本。`listable` 表示该副本现在能否发布；不能发布时，`reasons` 会说明原因。`listed` 标记已经有挂单的副本。
+
+请把本响应中的 `operational_asset_id` 和 `asset_revision` 原样传给 [`POST /v1/p2p/listings`](/zh-Hans/api-reference/post-p2p-listings)。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。免费——任何有效密钥均可，无余额要求。
+
+## 库存读取
+
+发布挂单需要一份最新的 Steam 库存读取结果。`inventory_proof` 会告诉您当前状态：
+
+| `inventory_proof.status` | 含义 | 该怎么做 |
+|---|---|---|
+| `ready` | 我们持有最新的读取结果。 | 上架 `listable: true` 的行。 |
+| `pending` | 本次调用发起了一次新的读取。 | 在 `retry_after_ms` 之后再次调用。 |
+| `blocked` | 我们无法读取您的库存。 | 修复 `code` 指出的问题——例如库存未公开或缺少交易链接——然后再次调用。 |
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/p2p/inventory \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "data": [
+    {
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+      "asset_id": "38451927734",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "context_id": "2",
+      "listable": true,
+      "reasons": [],
+      "listed": false,
+      "listing_id": null,
+      "listing_status": null,
+      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+    },
+    {
+      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+      "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+      "asset_id": "38451927990",
+      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+      "context_id": "16",
+      "listable": false,
+      "reasons": [
+        { "code": "hold_not_ended", "message": "The Steam trade hold has not ended yet." }
+      ],
+      "listed": false,
+      "listing_id": null,
+      "listing_status": null,
+      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+    }
+  ],
+  "inventory_proof": {
+    "status": "ready",
+    "completed_at": "2026-10-02T11:58:03.000Z",
+    "asset_count": 2
+  }
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 403 | `account_banned` | 该账户已被封禁。 |
+| 403 | `ip_not_allowed` | 请求来自该密钥 IP 白名单之外的地址。 |
+| 429 | `rate_limit_exceeded` | 超过该密钥的每分钟限额。请等待 `Retry-After` 响应头中的秒数。 |
+| 503 | `p2p_disabled` | P2P 市场目前已关闭。 |

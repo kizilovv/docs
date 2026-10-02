@@ -9,7 +9,15 @@ prices 端点返回 CSBoard 市场的分组价格快照。每一行代表 `marke
 
 **需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
 
+<Note>
+  传入 `appId=570` 读取 Dota 2，传入 `appId=252490` 读取 Rust。对这些游戏，每行对应一个 `market_hash_name`，`wear` 和 `doppler_phase` 为 `null`。参见[游戏](/zh-Hans/api-reference/get-games)。每个名称只需要一个价格？[`GET /v1/public/prices`](/zh-Hans/api-reference/get-public-prices) 无需密钥即可使用。
+</Note>
+
 ## 查询参数
+
+<ParamField query="appId" default="730" type="integer">
+  要读取的游戏：`730` = CS2，`570` = Dota 2，`252490` = Rust。不传则为 CS2。您的密钥可用的游戏请参见 [`GET /v1/games`](/zh-Hans/api-reference/get-games)。
+</ParamField>
 
 <ParamField query="search" type="string">
   对 `market_hash_name` 进行模糊匹配 —— 将查询拆分为多个词，并对每个词进行子串匹配。如果某个名称是更长商品名称的词子集（例如 `Spectrum Case` 与 `Spectrum 2 Case`），则无法通过此方式单独筛选；要精确查询，请使用 `name`。
@@ -24,7 +32,7 @@ prices 端点返回 CSBoard 市场的分组价格快照。每一行代表 `marke
 </ParamField>
 
 <ParamField query="wear" type="string">
-  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。
+  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -107,6 +115,8 @@ curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
 
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
+| 400 | `invalid_param` | 在 Dota 2 或 Rust 的 `appId` 下发送了 `wear`。 |
+| 400 | `unsupported_game` | 您的密钥无法使用该 `appId`。`supported_app_ids` 列出了可用的值。 |
 | 401 | `unauthorized` | API 密钥缺失或无效。 |
 | 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请在重试前等待 `Retry-After` 响应头中的秒数。 |
 

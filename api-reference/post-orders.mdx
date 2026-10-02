@@ -39,6 +39,10 @@ Before placing an order, ensure:
   Alternative to the `Idempotency-Key` header. If both are provided, the header takes precedence. Use one or the other, not both.
 </ParamField>
 
+<ParamField body="appId" default="730" type="integer">
+  Game the `item_ids` belong to: `730` = CS2, `570` = Dota 2, `252490` = Rust. Omit it for CS2. Send the same `appId` you read the ids with from `GET /v1/listings`. Check `tradable` in [`GET /v1/games`](/api-reference/get-games) to see where your key can buy.
+</ParamField>
+
 ## Response fields
 
 <ResponseField name="order_id" type="string" required>
@@ -122,6 +126,7 @@ curl -X POST https://csboard.com/v1/orders \
 | 402 | `insufficient_balance` | Your balance is too low to cover the order total. |
 | 400 | `steam_account_required` | No linked Steam account or valid trade URL on your CSBoard account. |
 | 403 | `trading_not_enabled` | The API key does not have buying enabled. Enable it in your profile. |
+| 400 | `unsupported_game` | Your key cannot buy in this `appId`. `supported_app_ids` lists the games it can buy in. |
 | 401 | `unauthorized` | Missing or invalid API key. |
 | 429 | `rate_limit_exceeded` | Over 30 requests/min. Wait for the `Retry-After` header value before retrying. |
 
@@ -131,4 +136,8 @@ curl -X POST https://csboard.com/v1/orders \
 
 <Note>
   Items delivered via `hold` are subject to a Steam trade hold. Check the `tradable_at` field on the original listing (from `GET /v1/listings`) to see exactly when a held item will become tradable in your Steam inventory.
+</Note>
+
+<Note>
+  **Dota 2 and Rust.** Orders with `appId` `570` or `252490` are queued for delivery and answer `delivery: "pending"` with `expected_minutes: null`. Follow them with [`GET /v1/orders/{id}`](/api-reference/get-order). The price ceiling, balance check and idempotency work exactly as for CS2.
 </Note>

@@ -9,7 +9,15 @@ openapi: "GET /listings"
 
 **Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
 
+<Note>
+  Передайте `appId=570` для Dota 2 или `appId=252490` для Rust. У таких строк те же ключи; поля, которые есть только в CS2 (`wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at`), равны `null`, а `stickers` — `[]`. См. [Игры](/ru/api-reference/get-games).
+</Note>
+
 ## Query-параметры
+
+<ParamField query="appId" default="730" type="integer">
+  Игра: `730` — CS2, `570` — Dota 2, `252490` — Rust. Не передавайте параметр, чтобы получить CS2. Игры, доступные вашему ключу, — в [`GET /v1/games`](/ru/api-reference/get-games).
+</ParamField>
 
 <ParamField query="search" type="string">
   Нечёткое совпадение по `market_hash_name` товара — запрос разбивается на слова, и каждое сопоставляется как подстрока, идеально подходит для поиска. Обратите внимание: имя, слова которого являются подмножеством более длинного имени предмета (например, `Spectrum Case` и `Spectrum 2 Case`), нельзя изолировать таким способом. Для одного конкретного предмета используйте `name`.
@@ -24,7 +32,7 @@ openapi: "GET /listings"
 </ParamField>
 
 <ParamField query="wear" type="string">
-  Фильтр по диапазону износа. Одно из: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+  Фильтр по диапазону износа. Одно из: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -40,29 +48,31 @@ openapi: "GET /listings"
 </ParamField>
 
 <ParamField query="min_float" type="number">
-  Минимальное значение float (включительно). Принимает значения от `0.0` до `1.0`.
+  Минимальное значение float (включительно). Принимает значения от `0.0` до `1.0`. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="max_float" type="number">
-  Максимальное значение float (включительно). Принимает значения от `0.0` до `1.0`.
+  Максимальное значение float (включительно). Принимает значения от `0.0` до `1.0`. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="stat_trak" type="string">
-  Фильтр StatTrak™. `only` возвращает только предметы StatTrak™; `exclude` исключает их из результатов.
+  Фильтр StatTrak™. `only` возвращает только предметы StatTrak™; `exclude` исключает их из результатов. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="souvenir" type="string">
-  Фильтр Souvenir. `only` возвращает только сувенирные предметы; `exclude` исключает их из результатов.
+  Фильтр Souvenir. `only` возвращает только сувенирные предметы; `exclude` исключает их из результатов. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="available_after" type="string (ISO 8601)">
   Возвращать только листинги, попавшие в каталог после этой временной метки — параметр для чтения дельты. В паре с `sort=newest` обычный ответ — пустая страница, и именно это делает частый опрос дешёвым вместо полного перечитывания на каждом тике.
 
   **Перекрывайте свою вотермарку примерно на 60 секунд и дедуплицируйте по `id`.** Отправляйте `max(listed_at) - 60s`, а не голый максимум. Временные метки берутся из момента НАЧАЛА транзакции БД, опубликовавшей листинг, поэтому большая транзакция может закоммитить строки со штампом *раньше*, чем строки меньшей и более поздней транзакции, уже закоммиченные. Вотермарка, сдвинутая ровно на максимум, перешагнёт такие листинги навсегда.
+
+  Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="sort" type="string" default="id">
-  Порядок сортировки. Одно из: `id` (стабильный по умолчанию), `newest`, `price_asc`, `price_desc`. `newest` сортирует по `listed_at`, поэтому перевыставленные предметы всплывают наравне с действительно новыми.
+  Порядок сортировки. Одно из: `id` (стабильный по умолчанию), `newest`, `price_asc`, `price_desc`. `newest` сортирует по `listed_at`, поэтому перевыставленные предметы всплывают наравне с действительно новыми. `newest` — только для CS2: с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="cursor" type="string">
@@ -219,6 +229,8 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 
 | HTTP-статус | Код | Значение |
 |---|---|---|
+| 400 | `invalid_param` | Некорректный параметр или фильтр только для CS2, переданный с другим `appId`. |
+| 400 | `unsupported_game` | Ваш ключ не может использовать этот `appId`. Доступные перечислены в `supported_app_ids`. |
 | 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
 | 429 | `rate_limit_exceeded` | Превышен поминутный лимит вашего ключа (по умолчанию 100/мин). Подождите количество секунд, указанное в заголовке `Retry-After`. |
 

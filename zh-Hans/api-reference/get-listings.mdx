@@ -9,7 +9,15 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
 
 **需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
 
+<Note>
+  传入 `appId=570` 读取 Dota 2，传入 `appId=252490` 读取 Rust。这些行的键名相同；仅 CS2 才有的字段（`wear`、`doppler_phase`、`float_value`、`paint_seed`、`inspect_link`、`tradable_at`、`listed_at`）为 `null`，`stickers` 为 `[]`。参见[游戏](/zh-Hans/api-reference/get-games)。
+</Note>
+
 ## 查询参数
+
+<ParamField query="appId" default="730" type="integer">
+  要读取的游戏：`730` = CS2，`570` = Dota 2，`252490` = Rust。不传则为 CS2。您的密钥可用的游戏请参见 [`GET /v1/games`](/zh-Hans/api-reference/get-games)。
+</ParamField>
 
 <ParamField query="search" type="string">
   对商品的 `market_hash_name` 进行模糊匹配 —— 将查询拆分为多个词，并对每个词进行子串匹配，非常适合探索。注意：如果某个名称是更长商品名称的词子集（例如 `Spectrum Case` 与 `Spectrum 2 Case`），则无法通过此方式单独筛选。要查询单个特定商品，请使用 `name`。
@@ -24,7 +32,7 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
 </ParamField>
 
 <ParamField query="wear" type="string">
-  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。
+  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -40,29 +48,31 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
 </ParamField>
 
 <ParamField query="min_float" type="number">
-  最小磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。
+  最小磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="max_float" type="number">
-  最大磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。
+  最大磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="stat_trak" type="string">
-  StatTrak™ 过滤。`only` 仅返回 StatTrak™ 商品；`exclude` 将其从结果中移除。
+  StatTrak™ 过滤。`only` 仅返回 StatTrak™ 商品；`exclude` 将其从结果中移除。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="souvenir" type="string">
-  纪念品过滤。`only` 仅返回纪念品商品；`exclude` 将其从结果中移除。
+  纪念品过滤。`only` 仅返回纪念品商品；`exclude` 将其从结果中移除。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="available_after" type="string (ISO 8601)">
   仅返回在该时间戳之后进入目录的挂单——增量轮询参数。与 `sort=newest` 搭配使用时，通常的响应是一个空页面，这正是让频繁轮询变得廉价、而不是每次都全量重扫的原因。
 
   **请将水位线回退约 60 秒，并按 `id` 去重。** 请发送 `max(listed_at) - 60s`，而不是那个裸的最大值。时间戳取自发布该挂单的数据库事务的**开始**时刻，因此一个大批次可能提交出时间戳*更早*的行，而一个更小、更晚的批次却已经提交完毕；把水位线精确推进到最大值，会永久跳过这些挂单。
+
+  仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="sort" type="string" default="id">
-  排序方式。可选值：`id`（稳定的默认值）、`newest`、`price_asc`、`price_desc` 之一。`newest` 按 `listed_at` 排序，因此重新上架的商品会与真正的新库存一起浮现。
+  排序方式。可选值：`id`（稳定的默认值）、`newest`、`price_asc`、`price_desc` 之一。`newest` 按 `listed_at` 排序，因此重新上架的商品会与真正的新库存一起浮现。`newest` 仅限 CS2——在其他 `appId` 下使用会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="cursor" type="string">
@@ -219,6 +229,8 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
+| 400 | `invalid_param` | 参数格式错误，或在其他 `appId` 下发送了仅限 CS2 的过滤参数。 |
+| 400 | `unsupported_game` | 您的密钥无法使用该 `appId`。`supported_app_ids` 列出了可用的值。 |
 | 401 | `unauthorized` | API 密钥缺失或无效。 |
 | 429 | `rate_limit_exceeded` | 超过该密钥的每分钟限额（默认 100 次/分钟）。请按照 `Retry-After` 响应头中的秒数退避。 |
 

@@ -1,0 +1,123 @@
+---
+title: "POST /v1/p2p/listings — 在 P2P 市场上架您的 CS2 物品"
+sidebarTitle: "POST /p2p/listings"
+description: "以您自己的价格在 CSBoard P2P 市场上架一件或最多 50 件 CS2 物品。任何 API 密钥均可免费使用；必须提供 Idempotency-Key。"
+openapi: "POST /p2p/listings"
+---
+
+以您自定的价格将您自己的 CS2 物品发布到 CSBoard P2P 市场。可以发送单件物品，也可以用 `{ "items": [...] }` 批量发送最多 50 件。请从 [`GET /v1/p2p/inventory`](/zh-Hans/api-reference/get-p2p-inventory) 获取 `operational_asset_id` 和 `asset_revision`，并原样发送。
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。免费——任何有效密钥均可，无余额要求，也无需交易权限。
+
+## 卖家规则
+
+与网站相同的规则同样适用：
+
+- 已验证的邮箱或已绑定的 Telegram，以便在物品售出时通知您；
+- CSBoard 扩展程序或应用能够发送 Steam 交易，且账户已启用 Steam 手机令牌；
+- 没有 P2P 冷却、暂停或店铺锁定；
+- 一份最新的库存读取结果（参见 [`GET /v1/p2p/inventory`](/zh-Hans/api-reference/get-p2p-inventory) 中的 `inventory_proof`）。
+
+## 价格下限
+
+价格不得低于我们对该物品市场价的**一半**。在网站上，卖家在看到警告后可以确认更低的价格；通过 API 密钥则没有这种确认：更低的价格会返回 `422 price_below_market`，并附带 `market_usd` 和 `floor_usd`，方便您调整后重新发送。这种拒绝不会消耗您的 `Idempotency-Key`。如果我们没有该物品的市场价，则不设下限。
+
+价格以美元计，范围 `0.10` 到 `100000`，精确到美分。`12.345` 会被拒绝，而不是被四舍五入。
+
+## 幂等性
+
+`Idempotency-Key` 为**必填**（8–128 个字符，每次发布请求唯一）。如果您用同一个键重新发送同一个请求，已发布的物品会按原样返回，而不会被重复上架。单件物品的重放返回 `200`，并带有 `Idempotent-Replay: true` 响应头。
+
+- 用同一个键发送不同的价格或修订版本，会返回 `409 idempotency_key_mismatch`。
+- 收到 `409 idempotency_key_consumed` 表示之前的某次尝试中途失败——请换一个新键重试。
+
+## 响应
+
+- **单件物品：** 返回 `201` 和挂单；重放时返回 `200`。
+- **批量：** 始终返回 `200`，`data` 中每件物品一条结果。一件物品失败不会影响其他物品；失败的物品会带上它单独请求时会返回的 `status` 和 `code`。
+
+写操作限制为**每个密钥每分钟 30 次请求**，与改价和下架共用。
+
+## 示例请求
+
+```bash
+curl -X POST https://csboard.com/v1/p2p/listings \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 0b7d4c1e-6f2a-4b9e-8c3d-5a1f2e9b7c40" \
+  -d '{
+    "items": [
+      {
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+        "price_usd": 12.34
+      },
+      {
+        "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+        "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+        "price_usd": 3.5
+      }
+    ]
+  }'
+```
+
+## 示例响应
+
+```json
+{
+  "data": [
+    {
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "success": true,
+      "replay": false,
+      "listing": {
+        "id": "cm1xq8z4k0003ab12cd34ef56",
+        "status": "active",
+        "price_usd": 12.34,
+        "currency": "USD",
+        "commission_usd": 0.25,
+        "seller_payout_usd": 12.09,
+        "market_hash_name": "AK-47 | Redline (Field-Tested)",
+        "item_name": "AK-47 | Redline (Field-Tested)",
+        "asset_id": "38451927734",
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "float_value": 0.2711,
+        "needs_resync": false,
+        "created_at": "2026-10-02T12:04:11.000Z",
+        "updated_at": "2026-10-02T12:04:11.000Z"
+      }
+    },
+    {
+      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+      "success": false,
+      "status": 409,
+      "code": "hold_not_ended",
+      "detail": "The Steam trade hold has not ended yet."
+    }
+  ],
+  "success_count": 1,
+  "total_requested": 2
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 400 | `idempotency_key_required` | 缺少 `Idempotency-Key` 请求头，或其长度不在 8–128 个字符之间。 |
+| 400 | `invalid_request` | 请求体格式错误——缺少字段、包含未知字段，或价格不在 `0.10`–`100000` 范围内或超过两位小数。 |
+| 400 | `no_capable_client` | 您这一侧没有能发送交易的客户端。请运行 CSBoard 扩展程序或应用。 |
+| 403 | `contact_required` | 请先添加已验证的邮箱或绑定 Telegram。 |
+| 403 | `shop_locked`、`p2p_cooldown`、`p2p_suspended`、`trading_banned` | 该账户的 P2P 出售已被锁定。如果锁定会到期，响应体会注明到期时间。 |
+| 403 | `account_banned` / `ip_not_allowed` | 账户已被封禁，或请求来自该密钥 IP 白名单之外的地址。 |
+| 404 | `operational_asset_not_found` | `operational_asset_id` 不在您已同步的库存中。 |
+| 409 | `asset_revision_changed` | 物品在您读取之后发生了变化。请重新读取库存。 |
+| 409 | `snapshot_stale` 及其他 `reasons` 代码 | 该物品不可上架——代码取其 `reasons` 中的第一项。`snapshot_stale` 会附带可供轮询的 `inventory_proof`。 |
+| 409 | `already_listed` | 该物品已有挂单。 |
+| 409 | `idempotency_in_progress` | 使用该键的请求仍在处理中。请稍候并重新发送同一请求。 |
+| 409 | `idempotency_key_mismatch` / `idempotency_key_consumed` | 该键已用于不同的参数，或之前使用它的尝试已失败。请换一个新键。 |
+| 422 | `price_below_market` | 价格低于我们市场价的一半。参见 `market_usd` 和 `floor_usd`。 |
+| 429 | `rate_limit_exceeded` | 本分钟内 P2P 写操作超过 30 次，或超过该密钥的通用限额。请等待 `Retry-After` 响应头中的秒数。 |
+| 503 | `p2p_disabled` | P2P 市场目前已关闭。 |
+
+物品售出后会发生什么，请参阅 [P2P 上架指南](/zh-Hans/guides/p2p-listing)。

@@ -35,7 +35,8 @@
                   "guides/buying",
                   "guides/automation",
                   "guides/instant-sell",
-                  "guides/webhooks"
+                  "guides/webhooks",
+                  "guides/p2p-listing"
                 ]
               }
             ]
@@ -49,8 +50,10 @@
                   "api-reference/get-listings",
                   "api-reference/get-listings-stream",
                   "api-reference/get-listings-availability",
+                  "api-reference/get-games",
                   "api-reference/get-prices",
                   "api-reference/get-prices-snapshot",
+                  "api-reference/get-public-prices",
                   "api-reference/get-currency"
                 ]
               },
@@ -63,6 +66,16 @@
                   "api-reference/get-orders",
                   "api-reference/get-orders-info",
                   "api-reference/get-order"
+                ]
+              },
+              {
+                "group": "P2P",
+                "pages": [
+                  "api-reference/get-p2p-inventory",
+                  "api-reference/post-p2p-listings",
+                  "api-reference/get-p2p-listings",
+                  "api-reference/patch-p2p-listing",
+                  "api-reference/delete-p2p-listing"
                 ]
               },
               {
@@ -129,7 +142,8 @@
                   "ru/guides/market-data",
                   "ru/guides/buying",
                   "ru/guides/automation",
-                  "ru/guides/instant-sell"
+                  "ru/guides/instant-sell",
+                  "ru/guides/p2p-listing"
                 ]
               }
             ]
@@ -143,8 +157,10 @@
                   "ru/api-reference/get-listings",
                   "ru/api-reference/get-listings-stream",
                   "ru/api-reference/get-listings-availability",
+                  "ru/api-reference/get-games",
                   "ru/api-reference/get-prices",
                   "ru/api-reference/get-prices-snapshot",
+                  "ru/api-reference/get-public-prices",
                   "ru/api-reference/get-currency"
                 ]
               },
@@ -157,6 +173,16 @@
                   "ru/api-reference/get-orders",
                   "ru/api-reference/get-orders-info",
                   "ru/api-reference/get-order"
+                ]
+              },
+              {
+                "group": "P2P",
+                "pages": [
+                  "ru/api-reference/get-p2p-inventory",
+                  "ru/api-reference/post-p2p-listings",
+                  "ru/api-reference/get-p2p-listings",
+                  "ru/api-reference/patch-p2p-listing",
+                  "ru/api-reference/delete-p2p-listing"
                 ]
               },
               {
@@ -206,7 +232,8 @@
                   "zh-Hans/guides/market-data",
                   "zh-Hans/guides/buying",
                   "zh-Hans/guides/automation",
-                  "zh-Hans/guides/instant-sell"
+                  "zh-Hans/guides/instant-sell",
+                  "zh-Hans/guides/p2p-listing"
                 ]
               }
             ]
@@ -220,8 +247,10 @@
                   "zh-Hans/api-reference/get-listings",
                   "zh-Hans/api-reference/get-listings-stream",
                   "zh-Hans/api-reference/get-listings-availability",
+                  "zh-Hans/api-reference/get-games",
                   "zh-Hans/api-reference/get-prices",
                   "zh-Hans/api-reference/get-prices-snapshot",
+                  "zh-Hans/api-reference/get-public-prices",
                   "zh-Hans/api-reference/get-currency"
                 ]
               },
@@ -234,6 +263,16 @@
                   "zh-Hans/api-reference/get-orders",
                   "zh-Hans/api-reference/get-orders-info",
                   "zh-Hans/api-reference/get-order"
+                ]
+              },
+              {
+                "group": "P2P",
+                "pages": [
+                  "zh-Hans/api-reference/get-p2p-inventory",
+                  "zh-Hans/api-reference/post-p2p-listings",
+                  "zh-Hans/api-reference/get-p2p-listings",
+                  "zh-Hans/api-reference/patch-p2p-listing",
+                  "zh-Hans/api-reference/delete-p2p-listing"
                 ]
               },
               {

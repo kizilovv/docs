@@ -1,0 +1,70 @@
+---
+title: "List CS2 Skins on the CSBoard P2P Market with Your API Key"
+sidebarTitle: "P2P Listing"
+description: "Read your inventory, publish items at your price, manage the listings, and get paid to your CSBoard balance after the Steam trade — free with any API key."
+---
+
+The P2P market is where players sell their own CS2 skins to other CSBoard buyers. With an API key you can do the seller's part from a script: read your inventory, publish items at your price, and reprice or remove them later.
+
+**It is free.** Any valid key works — no balance requirement and no trading permission. P2P listing is **CS2 only**.
+
+## Before you start
+
+The website's seller rules apply to the API unchanged:
+
+- a **verified email or a linked Telegram**, so we can tell you when an item sells;
+- the **CSBoard extension or app** running, able to send the Steam trade, and **Steam Mobile Authenticator** on the account;
+- no P2P cooldown, suspension or shop lock on the account.
+
+If one is missing, the publish call names it — for example `403 contact_required` or `400 no_capable_client`.
+
+## How it works
+
+<Steps>
+  <Step title="Read your inventory">
+    ```bash
+    curl https://csboard.com/v1/p2p/inventory \
+      -H "Authorization: Bearer csb_pub_..."
+    ```
+
+    Each row is one copy of an item. Rows with `listable: true` can be published now; the others say why not in `reasons`. If `inventory_proof.status` is `pending`, we have just started reading your Steam inventory — call again after `retry_after_ms`.
+  </Step>
+  <Step title="Publish at your price">
+    ```bash
+    curl -X POST https://csboard.com/v1/p2p/listings \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 0b7d4c1e-6f2a-4b9e-8c3d-5a1f2e9b7c40" \
+      -d '{
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+        "price_usd": 12.34
+      }'
+    ```
+
+    Send `operational_asset_id` and `asset_revision` from the inventory unchanged, and `price_usd` in whole cents. Send up to 50 items at once as `{ "items": [...] }`. `Idempotency-Key` is required: if the connection drops, resend the same request with the same key and nothing is listed twice.
+  </Step>
+  <Step title="Manage your listings">
+    [`GET /v1/p2p/listings`](/api-reference/get-p2p-listings) shows what is on sale and what is mid-sale, with `seller_payout_usd` for each. Change a price with [`PATCH /v1/p2p/listings/{id}`](/api-reference/patch-p2p-listing) or take a listing down with [`DELETE /v1/p2p/listings/{id}`](/api-reference/delete-p2p-listing) while it is still `active`.
+  </Step>
+  <Step title="Send the item when it sells">
+    When a buyer pays, the listing moves to `trade_pending` and we notify you by email or Telegram. The item still has to leave your Steam inventory: your CSBoard extension or app prepares the trade offer to the buyer, and you confirm it with Steam Guard in the Steam mobile app. Do it promptly — sales left unanswered lock your shop (`shop_locked`).
+  </Step>
+  <Step title="Get paid">
+    Once the buyer accepts the trade, the listing sits in `verification_hold` while Steam's trade protection runs. When it ends and the trade still stands, `seller_payout_usd` is credited to your CSBoard balance.
+  </Step>
+</Steps>
+
+## Pricing rules
+
+- Prices are in USD, from `0.10` to `100000`, in whole cents. `12.345` is refused, not rounded.
+- A price under **half of our market price** for the item is refused with `422 price_below_market`. The body carries `market_usd` and `floor_usd`, so your script can correct itself. On the website a seller can confirm a lower price after a warning; over an API key there is no such confirmation, so a leaked key cannot be used to dump your inventory.
+- Our commission is shown on every listing as `commission_usd`; `seller_payout_usd` is what you receive.
+
+## Limits
+
+Publishing, repricing and removing share one limit: **30 requests per minute per key**. A batch of 50 items is one request. Reads follow your key's normal per-minute limit. See [Rate Limits](/rate-limits).
+
+<Warning>
+  A listing only stays on sale while the item is in your inventory. If a full inventory read no longer finds it, the listing is taken down and shows `needs_resync: true`. Publish it again once the item is back.
+</Warning>

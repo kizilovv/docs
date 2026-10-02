@@ -1,0 +1,123 @@
+---
+title: "POST /v1/p2p/listings — выставление ваших предметов CS2 на P2P-маркет"
+sidebarTitle: "POST /p2p/listings"
+description: "Выставьте один предмет CS2 или до 50 сразу на P2P-маркет CSBoard по своей цене. Бесплатно с любым API-ключом; Idempotency-Key обязателен."
+openapi: "POST /p2p/listings"
+---
+
+Публикует ваши собственные предметы CS2 на P2P-маркете CSBoard по вашей цене. Отправьте один предмет или пакет до 50 штук в виде `{ "items": [...] }`. Берите `operational_asset_id` и `asset_revision` из [`GET /v1/p2p/inventory`](/ru/api-reference/get-p2p-inventory) и передавайте их без изменений.
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`. Бесплатно — подойдёт любой действующий ключ, без требований к балансу и без торгового доступа.
+
+## Правила для продавца
+
+Действуют те же правила, что и на сайте:
+
+- подтверждённый email или привязанный Telegram, чтобы мы могли сообщить вам о продаже;
+- расширение или приложение CSBoard, способное отправить трейд в Steam, и Steam Mobile Authenticator на аккаунте;
+- отсутствие P2P-cooldown, приостановки или блокировки магазина;
+- актуальный снимок вашего инвентаря (см. `inventory_proof` в [`GET /v1/p2p/inventory`](/ru/api-reference/get-p2p-inventory)).
+
+## Нижняя граница цены
+
+Цена не может быть ниже **половины нашей рыночной цены** на предмет. На сайте продавец может подтвердить более низкую цену после предупреждения. Через API-ключ такого подтверждения нет: более низкая цена получает `422 price_below_market` с `market_usd` и `floor_usd`, чтобы вы могли поправить цену и отправить запрос снова. Такой отказ не расходует ваш `Idempotency-Key`. Если рыночной цены на предмет у нас нет, нижняя граница не применяется.
+
+Цены указываются в USD, от `0.10` до `100000`, в целых центах. `12.345` отклоняется, а не округляется.
+
+## Идемпотентность
+
+`Idempotency-Key` **обязателен** (8–128 символов, уникальный для каждого запроса на публикацию). Если вы повторите тот же запрос с тем же ключом, каждый уже опубликованный предмет вернётся как есть, а не будет выставлен второй раз. Повтор для одного предмета отвечает `200` с заголовком `Idempotent-Replay: true`.
+
+- Повторное использование ключа с другой ценой или ревизией даёт `409 idempotency_key_mismatch`.
+- После `409 idempotency_key_consumed` предыдущая попытка оборвалась на полпути — повторите запрос с новым ключом.
+
+## Ответы
+
+- **Один предмет:** `201` с листингом или `200` при повторе.
+- **Пакет:** всегда `200` с результатом по каждому предмету в `data`. Ошибка одного предмета не останавливает остальные; у неудачного предмета есть `status` и `code`, которые он получил бы, если бы отправлялся отдельно.
+
+Запись ограничена **30 запросами в минуту на ключ** — этот лимит общий с изменением цены и снятием с продажи.
+
+## Пример запроса
+
+```bash
+curl -X POST https://csboard.com/v1/p2p/listings \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 0b7d4c1e-6f2a-4b9e-8c3d-5a1f2e9b7c40" \
+  -d '{
+    "items": [
+      {
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+        "price_usd": 12.34
+      },
+      {
+        "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+        "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+        "price_usd": 3.5
+      }
+    ]
+  }'
+```
+
+## Пример ответа
+
+```json
+{
+  "data": [
+    {
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "success": true,
+      "replay": false,
+      "listing": {
+        "id": "cm1xq8z4k0003ab12cd34ef56",
+        "status": "active",
+        "price_usd": 12.34,
+        "currency": "USD",
+        "commission_usd": 0.25,
+        "seller_payout_usd": 12.09,
+        "market_hash_name": "AK-47 | Redline (Field-Tested)",
+        "item_name": "AK-47 | Redline (Field-Tested)",
+        "asset_id": "38451927734",
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "float_value": 0.2711,
+        "needs_resync": false,
+        "created_at": "2026-10-02T12:04:11.000Z",
+        "updated_at": "2026-10-02T12:04:11.000Z"
+      }
+    },
+    {
+      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+      "success": false,
+      "status": 409,
+      "code": "hold_not_ended",
+      "detail": "The Steam trade hold has not ended yet."
+    }
+  ],
+  "success_count": 1,
+  "total_requested": 2
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 400 | `idempotency_key_required` | Нет заголовка `Idempotency-Key` или его длина не 8–128 символов. |
+| 400 | `invalid_request` | Некорректное тело — отсутствующее или лишнее поле, либо цена вне диапазона `0.10`–`100000` или с более чем двумя знаками после запятой. |
+| 400 | `no_capable_client` | На вашей стороне нечему отправить трейд. Запустите расширение или приложение CSBoard. |
+| 403 | `contact_required` | Сначала подтвердите email или привяжите Telegram. |
+| 403 | `shop_locked`, `p2p_cooldown`, `p2p_suspended`, `trading_banned` | Продажа на P2P для этого аккаунта заблокирована. Если у блокировки есть срок, он указан в теле ответа. |
+| 403 | `account_banned` / `ip_not_allowed` | Аккаунт заблокирован или запрос пришёл с адреса вне IP-allowlist ключа. |
+| 404 | `operational_asset_not_found` | `operational_asset_id` нет в вашем синхронизированном инвентаре. |
+| 409 | `asset_revision_changed` | Предмет изменился с момента чтения. Прочитайте инвентарь заново. |
+| 409 | `snapshot_stale` и другие коды из `reasons` | Предмет нельзя выставить — код равен первой из его `reasons`. `snapshot_stale` содержит `inventory_proof`, который нужно опрашивать. |
+| 409 | `already_listed` | У предмета уже есть листинг. |
+| 409 | `idempotency_in_progress` | Запрос с этим ключом ещё выполняется. Подождите и отправьте тот же запрос снова. |
+| 409 | `idempotency_key_mismatch` / `idempotency_key_consumed` | Ключ уже использовался с другими данными или предыдущая попытка с ним не удалась. Возьмите новый ключ. |
+| 422 | `price_below_market` | Цена ниже половины нашей рыночной цены. См. `market_usd` и `floor_usd`. |
+| 429 | `rate_limit_exceeded` | Больше 30 P2P-записей за эту минуту или превышен общий лимит ключа. Подождите время, указанное в заголовке `Retry-After`. |
+| 503 | `p2p_disabled` | P2P-маркет сейчас отключён. |
+
+Что происходит после продажи, описано в [руководстве по P2P-листингу](/ru/guides/p2p-listing).

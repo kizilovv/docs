@@ -1,0 +1,58 @@
+---
+title: "GET /v1/p2p/listings — Your P2P Listings"
+sidebarTitle: "GET /p2p/listings"
+description: "Your CSBoard P2P listings that are on sale or mid-sale, newest first, with the payout each sale credits you."
+openapi: "GET /p2p/listings"
+---
+
+Returns your listings that are on sale or in the middle of a sale, newest first. Each one carries `seller_payout_usd` — exactly what a sale credits to your balance, after our commission.
+
+| `status` | Meaning |
+|---|---|
+| `active` | On sale. You can reprice or remove it. |
+| `trade_pending`, `trade_sent`, `verification_hold` | Sold and mid-delivery. It can no longer be changed. |
+| `reconciliation_required` | Taken off the shelf because a full read of your inventory no longer contained the item (`needs_resync: true`). Publish it again once it is back. |
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Free — any valid key, no balance requirement.
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/p2p/listings \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": [
+    {
+      "id": "cm1xq8z4k0003ab12cd34ef56",
+      "status": "active",
+      "price_usd": 12.34,
+      "currency": "USD",
+      "commission_usd": 0.25,
+      "seller_payout_usd": 12.09,
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "item_name": "AK-47 | Redline (Field-Tested)",
+      "asset_id": "38451927734",
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "float_value": 0.2711,
+      "needs_resync": false,
+      "created_at": "2026-10-02T12:04:11.000Z",
+      "updated_at": "2026-10-02T12:04:11.000Z"
+    }
+  ]
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 403 | `account_banned` | The account is banned. |
+| 403 | `ip_not_allowed` | The request came from outside the key's IP allowlist. |
+| 429 | `rate_limit_exceeded` | Over your key's per-minute limit. Wait for the `Retry-After` header value. |
+| 503 | `p2p_disabled` | The P2P market is switched off right now. |

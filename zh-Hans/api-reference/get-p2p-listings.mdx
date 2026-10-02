@@ -1,0 +1,58 @@
+---
+title: "GET /v1/p2p/listings — 您的 P2P 挂单"
+sidebarTitle: "GET /p2p/listings"
+description: "您在 CSBoard P2P 市场上正在出售或交易中的挂单，按时间从新到旧排列，并附带每笔成交后将入账的金额。"
+openapi: "GET /p2p/listings"
+---
+
+返回您正在出售或处于交易过程中的挂单，按时间从新到旧排列。每条挂单都带有 `seller_payout_usd`——即扣除我们的佣金后，成交时会计入您余额的确切金额。
+
+| `status` | 含义 |
+|---|---|
+| `active` | 在售。您可以改价或下架。 |
+| `trade_pending`、`trade_sent`、`verification_hold` | 已售出，正在交付中。无法再修改。 |
+| `reconciliation_required` | 由于对您库存的完整读取中已不再包含该物品，挂单已被下架（`needs_resync: true`）。物品回到库存后请重新发布。 |
+
+**需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。免费——任何有效密钥均可，无余额要求。
+
+## 示例请求
+
+```bash
+curl https://csboard.com/v1/p2p/listings \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 示例响应
+
+```json
+{
+  "data": [
+    {
+      "id": "cm1xq8z4k0003ab12cd34ef56",
+      "status": "active",
+      "price_usd": 12.34,
+      "currency": "USD",
+      "commission_usd": 0.25,
+      "seller_payout_usd": 12.09,
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "item_name": "AK-47 | Redline (Field-Tested)",
+      "asset_id": "38451927734",
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "float_value": 0.2711,
+      "needs_resync": false,
+      "created_at": "2026-10-02T12:04:11.000Z",
+      "updated_at": "2026-10-02T12:04:11.000Z"
+    }
+  ]
+}
+```
+
+## 错误代码
+
+| HTTP 状态码 | 代码 | 含义 |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | API 密钥缺失或无效。 |
+| 403 | `account_banned` | 该账户已被封禁。 |
+| 403 | `ip_not_allowed` | 请求来自该密钥 IP 白名单之外的地址。 |
+| 429 | `rate_limit_exceeded` | 超过该密钥的每分钟限额。请等待 `Retry-After` 响应头中的秒数。 |
+| 503 | `p2p_disabled` | P2P 市场目前已关闭。 |

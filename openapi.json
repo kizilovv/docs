@@ -34,6 +34,10 @@
       "description": "Buy listings from your CSBoard balance. Opt-in, key-gated."
     },
     {
+      "name": "P2P",
+      "description": "List your own CS2 skins on the CSBoard P2P market. Free — any valid key, no balance requirement."
+    },
+    {
       "name": "Account",
       "description": "Your balance, settled funds, and trading status."
     },
@@ -49,7 +53,7 @@
           "Status"
         ],
         "summary": "Liveness + freshness probe",
-        "description": "Liveness and price-list freshness probe. No key required — use it to check the API is up and the price list is fresh. This is the only endpoint that works without authentication.",
+        "description": "Liveness and price-list freshness probe. No key required — use it to check the API is up and the price list is fresh. One of two endpoints that work without authentication; the other is `GET /public/prices`.",
         "operationId": "getHealth",
         "security": [],
         "responses": {
@@ -77,9 +81,12 @@
           "Market data"
         ],
         "summary": "Live buyable listings",
-        "description": "Live buyable listings across the marketplace — each with float, paint seed, stickers, and the asking price in USD. Use keyset pagination via `cursor`.",
+        "description": "Live buyable listings across the marketplace — each with float, paint seed, stickers, and the asking price in USD. Use keyset pagination via `cursor`. Pass `appId` to read Dota 2 (`570`) or Rust (`252490`) instead of CS2 — rows have the same keys, with the CS2-only fields `null` and `stickers` empty.",
         "operationId": "listListings",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
           {
             "name": "search",
             "in": "query",
@@ -108,7 +115,7 @@
           {
             "name": "wear",
             "in": "query",
-            "description": "Item wear bucket.",
+            "description": "Item wear bucket. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "string",
               "enum": [
@@ -147,7 +154,7 @@
           {
             "name": "min_float",
             "in": "query",
-            "description": "Minimum float value.",
+            "description": "Minimum float value. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "number"
             }
@@ -155,7 +162,7 @@
           {
             "name": "max_float",
             "in": "query",
-            "description": "Maximum float value.",
+            "description": "Maximum float value. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "number"
             }
@@ -186,7 +193,7 @@
           {
             "name": "stat_trak",
             "in": "query",
-            "description": "Filter StatTrak™ items.",
+            "description": "Filter StatTrak™ items. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "string",
               "enum": [
@@ -198,7 +205,7 @@
           {
             "name": "souvenir",
             "in": "query",
-            "description": "Filter Souvenir items.",
+            "description": "Filter Souvenir items. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "string",
               "enum": [
@@ -211,7 +218,7 @@
             "name": "available_after",
             "in": "query",
             "required": false,
-            "description": "ISO-8601 timestamp. Returns only listings that entered the catalogue after it — the delta-poll parameter. Pair with `sort=newest`; the usual response is an empty page, which is what makes frequent polling cheap instead of a full rescan every tick.\n\n**Overlap your watermark by ~60 seconds and dedupe by `id`.** Send `max(listed_at) - 60s`, never the bare maximum. Timestamps come from the start of the database transaction that published the listing, so a large batch can commit rows stamped *earlier* than rows a smaller, later batch already committed; a watermark advanced to the exact maximum steps over those listings permanently.",
+            "description": "ISO-8601 timestamp. Returns only listings that entered the catalogue after it — the delta-poll parameter. Pair with `sort=newest`; the usual response is an empty page, which is what makes frequent polling cheap instead of a full rescan every tick.\n\n**Overlap your watermark by ~60 seconds and dedupe by `id`.** Send `max(listed_at) - 60s`, never the bare maximum. Timestamps come from the start of the database transaction that published the listing, so a large batch can commit rows stamped *earlier* than rows a smaller, later batch already committed; a watermark advanced to the exact maximum steps over those listings permanently. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -221,7 +228,7 @@
           {
             "name": "sort",
             "in": "query",
-            "description": "Sort order. Default id. `newest` orders by `listed_at` (when the item entered the catalogue), so re-listings surface too.",
+            "description": "Sort order. Default id. `newest` orders by `listed_at` (when the item entered the catalogue), so re-listings surface too. `newest` is CS2 only — with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "string",
               "enum": [
@@ -312,6 +319,37 @@
               }
             }
           },
+          "400": {
+            "description": "A malformed or CS2-only parameter (`invalid_param`), or an `appId` this key may not use (`unsupported_game`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalid_param": {
+                    "summary": "CS2-only filter sent with another game",
+                    "value": {
+                      "code": "invalid_param",
+                      "detail": "wear is CS2-only and is not supported for appId 570 (Dota 2)."
+                    }
+                  },
+                  "unsupported_game": {
+                    "summary": "Game not available to this key",
+                    "value": {
+                      "code": "unsupported_game",
+                      "detail": "appId 440 is not available to this key. Supported: 730 (CS2), 570 (Dota 2), 252490 (Rust).",
+                      "supported_app_ids": [
+                        730,
+                        570,
+                        252490
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
@@ -327,7 +365,7 @@
           "Market data"
         ],
         "summary": "Stream listings as they appear and disappear",
-        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n```",
+        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n``` CS2 only — this endpoint does not read `appId`.",
         "operationId": "streamListings",
         "parameters": [
           {
@@ -485,15 +523,76 @@
         }
       }
     },
+    "/games": {
+      "get": {
+        "tags": [
+          "Market data"
+        ],
+        "summary": "Games you can pass as appId",
+        "description": "The games this key may read with `appId`, CS2 first, and whether it may also buy there (`tradable`). Key only — no balance requirement, so you can check it before funding.",
+        "operationId": "listGames",
+        "responses": {
+          "200": {
+            "description": "Games available to this key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "games": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Game"
+                      }
+                    }
+                  },
+                  "required": [
+                    "games"
+                  ]
+                },
+                "example": {
+                  "games": [
+                    {
+                      "appId": 730,
+                      "name": "CS2",
+                      "tradable": true
+                    },
+                    {
+                      "appId": 570,
+                      "name": "Dota 2",
+                      "tradable": true
+                    },
+                    {
+                      "appId": 252490,
+                      "name": "Rust",
+                      "tradable": true
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/prices": {
       "get": {
         "tags": [
           "Market data"
         ],
         "summary": "minAsk price list",
-        "description": "The minAsk price list — one row per market hash name (+ wear + Doppler phase), with the cheapest current ask and how many are listed. Indicative grouped snapshot; can lag the live listing price.",
+        "description": "The minAsk price list — one row per market hash name (+ wear + Doppler phase), with the cheapest current ask and how many are listed. Indicative grouped snapshot; can lag the live listing price. Pass `appId` to read Dota 2 (`570`) or Rust (`252490`) instead of CS2 — rows have the same keys, with the CS2-only fields `null` and `stickers` empty.",
         "operationId": "listPrices",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
           {
             "name": "search",
             "in": "query",
@@ -522,7 +621,7 @@
           {
             "name": "wear",
             "in": "query",
-            "description": "Item wear bucket.",
+            "description": "Item wear bucket. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
             "schema": {
               "type": "string",
               "enum": [
@@ -619,6 +718,37 @@
               }
             }
           },
+          "400": {
+            "description": "A malformed or CS2-only parameter (`invalid_param`), or an `appId` this key may not use (`unsupported_game`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalid_param": {
+                    "summary": "CS2-only filter sent with another game",
+                    "value": {
+                      "code": "invalid_param",
+                      "detail": "wear is CS2-only and is not supported for appId 252490 (Rust)."
+                    }
+                  },
+                  "unsupported_game": {
+                    "summary": "Game not available to this key",
+                    "value": {
+                      "code": "unsupported_game",
+                      "detail": "appId 440 is not available to this key. Supported: 730 (CS2), 570 (Dota 2), 252490 (Rust).",
+                      "supported_app_ids": [
+                        730,
+                        570,
+                        252490
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
@@ -634,7 +764,7 @@
           "Market data"
         ],
         "summary": "Full price-list snapshot (gzipped NDJSON)",
-        "description": "Full gzipped NDJSON dump of the price list — one price row JSON per line. Use this for full-catalog ingestion (e.g. comparison sites), not pagination. Rate limited to 1 request/minute. Supports ETag / If-None-Match: an unchanged snapshot returns 304 Not Modified.",
+        "description": "Full gzipped NDJSON dump of the price list — one price row JSON per line. Use this for full-catalog ingestion (e.g. comparison sites), not pagination. Rate limited to 1 request/minute. Supports ETag / If-None-Match: an unchanged snapshot returns 304 Not Modified. CS2 only — this endpoint does not read `appId`.",
         "operationId": "getPriceSnapshot",
         "parameters": [
           {
@@ -674,6 +804,108 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/public/prices": {
+      "get": {
+        "tags": [
+          "Market data"
+        ],
+        "summary": "Keyless min-ask feed",
+        "description": "One number per item: the cheapest current ask in USD for every `market_hash_name` on sale in one game. **No API key and no balance requirement** — send no `Authorization` header. In exchange it is limited to 1 request per minute per IP address, and the payload is rebuilt at most once a minute (`Cache-Control: public, max-age=60`), so polling faster gains nothing.\n\nCS2 Doppler and Gamma Doppler phases are merged into Steam's own base name, so every key matches a real Steam `market_hash_name`. For depth, counts, wear, filters or paging use the keyed `GET /prices`.",
+        "operationId": "getPublicPrices",
+        "security": [],
+        "parameters": [
+          {
+            "name": "appId",
+            "in": "query",
+            "required": false,
+            "description": "Game to price: `730` = CS2 (the default), `570` = Dota 2, `252490` = Rust. A game that is not available answers `400 invalid_param`.",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                730,
+                570,
+                252490
+              ],
+              "default": 730
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Name → min-ask map for the game.",
+            "headers": {
+              "Cache-Control": {
+                "description": "`public, max-age=60`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPrices"
+                },
+                "example": {
+                  "appId": 730,
+                  "currency": "USD",
+                  "updatedAt": "2026-10-02T12:00:41.512Z",
+                  "items": {
+                    "AK-47 | Redline (Field-Tested)": 11.92,
+                    "AWP | Asiimov (Field-Tested)": 96.4,
+                    "Karambit | Doppler (Factory New)": 812.5
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The `appId` is not available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "invalid_param",
+                  "detail": "appId \"440\" is not available. Use one of: 730, 570, 252490."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "More than 1 request in a minute from your IP address. Wait `Retry-After` seconds. This limit is enforced per address, not per key, and its body has no `code` field — branch on the status code.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "statusCode": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "error": "Rate limit exceeded, retry in 37 seconds",
+                  "statusCode": 429
+                }
+              }
+            }
           }
         }
       }
@@ -879,7 +1111,7 @@
           "Trading"
         ],
         "summary": "Buy listings from your balance",
-        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body.",
+        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body. To buy Dota 2 or Rust listings, send `appId` in the body with the ids you read under that `appId`; such orders answer `delivery: \"pending\"` and `expected_minutes: null`.",
         "operationId": "createOrder",
         "parameters": [
           {
@@ -940,7 +1172,7 @@
             }
           },
           "400": {
-            "description": "Bad request.",
+            "description": "Bad request — a malformed body, or an `appId` this key may not buy in (`unsupported_game`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -952,6 +1184,18 @@
                     "value": {
                       "code": "invalid_request",
                       "detail": "item_ids must contain 1–10 unique ids."
+                    }
+                  },
+                  "unsupported_game": {
+                    "summary": "Game this key may not buy in",
+                    "value": {
+                      "code": "unsupported_game",
+                      "detail": "appId 440 is not available to this key. Supported: 730 (CS2), 570 (Dota 2), 252490 (Rust).",
+                      "supported_app_ids": [
+                        730,
+                        570,
+                        252490
+                      ]
                     }
                   }
                 }
@@ -1095,7 +1339,7 @@
           "Market data"
         ],
         "summary": "Bulk availability check",
-        "description": "Check whether specific listings are still buyable, in one request. Pass up to 100 listing ids as a comma-separated `ids` query parameter. Returns how many of each id are available, plus the ids that are no longer available.",
+        "description": "Check whether specific listings are still buyable, in one request. Pass up to 100 listing ids as a comma-separated `ids` query parameter. Returns the live price of every id that is still available, plus the ids that are no longer available. For Dota 2 or Rust listings pass the same `appId` you read them with.",
         "operationId": "getListingsAvailability",
         "parameters": [
           {
@@ -1106,6 +1350,9 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "$ref": "#/components/parameters/AppId"
           }
         ],
         "responses": {
@@ -1122,9 +1369,9 @@
                         "available": {
                           "type": "object",
                           "additionalProperties": {
-                            "type": "integer"
+                            "type": "number"
                           },
-                          "description": "Map of listing id → count currently available."
+                          "description": "Map of listing id → its current price in USD, for every id that is still available."
                         },
                         "unavailable_ids": {
                           "type": "array",
@@ -1147,12 +1394,36 @@
                 "example": {
                   "data": {
                     "available": {
-                      "itm_8841201": 1,
-                      "itm_8841340": 3
+                      "itm_8841201": 14.37,
+                      "itm_8841340": 12.1
                     },
                     "unavailable_ids": [
                       "itm_8841999"
                     ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An `appId` this key may not use (`unsupported_game`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unsupported_game": {
+                    "summary": "Game not available to this key",
+                    "value": {
+                      "code": "unsupported_game",
+                      "detail": "appId 440 is not available to this key. Supported: 730 (CS2), 570 (Dota 2), 252490 (Rust).",
+                      "supported_app_ids": [
+                        730,
+                        570,
+                        252490
+                      ]
+                    }
                   }
                 }
               }
@@ -1525,7 +1796,7 @@
           "Trading"
         ],
         "summary": "Buy and deliver to a Steam trade URL",
-        "description": "Buy up to 100 items and deliver them straight to any Steam trade URL you supply (built from `partner` + `token`), paid from your **settled** (reversal-safe) balance. Built for wholesale and automated delivery. Idempotent via the `custom_id` body field — a retry with the same `custom_id` replays the original purchase and the response carries the `Idempotent-Replayed: true` header. This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account.",
+        "description": "Buy up to 100 items and deliver them straight to any Steam trade URL you supply (built from `partner` + `token`), paid from your **settled** (reversal-safe) balance. Built for wholesale and automated delivery. Idempotent via the `custom_id` body field — a retry with the same `custom_id` replays the original purchase and the response carries the `Idempotent-Replayed: true` header. This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. CS2 only — this endpoint does not read `appId`.",
         "operationId": "marketBuy",
         "requestBody": {
           "required": true,
@@ -1785,6 +2056,901 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/p2p/inventory": {
+      "get": {
+        "tags": [
+          "P2P"
+        ],
+        "summary": "Your inventory, ready to list",
+        "description": "Every CS2 item we have seen in your Steam inventory, one row per copy, with whether it can be listed right now and why not. Free — any valid key, no balance requirement. If we hold no current read of your inventory this call starts one and answers `inventory_proof.status = pending`; call again after `retry_after_ms`.",
+        "operationId": "getP2PInventory",
+        "responses": {
+          "200": {
+            "description": "Your items and the state of the inventory read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/P2PInventoryItem"
+                      }
+                    },
+                    "inventory_proof": {
+                      "$ref": "#/components/schemas/P2PInventoryProof"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "inventory_proof"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                      "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+                      "asset_id": "38451927734",
+                      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                      "context_id": "2",
+                      "listable": true,
+                      "reasons": [],
+                      "listed": false,
+                      "listing_id": null,
+                      "listing_status": null,
+                      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+                    },
+                    {
+                      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+                      "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+                      "asset_id": "38451927990",
+                      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+                      "context_id": "16",
+                      "listable": false,
+                      "reasons": [
+                        {
+                          "code": "hold_not_ended",
+                          "message": "The Steam trade hold has not ended yet."
+                        }
+                      ],
+                      "listed": false,
+                      "listing_id": null,
+                      "listing_status": null,
+                      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+                    }
+                  ],
+                  "inventory_proof": {
+                    "status": "ready",
+                    "completed_at": "2026-10-02T11:58:03.000Z",
+                    "asset_count": 2
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden — the key's IP allowlist or an account ban.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "account_banned": {
+                    "summary": "Account banned",
+                    "value": {
+                      "code": "account_banned",
+                      "detail": "This account is banned."
+                    }
+                  },
+                  "ip_not_allowed": {
+                    "summary": "Request from outside the key's IP allowlist",
+                    "value": {
+                      "code": "ip_not_allowed",
+                      "detail": "This API key is restricted to an IP allowlist and 203.0.113.7 is not on it. Update it at https://csboard.com/profile?tab=api"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/P2PDisabled"
+          }
+        }
+      }
+    },
+    "/p2p/listings": {
+      "get": {
+        "tags": [
+          "P2P"
+        ],
+        "summary": "Your P2P listings",
+        "description": "Your listings that are on sale or mid-sale, newest first, with the payout a sale credits you. A listing with `needs_resync: true` was taken off the shelf because a full read of your inventory no longer contained the item.",
+        "operationId": "getP2PListings",
+        "responses": {
+          "200": {
+            "description": "Your listings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/P2PListing"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "cm1xq8z4k0003ab12cd34ef56",
+                      "status": "active",
+                      "price_usd": 12.34,
+                      "currency": "USD",
+                      "commission_usd": 0.25,
+                      "seller_payout_usd": 12.09,
+                      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                      "item_name": "AK-47 | Redline (Field-Tested)",
+                      "asset_id": "38451927734",
+                      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                      "float_value": 0.2711,
+                      "needs_resync": false,
+                      "created_at": "2026-10-02T12:04:11.000Z",
+                      "updated_at": "2026-10-02T12:04:11.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden — the key's IP allowlist or an account ban.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "account_banned": {
+                    "summary": "Account banned",
+                    "value": {
+                      "code": "account_banned",
+                      "detail": "This account is banned."
+                    }
+                  },
+                  "ip_not_allowed": {
+                    "summary": "Request from outside the key's IP allowlist",
+                    "value": {
+                      "code": "ip_not_allowed",
+                      "detail": "This API key is restricted to an IP allowlist and 203.0.113.7 is not on it. Update it at https://csboard.com/profile?tab=api"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/P2PDisabled"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "P2P"
+        ],
+        "summary": "List items on the P2P market",
+        "description": "Publish one item, or up to 50 as `{ \"items\": [...] }`. Free — any valid key, no balance requirement. CS2 only.\n\nThe website's seller rules apply: a verified email or linked Telegram, the CSBoard extension or app able to send the trade, Steam Mobile Authenticator, no cooldown or shop lock, and a current read of your inventory. The price may not be under half of our market price for the item; unlike the website there is no way to confirm a lower one over a key.\n\nA single item answers `201` (or `200` with `Idempotent-Replay: true` when it was already published under this key). A batch always answers `200` with a result per item — one item that fails does not stop the others. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "createP2PListings",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Required, 8–128 characters, unique per publish request. Resending the same request with the same key returns each item that was already published instead of listing it twice. A key reused with a different price or revision answers `409 idempotency_key_mismatch`; after `409 idempotency_key_consumed`, use a new key. A `422 price_below_market` refusal does not spend the key.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/P2PListingRequest"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "items"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "description": "Each `operational_asset_id` may appear once.",
+                        "items": {
+                          "$ref": "#/components/schemas/P2PListingRequest"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "examples": {
+                "single": {
+                  "summary": "One item",
+                  "value": {
+                    "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                    "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+                    "price_usd": 12.34
+                  }
+                },
+                "batch": {
+                  "summary": "Several items",
+                  "value": {
+                    "items": [
+                      {
+                        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                        "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+                        "price_usd": 12.34
+                      },
+                      {
+                        "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+                        "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+                        "price_usd": 3.5
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Single item published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PListing"
+                },
+                "example": {
+                  "id": "cm1xq8z4k0003ab12cd34ef56",
+                  "status": "active",
+                  "price_usd": 12.34,
+                  "currency": "USD",
+                  "commission_usd": 0.25,
+                  "seller_payout_usd": 12.09,
+                  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                  "item_name": "AK-47 | Redline (Field-Tested)",
+                  "asset_id": "38451927734",
+                  "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                  "float_value": 0.2711,
+                  "needs_resync": false,
+                  "created_at": "2026-10-02T12:04:11.000Z",
+                  "updated_at": "2026-10-02T12:04:11.000Z"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "A batch result, or a single item that was already published under this Idempotency-Key (header `Idempotent-Replay: true`).",
+            "headers": {
+              "Idempotent-Replay": {
+                "description": "`true` on a replayed single-item publish.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/P2PBatchResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/P2PListing"
+                    }
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                      "success": true,
+                      "replay": false,
+                      "listing": {
+                        "id": "cm1xq8z4k0003ab12cd34ef56",
+                        "status": "active",
+                        "price_usd": 12.34,
+                        "currency": "USD",
+                        "commission_usd": 0.25,
+                        "seller_payout_usd": 12.09,
+                        "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                        "item_name": "AK-47 | Redline (Field-Tested)",
+                        "asset_id": "38451927734",
+                        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                        "float_value": 0.2711,
+                        "needs_resync": false,
+                        "created_at": "2026-10-02T12:04:11.000Z",
+                        "updated_at": "2026-10-02T12:04:11.000Z"
+                      }
+                    },
+                    {
+                      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+                      "success": false,
+                      "status": 409,
+                      "code": "hold_not_ended",
+                      "detail": "The Steam trade hold has not ended yet."
+                    }
+                  ],
+                  "success_count": 1,
+                  "total_requested": 2
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing Idempotency-Key, a malformed body, or a seller requirement that is not met.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "idempotency_key_required": {
+                    "summary": "No Idempotency-Key header",
+                    "value": {
+                      "code": "idempotency_key_required",
+                      "detail": "Send an Idempotency-Key header (8-128 characters), unique per publish request."
+                    }
+                  },
+                  "invalid_request": {
+                    "summary": "Malformed body",
+                    "value": {
+                      "code": "invalid_request",
+                      "detail": "price_usd must be 0.10 to 100000 USD with at most two decimals"
+                    }
+                  },
+                  "no_capable_client": {
+                    "summary": "Nothing running that can send the trade",
+                    "value": {
+                      "code": "no_capable_client",
+                      "detail": "Seller has no client able to deliver this item — try again later."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden — a seller rule (`contact_required`, `shop_locked`, `p2p_cooldown`, `p2p_suspended`, `trading_banned`), an account ban, or the key's IP allowlist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "contact_required": {
+                    "summary": "No verified email or Telegram to tell you about a sale",
+                    "value": {
+                      "code": "contact_required",
+                      "detail": "Add a verified email or link Telegram so we can tell you when your item sells"
+                    }
+                  },
+                  "shop_locked": {
+                    "summary": "Shop locked for unanswered sales",
+                    "value": {
+                      "code": "shop_locked",
+                      "detail": "Your shop is locked for unanswered sales",
+                      "locked_until": "2026-10-03T09:00:00.000Z"
+                    }
+                  },
+                  "p2p_cooldown": {
+                    "summary": "P2P cooldown",
+                    "value": {
+                      "code": "p2p_cooldown",
+                      "detail": "P2P trading is on cooldown for your account",
+                      "cooldown_until": "2026-10-02T18:00:00.000Z"
+                    }
+                  },
+                  "account_banned": {
+                    "summary": "Account banned",
+                    "value": {
+                      "code": "account_banned",
+                      "detail": "This account is banned."
+                    }
+                  },
+                  "ip_not_allowed": {
+                    "summary": "Request from outside the key's IP allowlist",
+                    "value": {
+                      "code": "ip_not_allowed",
+                      "detail": "This API key is restricted to an IP allowlist and 203.0.113.7 is not on it. Update it at https://csboard.com/profile?tab=api"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The `operational_asset_id` is not in your synced inventory.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "operational_asset_not_found": {
+                    "summary": "Unknown asset",
+                    "value": {
+                      "code": "operational_asset_not_found",
+                      "detail": "Asset not found in your synced inventory."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item cannot be listed as sent, or the Idempotency-Key conflicts. An item that is not listable answers with the first of its `reasons` codes from `GET /p2p/inventory`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "asset_revision_changed": {
+                    "summary": "Item changed since you read it",
+                    "value": {
+                      "code": "asset_revision_changed",
+                      "detail": "Inventory changed; review this listing action again"
+                    }
+                  },
+                  "already_listed": {
+                    "summary": "Already on sale",
+                    "value": {
+                      "code": "already_listed",
+                      "detail": "Item already has a publishable listing"
+                    }
+                  },
+                  "snapshot_stale": {
+                    "summary": "Inventory read too old — includes inventory_proof to poll",
+                    "value": {
+                      "code": "snapshot_stale",
+                      "detail": "The latest complete inventory proof is out of date — refresh your inventory.",
+                      "inventory_proof": {
+                        "status": "pending",
+                        "started_at": "2026-10-02T12:00:00.000Z",
+                        "retry_after_ms": 3000
+                      }
+                    }
+                  },
+                  "idempotency_in_progress": {
+                    "summary": "Same key still processing",
+                    "value": {
+                      "code": "idempotency_in_progress",
+                      "detail": "A request with this Idempotency-Key is still processing."
+                    }
+                  },
+                  "idempotency_key_mismatch": {
+                    "summary": "Key reused with different details",
+                    "value": {
+                      "code": "idempotency_key_mismatch",
+                      "detail": "This Idempotency-Key was already used with different listing details."
+                    }
+                  },
+                  "idempotency_key_consumed": {
+                    "summary": "Earlier attempt with this key failed",
+                    "value": {
+                      "code": "idempotency_key_consumed",
+                      "detail": "An earlier attempt with this Idempotency-Key failed. Retry with a new key."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The price is under half of our market price for this item. Over a key it cannot be confirmed past — adjust `price_usd` and resend; the Idempotency-Key is not spent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "price_below_market": {
+                    "summary": "Under half of market",
+                    "value": {
+                      "code": "price_below_market",
+                      "detail": "price_usd 4 is under the minimum 255.16 for this item (market ~510.32). Listings made with an API key cannot go below it.",
+                      "market_usd": 510.32,
+                      "floor_usd": 255.16,
+                      "price_usd": 4
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/P2PWriteLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/P2PDisabled"
+          }
+        }
+      }
+    },
+    "/p2p/listings/{id}": {
+      "patch": {
+        "tags": [
+          "P2P"
+        ],
+        "summary": "Change a listing's price",
+        "description": "Move the asking price of one of your `active` listings. The same floor as publishing applies: a price under half of our market price answers `422 price_below_market`. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "updateP2PListingPrice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Listing id from `POST /p2p/listings` or `GET /p2p/listings`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "price_usd"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "price_usd": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 100000,
+                    "multipleOf": 0.01,
+                    "description": "Asking price in USD, whole cents (`12.34`; `12.345` is refused, not rounded). It may not be under half of our market price for the item — see `price_below_market`."
+                  }
+                }
+              },
+              "example": {
+                "price_usd": 11.5
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated listing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PListing"
+                },
+                "example": {
+                  "id": "cm1xq8z4k0003ab12cd34ef56",
+                  "status": "active",
+                  "price_usd": 11.5,
+                  "currency": "USD",
+                  "commission_usd": 0.23,
+                  "seller_payout_usd": 11.27,
+                  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                  "item_name": "AK-47 | Redline (Field-Tested)",
+                  "asset_id": "38451927734",
+                  "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+                  "float_value": 0.2711,
+                  "needs_resync": false,
+                  "created_at": "2026-10-02T12:04:11.000Z",
+                  "updated_at": "2026-10-02T13:20:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed price, or the listing is not `active`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "Malformed body",
+                    "value": {
+                      "code": "invalid_request",
+                      "detail": "price_usd must be 0.10 to 100000 USD with at most two decimals"
+                    }
+                  },
+                  "listing_not_active": {
+                    "summary": "Sold, mid-sale or removed",
+                    "value": {
+                      "code": "listing_not_active",
+                      "detail": "Can only edit active listings"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden — not your listing, an account ban, or the key's IP allowlist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_owner": {
+                    "summary": "Someone else's listing",
+                    "value": {
+                      "code": "not_owner",
+                      "detail": "Not your listing"
+                    }
+                  },
+                  "account_banned": {
+                    "summary": "Account banned",
+                    "value": {
+                      "code": "account_banned",
+                      "detail": "This account is banned."
+                    }
+                  },
+                  "ip_not_allowed": {
+                    "summary": "Request from outside the key's IP allowlist",
+                    "value": {
+                      "code": "ip_not_allowed",
+                      "detail": "This API key is restricted to an IP allowlist and 203.0.113.7 is not on it. Update it at https://csboard.com/profile?tab=api"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such listing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "listing_not_found": {
+                    "summary": "Not found",
+                    "value": {
+                      "code": "listing_not_found",
+                      "detail": "Listing not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The price is under half of our market price for this item. Over a key it cannot be confirmed past.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "price_below_market": {
+                    "summary": "Under half of market",
+                    "value": {
+                      "code": "price_below_market",
+                      "detail": "price_usd 4 is under the minimum 255.16 for this item (market ~510.32). Listings made with an API key cannot go below it.",
+                      "market_usd": 510.32,
+                      "floor_usd": 255.16,
+                      "price_usd": 4
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/P2PWriteLimited"
+          },
+          "503": {
+            "description": "The P2P market, or price changes on it, are switched off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "p2p_disabled": {
+                    "summary": "P2P market unavailable",
+                    "value": {
+                      "code": "p2p_disabled",
+                      "detail": "The P2P market is not available right now."
+                    }
+                  },
+                  "p2p_reprice_disabled": {
+                    "summary": "Price changes unavailable",
+                    "value": {
+                      "code": "p2p_reprice_disabled",
+                      "detail": "Price changes are not available right now."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "P2P"
+        ],
+        "summary": "Remove a listing",
+        "description": "Take one of your `active` listings off the market. A listing that has already sold or is mid-sale cannot be removed and answers `409 listing_not_active`; removing it twice answers the same. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "deleteP2PListing",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Listing id from `POST /p2p/listings` or `GET /p2p/listings`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "cancelled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ]
+                },
+                "example": {
+                  "id": "cm1xq8z4k0003ab12cd34ef56",
+                  "status": "cancelled"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden — not your listing, an account ban, or the key's IP allowlist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "listing_owner_mismatch": {
+                    "summary": "Someone else's listing",
+                    "value": {
+                      "code": "listing_owner_mismatch",
+                      "detail": "Listing belongs to another account"
+                    }
+                  },
+                  "account_banned": {
+                    "summary": "Account banned",
+                    "value": {
+                      "code": "account_banned",
+                      "detail": "This account is banned."
+                    }
+                  },
+                  "ip_not_allowed": {
+                    "summary": "Request from outside the key's IP allowlist",
+                    "value": {
+                      "code": "ip_not_allowed",
+                      "detail": "This API key is restricted to an IP allowlist and 203.0.113.7 is not on it. Update it at https://csboard.com/profile?tab=api"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such listing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "listing_not_found": {
+                    "summary": "Not found",
+                    "value": {
+                      "code": "listing_not_found",
+                      "detail": "Listing not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The listing is not `active` any more.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "listing_not_active": {
+                    "summary": "Sold, mid-sale or already removed",
+                    "value": {
+                      "code": "listing_not_active",
+                      "detail": "Only active listings can be unpublished"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/P2PWriteLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/P2PDisabled"
           }
         }
       }
@@ -2817,6 +3983,47 @@
             }
           }
         }
+      },
+      "P2PDisabled": {
+        "description": "The P2P market is switched off.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "p2p_disabled": {
+                "summary": "P2P market unavailable",
+                "value": {
+                  "code": "p2p_disabled",
+                  "detail": "The P2P market is not available right now."
+                }
+              }
+            }
+          }
+        }
+      },
+      "P2PWriteLimited": {
+        "description": "More than 30 P2P writes (publish, reprice, remove) in the current minute on this key. Wait `Retry-After` seconds.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": "rate_limit_exceeded",
+              "detail": "P2P write limit of 30/min exceeded."
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -2926,17 +4133,29 @@
             "description": "Authoritative asking price in USD. Equals the amount charged if you buy this listing."
           },
           "category": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "rarity": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "image": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
           },
           "inspect_link": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "tradable": {
             "type": "boolean"
@@ -2974,7 +4193,8 @@
           "delivery",
           "stickers",
           "tradable"
-        ]
+        ],
+        "description": "One buyable listing. Dota 2 and Rust listings (`appId` 570 / 252490) carry the same keys as CS2 ones; the CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at` — are `null` and `stickers` is `[]`."
       },
       "PriceRow": {
         "type": "object",
@@ -3007,7 +4227,8 @@
           "market_hash_name",
           "min_price_usd",
           "qty"
-        ]
+        ],
+        "description": "One min-ask group. For Dota 2 and Rust (`appId` 570 / 252490) a group is one `market_hash_name`; `wear` and `doppler_phase` are `null`."
       },
       "Currency": {
         "type": "object",
@@ -3064,6 +4285,16 @@
           "autoclaim": {
             "type": "boolean",
             "description": "Sticky per-account setting (not per-order). Send `true` once to switch your key into auto-claim mode: every held order is then auto-released the moment its hold clears (your bot must auto-accept the Steam trade offer within ~15 minutes). Send `false` to switch back to manual claiming via `POST /orders/{id}/claim`. Omit to leave the setting unchanged."
+          },
+          "appId": {
+            "type": "integer",
+            "enum": [
+              730,
+              570,
+              252490
+            ],
+            "default": 730,
+            "description": "Game the `item_ids` belong to: `730` = CS2 (the default), `570` = Dota 2, `252490` = Rust. Send the same `appId` you read the ids with from `GET /listings`. A game this key may not buy in answers `400 unsupported_game` — `tradable` in `GET /games` tells you in advance."
           }
         },
         "required": [
@@ -3114,6 +4345,25 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "delivery": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "instant",
+              "pending",
+              null
+            ],
+            "description": "How the order is being delivered, when known. Dota 2 and Rust orders always answer `pending`: they are queued for delivery rather than handed over inline."
+          },
+          "expected_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Expected delivery time in minutes, when we can state one. Always `null` for Dota 2 and Rust orders."
           }
         },
         "required": [
@@ -3540,6 +4790,366 @@
           "balance_after_usd",
           "created_at"
         ]
+      },
+      "Game": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "integer",
+            "description": "Steam appId — the value to pass as `appId`.",
+            "example": 570
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name, e.g. `CS2`, `Dota 2`, `Rust`."
+          },
+          "tradable": {
+            "type": "boolean",
+            "description": "Whether this key may also buy in this game (`POST /orders` with this `appId`). `false` means read-only for now."
+          }
+        },
+        "required": [
+          "appId",
+          "name",
+          "tradable"
+        ]
+      },
+      "PublicPrices": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "integer",
+            "description": "The game these prices are for.",
+            "example": 730
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this payload was built. It is rebuilt at most once a minute."
+          },
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "`market_hash_name` → the cheapest current ask in USD, rounded to the cent. Keys are sorted. Only names with at least one listing on sale appear. CS2 Doppler and Gamma Doppler phases are merged into Steam's base name and carry the cheapest phase."
+          }
+        },
+        "required": [
+          "appId",
+          "currency",
+          "updatedAt",
+          "items"
+        ]
+      },
+      "P2PListingRequest": {
+        "type": "object",
+        "required": [
+          "operational_asset_id",
+          "asset_revision",
+          "price_usd"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "operational_asset_id": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The copy to list, from `GET /p2p/inventory`.",
+            "example": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30"
+          },
+          "asset_revision": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128,
+            "description": "From `GET /p2p/inventory`, unchanged. If the item changed since you read it, the publish answers `409 asset_revision_changed` — read the inventory again.",
+            "example": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5"
+          },
+          "price_usd": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 100000,
+            "multipleOf": 0.01,
+            "description": "Asking price in USD, whole cents (`12.34`; `12.345` is refused, not rounded). It may not be under half of our market price for the item — see `price_below_market`."
+          }
+        }
+      },
+      "P2PListing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Listing id — use it with `PATCH` / `DELETE /p2p/listings/{id}`."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active` — on sale. `trade_pending`, `trade_sent`, `verification_hold` — sold and mid-delivery. `reconciliation_required` — off the shelf because a full inventory read no longer saw the item (`needs_resync: true`)."
+          },
+          "price_usd": {
+            "type": "number",
+            "description": "What the buyer pays."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "commission_usd": {
+            "type": "number",
+            "description": "Our fee on this listing, taken from the seller's side."
+          },
+          "seller_payout_usd": {
+            "type": "number",
+            "description": "What a sale credits to your balance: `price_usd` minus `commission_usd`."
+          },
+          "market_hash_name": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string",
+            "description": "Steam asset id of the listed copy."
+          },
+          "operational_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "float_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "needs_resync": {
+            "type": "boolean",
+            "description": "`true` when the listing was taken off the shelf because your inventory no longer showed the item. It cannot be revived in place — publish the item again once it is back."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "price_usd",
+          "currency",
+          "commission_usd",
+          "seller_payout_usd",
+          "market_hash_name",
+          "asset_id",
+          "needs_resync",
+          "created_at",
+          "updated_at"
+        ],
+        "example": {
+          "id": "cm1xq8z4k0003ab12cd34ef56",
+          "status": "active",
+          "price_usd": 12.34,
+          "currency": "USD",
+          "commission_usd": 0.25,
+          "seller_payout_usd": 12.09,
+          "market_hash_name": "AK-47 | Redline (Field-Tested)",
+          "item_name": "AK-47 | Redline (Field-Tested)",
+          "asset_id": "38451927734",
+          "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+          "float_value": 0.2711,
+          "needs_resync": false,
+          "created_at": "2026-10-02T12:04:11.000Z",
+          "updated_at": "2026-10-02T12:04:11.000Z"
+        }
+      },
+      "P2PInventoryProof": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "description": "Whether we hold a current read of your Steam inventory. Publishing needs `ready`. On `pending`, call `GET /p2p/inventory` again after `retry_after_ms`. On `blocked`, `code` says what to fix on your side.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "pending",
+              "blocked"
+            ]
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "`ready` only."
+          },
+          "asset_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "`ready` only."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "`pending` only."
+          },
+          "retry_after_ms": {
+            "type": "integer",
+            "description": "`pending` only — when to ask again."
+          },
+          "code": {
+            "type": "string",
+            "description": "`blocked` only: `no_steam_link`, `no_trade_url`, `private_inventory`, `invalid_trade_url`, `empty_inventory`, `inventory_too_large`, `bot_service_unavailable` or `build_timed_out`."
+          },
+          "message": {
+            "type": "string",
+            "description": "`blocked` only."
+          }
+        }
+      },
+      "P2PInventoryItem": {
+        "type": "object",
+        "properties": {
+          "operational_asset_id": {
+            "type": "string",
+            "description": "Send this to `POST /p2p/listings`."
+          },
+          "asset_revision": {
+            "type": "string",
+            "description": "Send this to `POST /p2p/listings` unchanged."
+          },
+          "asset_id": {
+            "type": "string",
+            "description": "Steam asset id — tells two copies of the same skin apart."
+          },
+          "market_hash_name": {
+            "type": "string"
+          },
+          "context_id": {
+            "type": "string",
+            "enum": [
+              "2",
+              "16"
+            ],
+            "description": "Steam inventory context the copy was seen in."
+          },
+          "listable": {
+            "type": "boolean",
+            "description": "`true` when this copy can be published right now."
+          },
+          "reasons": {
+            "type": "array",
+            "description": "Why it cannot be published — empty when `listable` is `true`. Typical codes: `snapshot_stale`, `not_tradable`, `on_hold`, `hold_not_ended`, `already_listed`, `reserved`, `active_trade`.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "listed": {
+            "type": "boolean",
+            "description": "Already has a listing."
+          },
+          "listing_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "listing_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Status of that listing, as in `P2PListing.status`."
+          },
+          "snapshot_completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the inventory read that last saw this copy finished."
+          }
+        }
+      },
+      "P2PBatchResult": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One entry per requested item, in request order. On success: `success`, `replay`, `listing`. On failure: `success: false`, `status` and the same `code` / `detail` (plus extras such as `market_usd` / `floor_usd`) the item would have answered on its own.",
+              "properties": {
+                "operational_asset_id": {
+                  "type": "string"
+                },
+                "success": {
+                  "type": "boolean"
+                },
+                "replay": {
+                  "type": "boolean",
+                  "description": "`true` when the item was already published under this Idempotency-Key and nothing new was listed."
+                },
+                "listing": {
+                  "$ref": "#/components/schemas/P2PListing"
+                },
+                "status": {
+                  "type": "integer",
+                  "description": "On failure: the HTTP status this item alone would have answered."
+                },
+                "code": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "success_count": {
+            "type": "integer"
+          },
+          "total_requested": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "AppId": {
+        "name": "appId",
+        "in": "query",
+        "required": false,
+        "description": "Steam appId of the game. `730` = CS2 (the default), `570` = Dota 2, `252490` = Rust. Omit it and the endpoint answers for CS2 exactly as before. An appId this key may not use answers `400 unsupported_game`, whose `supported_app_ids` lists the ones it may — see `GET /games`.",
+        "schema": {
+          "type": "integer",
+          "enum": [
+            730,
+            570,
+            252490
+          ],
+          "default": 730
+        }
       }
     }
   }

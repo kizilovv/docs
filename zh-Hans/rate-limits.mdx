@@ -8,13 +8,15 @@ CSBoard API 强制执行每密钥的速率限制，以确保服务对所有用�
 
 ## 各端点的限制
 
-所有限制均为 **每个 API 密钥**，并以 60 秒滚动窗口重置。
+所有限制均为 **每个 API 密钥**，并以 60 秒滚动窗口重置。唯一的例外是无需密钥的价格数据源，它按 IP 地址限流。
 
 | 限制 | 端点 |
 |---|---|
 | **30 / 分钟** | 挂单、价格、货币、余额和订单状态——所有标准 `GET` 端点 |
 | **30 / 分钟** | `POST /v1/orders`（下达购买订单并消费真实资金） |
 | **1 / 分钟** | `GET /v1/prices/snapshot.ndjson.gz`（批量压缩快照） |
+| **30 / 分钟** | P2P 写操作——`POST /v1/p2p/listings`、`PATCH` 和 `DELETE /v1/p2p/listings/{id}` 共用同一额度。包含最多 50 件物品的批量请求只算一次。这些调用同时计入密钥的通用限额。 |
+| **每 IP 1 / 分钟** | `GET /v1/public/prices`——无需密钥，因此按您的 IP 地址限流。该数据源每分钟重建一次，更频繁地轮询并无收益。 |
 
 <Note>
   从同一 IP 地址在一分钟内使用 **无效或缺失的 API 密钥** 发送超过 30 个请求，将触发自动 5 分钟的 IP 级封禁。在封禁期间，无论使用哪个密钥，来自该 IP 的每个请求都会返回 `401 too_many_failed_auth`。请轮换到有效密钥并等待冷却期结束后再重试。
@@ -38,6 +40,12 @@ Content-Type: application/json
 
 ```json
 { "code": "snapshot_rate_limited", "detail": "Snapshot rate limit exceeded. Retry after 60 seconds." }
+```
+
+无需密钥的 `GET /v1/public/prices` 按 IP 地址而非按密钥限流，其 `429` 响应体没有 `code` 字段——请根据状态码和 `Retry-After` 处理：
+
+```json
+{ "error": "Rate limit exceeded, retry in 37 seconds", "statusCode": 429 }
 ```
 
 ## 在客户端中处理 429

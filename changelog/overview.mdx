@@ -4,6 +4,38 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 2, 2026">
+
+## New features
+
+**Dota 2 and Rust over the same API — choose the game with `appId`**
+
+CSBoard now sells Dota 2 and Rust items as well as CS2, and the API reaches them through one new parameter. Pass Steam's appId — `570` for Dota 2, `252490` for Rust — and the endpoint answers for that game. Leave it out and you get CS2, byte for byte as before.
+
+- `appId` works on [`GET /v1/listings`](/api-reference/get-listings), [`GET /v1/prices`](/api-reference/get-prices) and [`GET /v1/listings/availability`](/api-reference/get-listings-availability) as a query parameter, and on [`POST /v1/orders`](/api-reference/post-orders) as a body field.
+- Dota 2 and Rust rows have the same keys as CS2 rows. The CS2-only fields are `null` and `stickers` is `[]`, so one parser reads all three games.
+- CS2-only filters (`wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after`, `sort=newest`) sent with another game answer `400 invalid_param` instead of being silently ignored.
+- An `appId` your key cannot use answers `400 unsupported_game` with `supported_app_ids`. New endpoint [**`GET /v1/games`**](/api-reference/get-games) lists the games your key can read and whether it can buy there.
+- Dota 2 and Rust orders answer `delivery: "pending"` and `expected_minutes: null`.
+
+The SSE stream, the bulk snapshot and `POST /v1/market/buy` stay CS2 only.
+
+**A keyless price feed: `GET /v1/public/prices`**
+
+[**`GET /v1/public/prices`**](/api-reference/get-public-prices) returns one cheapest ask per `market_hash_name` for CS2, Dota 2 or Rust. It needs no API key and no balance. CS2 Doppler phases are merged into Steam's base name, so every key matches a real Steam name. The feed is rebuilt once a minute and limited to 1 request per minute per IP.
+
+**List your own skins on the P2P market from the API — free**
+
+Five new endpoints let a key put its owner's CS2 items up for sale on the CSBoard P2P market. No balance requirement and no trading permission — any valid key works.
+
+- [`GET /v1/p2p/inventory`](/api-reference/get-p2p-inventory) — your items, which can be listed now, and why the others cannot.
+- [`POST /v1/p2p/listings`](/api-reference/post-p2p-listings) — publish one item or up to 50; `Idempotency-Key` required.
+- [`GET /v1/p2p/listings`](/api-reference/get-p2p-listings), [`PATCH /v1/p2p/listings/{id}`](/api-reference/patch-p2p-listing) and [`DELETE /v1/p2p/listings/{id}`](/api-reference/delete-p2p-listing) — see, reprice and remove them.
+
+The website's seller rules apply unchanged, and a sold item still has to be sent through Steam and confirmed with Steam Guard before the payout reaches your balance. One deliberate difference: a price under half of our market price is refused with `422 price_below_market`. Over a key it cannot be confirmed past, so a leaked key cannot dump your inventory. Writes are limited to 30 per minute per key. The [P2P listing guide](/guides/p2p-listing) walks through the whole flow.
+
+</Update>
+
 <Update label="August 5, 2026">
 
 ## Fixes

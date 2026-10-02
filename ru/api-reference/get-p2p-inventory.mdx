@@ -1,0 +1,81 @@
+---
+title: "GET /v1/p2p/inventory — ваш инвентарь CS2, готовый к выставлению"
+sidebarTitle: "GET /p2p/inventory"
+description: "Ваши предметы CS2, по строке на каждую копию: можно ли выставить её на P2P-маркет CSBoard прямо сейчас и если нет, то почему."
+openapi: "GET /p2p/inventory"
+---
+
+Первый шаг выставления через API. Эндпоинт возвращает все предметы CS2, которые мы видели в вашем инвентаре Steam, — по строке на каждую копию: `asset_id` отличает две копии одного и того же скина. `listable` показывает, можно ли опубликовать копию прямо сейчас; если нельзя, причину объясняет `reasons`. `listed` отмечает копии, у которых уже есть листинг.
+
+Передавайте `operational_asset_id` и `asset_revision` из этого ответа без изменений в [`POST /v1/p2p/listings`](/ru/api-reference/post-p2p-listings).
+
+**Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`. Бесплатно — подойдёт любой действующий ключ, требований к балансу нет.
+
+## Чтение инвентаря
+
+Для публикации нужен актуальный снимок вашего инвентаря Steam. Его состояние показывает `inventory_proof`:
+
+| `inventory_proof.status` | Значение | Что делать |
+|---|---|---|
+| `ready` | Актуальный снимок есть. | Выставляйте строки с `listable: true`. |
+| `pending` | Этот вызов запустил новое чтение. | Повторите запрос через `retry_after_ms`. |
+| `blocked` | Мы не можем прочитать ваш инвентарь. | Исправьте то, что указано в `code` — например, закрытый инвентарь или отсутствующий trade URL, — и повторите запрос. |
+
+## Пример запроса
+
+```bash
+curl https://csboard.com/v1/p2p/inventory \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "data": [
+    {
+      "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+      "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+      "asset_id": "38451927734",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "context_id": "2",
+      "listable": true,
+      "reasons": [],
+      "listed": false,
+      "listing_id": null,
+      "listing_status": null,
+      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+    },
+    {
+      "operational_asset_id": "c81e2d44-9b07-4f1a-b3d5-6e2a90f4c7b8",
+      "asset_revision": "sha256:a5b10a9006f6ebb68f8b9e81c85b5a6d1bf0f32737fc3f57a597dd01e66e0523",
+      "asset_id": "38451927990",
+      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+      "context_id": "16",
+      "listable": false,
+      "reasons": [
+        { "code": "hold_not_ended", "message": "The Steam trade hold has not ended yet." }
+      ],
+      "listed": false,
+      "listing_id": null,
+      "listing_status": null,
+      "snapshot_completed_at": "2026-10-02T11:58:03.000Z"
+    }
+  ],
+  "inventory_proof": {
+    "status": "ready",
+    "completed_at": "2026-10-02T11:58:03.000Z",
+    "asset_count": 2
+  }
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+|---|---|---|
+| 401 | `missing_api_key` / `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 403 | `account_banned` | Аккаунт заблокирован. |
+| 403 | `ip_not_allowed` | Запрос пришёл с адреса вне IP-allowlist ключа. |
+| 429 | `rate_limit_exceeded` | Превышен поминутный лимит вашего ключа. Подождите время, указанное в заголовке `Retry-After`. |
+| 503 | `p2p_disabled` | P2P-маркет сейчас отключён. |

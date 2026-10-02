@@ -8,7 +8,7 @@ The CSBoard API enforces per-key rate limits to keep the service stable for all 
 
 ## Limits by endpoint
 
-All limits are **per API key** and reset on a rolling 60-second window.
+All limits are **per API key** and reset on a rolling 60-second window. The one exception is the keyless price feed, which is limited per IP address.
 
 | Limit | Endpoint(s) |
 |---|---|
@@ -16,6 +16,8 @@ All limits are **per API key** and reset on a rolling 60-second window.
 | **250 / min** | `POST /v1/orders` (places a buy order and spends real money) |
 | **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed snapshot) |
 | **100 / min** | `/v1/webhooks*` management calls (registering and inspecting endpoints, not the deliveries themselves) |
+| **30 / min** | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the 100 / min above. |
+| **1 / min per IP** | `GET /v1/public/prices` — no key, so the limit follows your IP address. The feed is rebuilt once a minute, so faster polling gains nothing. |
 
 <Note>
   Sending more than 30 requests with **invalid or missing API keys** from the same IP address within one minute triggers an automatic 5-minute IP-level ban. During the ban every request from that IP returns `401 too_many_failed_auth` regardless of which key is used. Rotate to a valid key and wait out the cooldown before retrying.
@@ -43,6 +45,12 @@ The bulk snapshot endpoint uses a distinct error code when rate-limited:
 
 ```json
 { "code": "snapshot_rate_limited", "detail": "Snapshot rate limit exceeded. Retry after 60 seconds." }
+```
+
+The keyless `GET /v1/public/prices` is limited by IP address rather than by key, and its `429` body has no `code` field — branch on the status and `Retry-After`:
+
+```json
+{ "error": "Rate limit exceeded, retry in 37 seconds", "statusCode": 429 }
 ```
 
 ## Handling 429s in your client

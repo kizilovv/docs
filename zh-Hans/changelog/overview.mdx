@@ -4,6 +4,38 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年10月2日">
+
+## 新功能
+
+**同一套 API 支持 Dota 2 和 Rust——用 `appId` 选择游戏**
+
+除 CS2 外，CSBoard 现在也销售 Dota 2 和 Rust 的商品，API 通过一个新参数即可访问它们。传入 Steam 的 appId——Dota 2 为 `570`，Rust 为 `252490`——端点就会按该游戏返回。不传则返回 CS2，与之前逐字节一致。
+
+- `appId` 可作为查询参数用于 [`GET /v1/listings`](/zh-Hans/api-reference/get-listings)、[`GET /v1/prices`](/zh-Hans/api-reference/get-prices) 和 [`GET /v1/listings/availability`](/zh-Hans/api-reference/get-listings-availability)，也可作为请求体字段用于 [`POST /v1/orders`](/zh-Hans/api-reference/post-orders)。
+- Dota 2 和 Rust 的行与 CS2 的行键名相同。仅 CS2 才有的字段为 `null`，`stickers` 为 `[]`，一个解析器即可读取三个游戏。
+- 在其他游戏下发送仅限 CS2 的过滤参数（`wear`、`min_float`、`max_float`、`stat_trak`、`souvenir`、`available_after`、`sort=newest`），会返回 `400 invalid_param`，而不是被悄悄忽略。
+- 您的密钥无法使用的 `appId` 会返回 `400 unsupported_game`，并附带 `supported_app_ids`。新端点 [**`GET /v1/games`**](/zh-Hans/api-reference/get-games) 列出您的密钥可读取的游戏，以及是否可以在其中购买。
+- Dota 2 和 Rust 订单返回 `delivery: "pending"` 和 `expected_minutes: null`。
+
+SSE 流、批量快照和 `POST /v1/market/buy` 仍然仅支持 CS2。
+
+**无需密钥的价格数据源：`GET /v1/public/prices`**
+
+[**`GET /v1/public/prices`**](/zh-Hans/api-reference/get-public-prices) 为 CS2、Dota 2 或 Rust 的每个 `market_hash_name` 返回一个最低报价。无需 API 密钥，也无需余额。CS2 的多普勒相位会合并到 Steam 的基础名称下，因此每个键都对应一个真实的 Steam 名称。数据源每分钟重建一次，每个 IP 每分钟限 1 次请求。
+
+**通过 API 在 P2P 市场上架您自己的饰品——免费**
+
+五个新端点让密钥可以将其所有者的 CS2 物品发布到 CSBoard P2P 市场出售。无余额要求，也无需交易权限——任何有效密钥均可。
+
+- [`GET /v1/p2p/inventory`](/zh-Hans/api-reference/get-p2p-inventory)——您的物品，哪些现在可以上架，其余的为什么不行。
+- [`POST /v1/p2p/listings`](/zh-Hans/api-reference/post-p2p-listings)——发布一件或最多 50 件物品；必须提供 `Idempotency-Key`。
+- [`GET /v1/p2p/listings`](/zh-Hans/api-reference/get-p2p-listings)、[`PATCH /v1/p2p/listings/{id}`](/zh-Hans/api-reference/patch-p2p-listing) 和 [`DELETE /v1/p2p/listings/{id}`](/zh-Hans/api-reference/delete-p2p-listing)——查看、改价和下架。
+
+网站上的卖家规则原样适用；售出的物品仍需通过 Steam 发出并用 Steam 令牌确认，款项才会计入您的余额。有一处刻意的不同：低于我们市场价一半的价格会以 `422 price_below_market` 拒绝。通过密钥无法确认绕过这一下限，因此泄露的密钥无法被用来贱卖您的库存。写操作限制为每个密钥每分钟 30 次。[P2P 上架指南](/zh-Hans/guides/p2p-listing)介绍了完整流程。
+
+</Update>
+
 <Update label="2026年8月5日">
 
 ## 修复

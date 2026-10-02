@@ -9,7 +9,15 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
 
+<Note>
+  Pass `appId=570` for Dota 2 or `appId=252490` for Rust. Those rows have the same keys; the CS2-only fields (`wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at`) are `null` and `stickers` is `[]`. See [Games](/api-reference/get-games).
+</Note>
+
 ## Query parameters
+
+<ParamField query="appId" default="730" type="integer">
+  Game to read: `730` = CS2, `570` = Dota 2, `252490` = Rust. Omit it for CS2. See [`GET /v1/games`](/api-reference/get-games) for the games your key can use.
+</ParamField>
 
 <ParamField query="search" type="string">
   Fuzzy match on the item's `market_hash_name` — splits the query into words and substring-matches each, ideal for discovery. Note: a name whose words are a subset of a longer item's name (e.g. `Spectrum Case` vs `Spectrum 2 Case`) cannot be isolated this way. For a single specific item, use `name`.
@@ -24,7 +32,7 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 </ParamField>
 
 <ParamField query="wear" type="string">
-  Filter by wear bucket. One of: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+  Filter by wear bucket. One of: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -40,11 +48,11 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 </ParamField>
 
 <ParamField query="min_float" type="number">
-  Minimum float value (inclusive). Accepts values from `0.0` to `1.0`.
+  Minimum float value (inclusive). Accepts values from `0.0` to `1.0`. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="max_float" type="number">
-  Maximum float value (inclusive). Accepts values from `0.0` to `1.0`.
+  Maximum float value (inclusive). Accepts values from `0.0` to `1.0`. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="delivery" type="string">
@@ -64,21 +72,23 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 </ParamField>
 
 <ParamField query="stat_trak" type="string">
-  StatTrak™ filter. `only` returns only StatTrak™ items; `exclude` removes them from results.
+  StatTrak™ filter. `only` returns only StatTrak™ items; `exclude` removes them from results. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="souvenir" type="string">
-  Souvenir filter. `only` returns only Souvenir items; `exclude` removes them from results.
+  Souvenir filter. `only` returns only Souvenir items; `exclude` removes them from results. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="available_after" type="string (ISO 8601)">
   Only return listings that entered the catalogue after this timestamp — the delta-poll parameter. Pair it with `sort=newest` and the usual response is an empty page, which is what makes frequent polling cheap instead of a full rescan every tick.
 
   **Overlap your watermark by ~60 seconds and dedupe by `id`.** Send `max(listed_at) - 60s`, never the bare maximum. Timestamps come from the start of the database transaction that published the listing, so a large batch can commit rows stamped *earlier* than rows a smaller, later batch already committed — a watermark advanced to the exact maximum steps over those listings permanently.
+
+  CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="sort" default="id" type="string">
-  Sort order. One of: `id` (stable default), `newest`, `price_asc`, `price_desc`. `newest` orders by `listed_at`, so re-listings surface alongside genuinely new inventory.
+  Sort order. One of: `id` (stable default), `newest`, `price_asc`, `price_desc`. `newest` orders by `listed_at`, so re-listings surface alongside genuinely new inventory. `newest` is CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
 
 <ParamField query="cursor" type="string">
@@ -244,6 +254,8 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 
 | HTTP status | Code | Meaning |
 | --- | --- | --- |
+| 400 | `invalid_param` | A malformed parameter, or a CS2-only filter sent with another `appId`. |
+| 400 | `unsupported_game` | Your key cannot use this `appId`. `supported_app_ids` lists the ones it can. |
 | 401 | `unauthorized` | Missing or invalid API key. |
 | 429 | `rate_limit_exceeded` | Over your key's per-minute limit (100/min by default). Back off for the number of seconds in the `Retry-After` header. |
 

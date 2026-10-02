@@ -39,6 +39,10 @@ openapi: "POST /orders"
   Альтернатива заголовку `Idempotency-Key`. Если переданы оба, заголовок имеет приоритет. Используйте что-то одно.
 </ParamField>
 
+<ParamField body="appId" default="730" type="integer">
+  Игра, к которой относятся `item_ids`: `730` — CS2, `570` — Dota 2, `252490` — Rust. Не передавайте поле для CS2. Отправляйте тот же `appId`, с которым получили id из `GET /v1/listings`. Где ваш ключ может покупать, показывает `tradable` в [`GET /v1/games`](/ru/api-reference/get-games).
+</ParamField>
+
 ## Поля ответа
 
 <ResponseField name="order_id" type="string" required>
@@ -122,6 +126,7 @@ curl -X POST https://csboard.com/v1/orders \
 | 402 | `insufficient_balance` | Баланса недостаточно для покрытия суммы заказа. |
 | 400 | `steam_account_required` | К аккаунту CSBoard не привязан Steam-аккаунт или нет валидного trade URL. |
 | 403 | `trading_not_enabled` | Для API-ключа не включены покупки. Включите их в профиле. |
+| 400 | `unsupported_game` | Ваш ключ не может покупать в этом `appId`. Игры, где можно покупать, перечислены в `supported_app_ids`. |
 | 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
 | 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Перед повтором подождите время, указанное в заголовке `Retry-After`. |
 
@@ -131,4 +136,8 @@ curl -X POST https://csboard.com/v1/orders \
 
 <Note>
   Предметы, доставляемые в режиме `hold`, попадают под торговый холд Steam. Проверяйте поле `tradable_at` исходного листинга (из `GET /v1/listings`), чтобы узнать, когда именно удерживаемый предмет станет доступен для обмена в вашем инвентаре Steam.
+</Note>
+
+<Note>
+  **Dota 2 и Rust.** Заказы с `appId` `570` или `252490` ставятся в очередь на доставку и отвечают `delivery: "pending"` с `expected_minutes: null`. Следите за ними через [`GET /v1/orders/{id}`](/ru/api-reference/get-order). Верхняя граница цены, проверка баланса и идемпотентность работают так же, как для CS2.
 </Note>

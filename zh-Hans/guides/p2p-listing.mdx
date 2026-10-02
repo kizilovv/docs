@@ -1,0 +1,70 @@
+---
+title: "使用 API 密钥在 CSBoard P2P 市场上架 CS2 饰品"
+sidebarTitle: "P2P 上架"
+description: "读取库存、按您的价格发布物品、管理挂单，并在 Steam 交易完成后收款至 CSBoard 余额——任何 API 密钥均可免费使用。"
+---
+
+P2P 市场是玩家把自己的 CS2 饰品卖给其他 CSBoard 买家的地方。有了 API 密钥，卖家这一侧的操作都可以用脚本完成：读取库存、按您的价格发布物品，之后再改价或下架。
+
+**完全免费。** 任何有效密钥均可——无余额要求，也无需交易权限。P2P 上架**仅支持 CS2**。
+
+## 开始之前
+
+网站上的卖家规则原样适用于 API：
+
+- **已验证的邮箱或已绑定的 Telegram**，以便在物品售出时通知您；
+- **CSBoard 扩展程序或应用**正在运行并能够发送 Steam 交易，且账户已启用 **Steam 手机令牌**；
+- 账户没有 P2P 冷却、暂停或店铺锁定。
+
+如果缺少其中某一项，发布接口会明确指出——例如 `403 contact_required` 或 `400 no_capable_client`。
+
+## 工作原理
+
+<Steps>
+  <Step title="读取库存">
+    ```bash
+    curl https://csboard.com/v1/p2p/inventory \
+      -H "Authorization: Bearer csb_pub_..."
+    ```
+
+    每一行是某件物品的一个副本。`listable: true` 的行现在就可以发布；其余行会在 `reasons` 中说明原因。如果 `inventory_proof.status` 为 `pending`，说明我们刚刚开始读取您的 Steam 库存——请在 `retry_after_ms` 之后再次调用。
+  </Step>
+  <Step title="按您的价格发布">
+    ```bash
+    curl -X POST https://csboard.com/v1/p2p/listings \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 0b7d4c1e-6f2a-4b9e-8c3d-5a1f2e9b7c40" \
+      -d '{
+        "operational_asset_id": "5b0c1f7e-3d2a-4c8e-9a61-2f4d8b7e1c30",
+        "asset_revision": "sha256:fd0e6de607b774aaaf4d9cdb7e014c003ba614b03f0460b01e8c94bce034bac5",
+        "price_usd": 12.34
+      }'
+    ```
+
+    原样发送库存中的 `operational_asset_id` 和 `asset_revision`，`price_usd` 精确到美分。一次最多可用 `{ "items": [...] }` 发送 50 件物品。`Idempotency-Key` 为必填：如果连接中断，用同一个键重新发送同一个请求，不会重复上架。
+  </Step>
+  <Step title="管理挂单">
+    [`GET /v1/p2p/listings`](/zh-Hans/api-reference/get-p2p-listings) 会显示哪些挂单在售、哪些正在交易中，并附带每条的 `seller_payout_usd`。在挂单仍为 `active` 时，可以用 [`PATCH /v1/p2p/listings/{id}`](/zh-Hans/api-reference/patch-p2p-listing) 改价，或用 [`DELETE /v1/p2p/listings/{id}`](/zh-Hans/api-reference/delete-p2p-listing) 下架。
+  </Step>
+  <Step title="售出后发送物品">
+    买家付款后，挂单进入 `trade_pending`，我们会通过邮件或 Telegram 通知您。物品仍需从您的 Steam 库存中发出：您的 CSBoard 扩展程序或应用会准备好发给买家的交易报价，您需要在 Steam 手机应用中通过 Steam 令牌确认。请及时处理——未响应的销售会导致您的店铺被锁定（`shop_locked`）。
+  </Step>
+  <Step title="收款">
+    买家接受交易后，挂单会在 Steam 交易保护期内处于 `verification_hold` 状态。保护期结束且交易依然有效时，`seller_payout_usd` 将计入您的 CSBoard 余额。
+  </Step>
+</Steps>
+
+## 定价规则
+
+- 价格以美元计，范围 `0.10` 到 `100000`，精确到美分。`12.345` 会被拒绝，而不是被四舍五入。
+- 低于我们对该物品市场价**一半**的价格会被拒绝，返回 `422 price_below_market`。响应体包含 `market_usd` 和 `floor_usd`，方便您的脚本自行修正。在网站上，卖家在看到警告后可以确认更低的价格；通过 API 密钥则没有这种确认，因此泄露的密钥无法被用来贱卖您的库存。
+- 我们的佣金会以 `commission_usd` 显示在每条挂单上；`seller_payout_usd` 是您实际收到的金额。
+
+## 限制
+
+发布、改价和下架共用一个限额：**每个密钥每分钟 30 次请求**。一个包含 50 件物品的批量请求只算一次。读取操作遵循密钥的常规每分钟限额。参见[速率限制](/zh-Hans/rate-limits)。
+
+<Warning>
+  只有当物品仍在您的库存中时，挂单才会保持在售。如果完整的库存读取中找不到该物品，挂单会被下架并显示 `needs_resync: true`。物品回到库存后，请重新发布。
+</Warning>

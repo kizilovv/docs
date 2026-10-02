@@ -9,7 +9,15 @@ openapi: "GET /prices"
 
 **Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
 
+<Note>
+  Передайте `appId=570` для Dota 2 или `appId=252490` для Rust. Для этих игр каждая строка — один `market_hash_name`, а `wear` и `doppler_phase` равны `null`. См. [Игры](/ru/api-reference/get-games). Нужно одно число на название? [`GET /v1/public/prices`](/ru/api-reference/get-public-prices) работает без ключа.
+</Note>
+
 ## Query-параметры
+
+<ParamField query="appId" default="730" type="integer">
+  Игра: `730` — CS2, `570` — Dota 2, `252490` — Rust. Не передавайте параметр, чтобы получить CS2. Игры, доступные вашему ключу, — в [`GET /v1/games`](/ru/api-reference/get-games).
+</ParamField>
 
 <ParamField query="search" type="string">
   Нечёткое совпадение по `market_hash_name` — запрос разбивается на слова, и каждое сопоставляется как подстрока. Имя, являющееся словесным подмножеством более длинного имени предмета (например, `Spectrum Case` и `Spectrum 2 Case`), нельзя изолировать таким способом; для точного поиска используйте `name`.
@@ -24,7 +32,7 @@ openapi: "GET /prices"
 </ParamField>
 
 <ParamField query="wear" type="string">
-  Фильтр по диапазону износа. Одно из: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`.
+  Фильтр по диапазону износа. Одно из: `Factory New`, `Minimal Wear`, `Field-Tested`, `Well-Worn`, `Battle-Scarred`. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -107,6 +115,8 @@ curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
 
 | HTTP-статус | Код | Значение |
 |---|---|---|
+| 400 | `invalid_param` | `wear` передан с `appId` Dota 2 или Rust. |
+| 400 | `unsupported_game` | Ваш ключ не может использовать этот `appId`. Доступные перечислены в `supported_app_ids`. |
 | 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
 | 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Перед повтором подождите время, указанное в заголовке `Retry-After`. |
 
