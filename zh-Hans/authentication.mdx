@@ -74,7 +74,7 @@ API 返回的每个错误都会以以下格式返回 JSON 主体：
 |---|---|---|
 | 401 | `missing_api_key` | 未提供密钥或密钥不以 `csb_pub_` 开头 |
 | 401 | `invalid_api_key` | 密钥无法识别或已被撤销 |
-| 401 | `too_many_failed_auth` | 来自您 IP 的无效密钥过多——已应用 5 分钟封禁 |
+| 429 | `too_many_failed_auth` | 来自您 IP 的无效密钥过多——已应用 5 分钟封禁 |
 | 403 | `trading_not_enabled` | 密钥有效但未启用交易 |
 | 429 | `rate_limit_exceeded` | 您已超出每个密钥的请求限制 |
 

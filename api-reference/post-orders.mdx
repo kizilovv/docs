@@ -22,7 +22,7 @@ Before placing an order, ensure:
 ## Request headers
 
 <ParamField header="Idempotency-Key" type="string">
-  Optional. A unique string (e.g. a UUID) that identifies this order attempt. If you retry a request with the same key, the server replays the original order response instead of executing a second purchase. Use this to safely retry on network timeouts without risk of double-charging.
+  Optional, 8–128 characters (e.g. a UUID) identifying this order attempt. If you retry a request with the same key, the server answers `200` with the header `Idempotent-Replayed: true` and the original order response instead of executing a second purchase. While the first request is still running, a retry answers `409 idempotency_in_progress`. Use this to safely retry on network timeouts without risk of double-charging.
 </ParamField>
 
 ## Request body
@@ -45,40 +45,58 @@ Before placing an order, ensure:
 
 ## Response fields
 
+A new order answers **`201 Created`**. An idempotent replay answers `200` with the same body.
+
 <ResponseField name="order_id" type="string" required>
-  Unique identifier for this order, e.g. `ord_01J9Z3K8Q2`.
+  Unique identifier for this order. Pass it to `GET /v1/orders/{id}` to follow delivery.
 </ResponseField>
 
 <ResponseField name="status" type="string" required>
-  Current order status: `processing`, `completed`, or `failed`.
+  The order's internal state when the response was built, for example `paid` or `pending_delivery`. This is not the normalised `status` vocabulary of `GET /v1/orders` — read the order there, or use [webhooks](/guides/webhooks), to follow it.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  Always `USD`.
+</ResponseField>
+
+<ResponseField name="charged_total_usd" type="number" required>
+  Total debited from your balance, in USD.
+</ResponseField>
+
+<ResponseField name="item_count" type="integer">
+  Number of items in the order.
 </ResponseField>
 
 <ResponseField name="items" type="object[]">
-  Per-item breakdown of the order.
+  One entry per item bought.
 
   <Expandable title="Item object">
-    <ResponseField name="item_id" type="string">
-      The listing ID that was purchased.
+    <ResponseField name="market_hash_name" type="string | null">
+      Steam market hash name of the item.
     </ResponseField>
-    <ResponseField name="charged_usd" type="number">
-      The amount charged for this specific item at its live price.
+    <ResponseField name="price_usd" type="number | null">
+      What this item was charged, in USD.
     </ResponseField>
-    <ResponseField name="delivery" type="string">
-      Delivery mode for this item: `instant` (transferred immediately) or `hold` (subject to Steam trade hold).
+    <ResponseField name="status" type="string | null">
+      Internal item state, if one is set yet — usually `null` right after purchase.
     </ResponseField>
   </Expandable>
 </ResponseField>
 
-<ResponseField name="total_charged_usd" type="number" required>
-  Sum of all per-item charges. This is the total amount debited from your balance.
+<ResponseField name="delivery" type="string | null" required>
+  How the order is being delivered, when known: `instant` (bot delivery) or `pending` (a seller or supplier still has to send the trade). Dota 2 and Rust orders always answer `pending`.
 </ResponseField>
 
-<ResponseField name="balance_after_usd" type="number">
-  Your CSBoard balance immediately after the debit.
+<ResponseField name="expected_minutes" type="integer | null" required>
+  Rough delivery estimate in minutes, when we can state one. Always `null` for Dota 2 and Rust orders.
 </ResponseField>
 
 <ResponseField name="created_at" type="datetime">
   ISO 8601 timestamp of when the order was created.
+</ResponseField>
+
+<ResponseField name="updated_at" type="datetime | null">
+  ISO 8601 timestamp of the order's last change.
 </ResponseField>
 
 ## Example request
@@ -98,23 +116,27 @@ curl -X POST https://csboard.com/v1/orders \
 
 ```json
 {
-  "order_id": "ord_01J9Z3K8Q2",
-  "status": "processing",
+  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+  "status": "paid",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
   "items": [
     {
-      "item_id": "itm_8841201",
-      "charged_usd": 14.37,
-      "delivery": "hold"
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": null
     },
     {
-      "item_id": "itm_8841340",
-      "charged_usd": 12.10,
-      "delivery": "instant"
+      "market_hash_name": "AWP | Atheris (Field-Tested)",
+      "price_usd": 12.1,
+      "status": null
     }
   ],
-  "total_charged_usd": 26.47,
-  "balance_after_usd": 73.53,
-  "created_at": "2026-06-29T17:12:04Z"
+  "delivery": "instant",
+  "expected_minutes": 1,
+  "created_at": "2026-06-29T17:12:04.000Z",
+  "updated_at": "2026-06-29T17:12:04.000Z"
 }
 ```
 
@@ -122,13 +144,25 @@ curl -X POST https://csboard.com/v1/orders \
 
 | HTTP status | Code | Meaning |
 |---|---|---|
-| 409 | `price_moved` | The live total of your items exceeded `max_price_usd`. Order rejected; no charge made. The response includes `current_total_usd` showing the actual price. |
-| 402 | `insufficient_balance` | Your balance is too low to cover the order total. |
+| 400 | `invalid_request` | Malformed body — `detail` is the field-error map. |
+| 400 | `unsupported_item` | An id that cannot be bought through the API. Use ids from `GET /v1/listings`. |
 | 400 | `steam_account_required` | No linked Steam account or valid trade URL on your CSBoard account. |
-| 403 | `trading_not_enabled` | The API key does not have buying enabled. Enable it in your profile. |
+| 400 | `cannot_mix_sources` / `one_external_per_order` | These items cannot share one order. Split it. |
 | 400 | `unsupported_game` | Your key cannot buy in this `appId`. `supported_app_ids` lists the games it can buy in. |
-| 401 | `unauthorized` | Missing or invalid API key. |
-| 429 | `rate_limit_exceeded` | Over 30 requests/min. Wait for the `Retry-After` header value before retrying. |
+| 401 | `missing_api_key` / `invalid_api_key` | Missing or invalid API key. |
+| 402 | `insufficient_balance` | Your balance is too low. The body carries `required_usd` and `current_usd`. |
+| 402 | `kyc_required` | The purchase needs identity verification first. The body carries `kyc_url`. |
+| 403 | `trading_not_enabled` | The API key does not have buying enabled. Enable it in your profile. |
+| 403 | `account_restricted` | The account is restricted. Contact support. |
+| 409 | `price_moved` | The live total exceeded `max_price_usd`. Order rejected; no charge made. The body carries `quoted_max_usd`, `current_total_usd` and the live price of each item. |
+| 409 | `item_unavailable` | An item sold before your order landed. The body may carry `unavailable_ids`. |
+| 409 | `idempotency_in_progress` | A request with this `Idempotency-Key` is still running. Wait and retry with the same key. |
+| 409 | `pending_trades_limit` | The recipient has too many unaccepted Steam offers. `limit` is in the body. |
+| 409 | `price_updating` / `concurrent_update` | Prices are mid-refresh, or a concurrent order won the race. Nothing was charged — retry. |
+| 429 | `rate_limit_exceeded` | Over 250 orders/min, or over your key's general per-minute limit. Wait for the `Retry-After` header value. |
+| 500 | `order_failed` | Unexpected failure. Check `GET /v1/orders/info` before retrying — the order may exist. |
+| 503 | `market_unavailable` | The marketplace for one of the items is temporarily down. No charge was made. |
+| 504 | `upstream_timeout` | The outcome is unknown. Re-send with the same `Idempotency-Key` or poll your orders — never with a new key. |
 
 <Warning>
   Always include `max_price_usd` in your request. Prices on a live marketplace can change between the moment you query `/v1/listings` and the moment your order executes. Without this ceiling, your balance could be debited at a higher price than you intended, and there is no automatic rollback.

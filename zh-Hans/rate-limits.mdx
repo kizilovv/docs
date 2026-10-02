@@ -8,41 +8,46 @@ CSBoard API 强制执行每密钥的速率限制，以确保服务对所有用�
 
 ## 各端点的限制
 
-所有限制均为 **每个 API 密钥**，并以 60 秒滚动窗口重置。唯一的例外是无需密钥的价格数据源，它按 IP 地址限流。
+限制按 **每个 API 密钥** 以固定的一分钟窗口计数：计数器在每分钟开始时清零。唯一的例外是无需密钥的价格数据源，它按 IP 地址限流。
 
 | 限制 | 端点 |
 |---|---|
-| **30 / 分钟** | 挂单、价格、货币、余额和订单状态——所有标准 `GET` 端点 |
-| **30 / 分钟** | `POST /v1/orders`（下达购买订单并消费真实资金） |
+| **100 / 分钟** | 所有携带密钥的请求——挂单、价格、游戏、货币、余额、订单状态、Webhook 管理、P2P。这是默认值，可针对单个密钥提高。 |
+| **250 / 分钟** | `POST /v1/orders` 和 `POST /v1/market/buy`（下达购买订单并消费真实资金）。这些请求同时计入上面的每密钥限制。 |
+| **30 / 分钟** | P2P 写操作——`POST /v1/p2p/listings`、`PATCH` 和 `DELETE /v1/p2p/listings/{id}` 共用一个额度。一次最多 50 件物品的批量请求只算一次。这些调用同时计入上面的每密钥限制。 |
 | **1 / 分钟** | `GET /v1/prices/snapshot.ndjson.gz`（批量压缩快照） |
-| **30 / 分钟** | P2P 写操作——`POST /v1/p2p/listings`、`PATCH` 和 `DELETE /v1/p2p/listings/{id}` 共用同一额度。包含最多 50 件物品的批量请求只算一次。这些调用同时计入密钥的通用限额。 |
-| **每 IP 1 / 分钟** | `GET /v1/public/prices`——无需密钥，因此按您的 IP 地址限流。该数据源每分钟重建一次，更频繁地轮询并无收益。 |
+| **同时 3 个** | 每个密钥对 `GET /v1/listings/stream` 的并发连接数 |
+| **每 IP 1 / 分钟** | `GET /v1/public/prices`——无需密钥，因此限制跟随您的 IP 地址。该数据源每分钟重建一次，更频繁地轮询没有任何收益。 |
 
 <Note>
-  从同一 IP 地址在一分钟内使用 **无效或缺失的 API 密钥** 发送超过 30 个请求，将触发自动 5 分钟的 IP 级封禁。在封禁期间，无论使用哪个密钥，来自该 IP 的每个请求都会返回 `401 too_many_failed_auth`。请轮换到有效密钥并等待冷却期结束后再重试。
+  同一 IP 地址在一分钟内发送 30 个使用 **无效或缺失 API 密钥** 的请求，将自动触发 5 分钟的 IP 级封禁。封禁期间，来自该 IP 的每个请求无论携带哪个密钥，都会返回 `429 too_many_failed_auth`。请修正密钥并等待封禁结束后再重试。
 </Note>
+
+<Tip>
+  保持在限制之内最省力的方法，是不再轮询那些我们可以主动推送的内容。[Webhooks](/guides/webhooks) 会在订单状态变化时推送，[SSE 挂单流](/zh-Hans/api-reference/get-listings-stream) 则通过一个连接推送 `new` 和 `gone` 事件——两者都不会按事件消耗您的请求额度。
+</Tip>
 
 ## 429 响应格式
 
-当您超出标准端点限制时，API 返回：
+当您超出每密钥限制时，API 返回：
 
 ```http
 HTTP/1.1 429 Too Many Requests
-Retry-After: 14
+Retry-After: 60
 Content-Type: application/json
 
-{ "code": "rate_limit_exceeded", "detail": "Rate limit exceeded. Retry after 14 seconds." }
+{ "code": "rate_limit_exceeded", "detail": "Rate limit of 100 requests/min exceeded." }
 ```
 
-`Retry-After` 头部的值是一个整数，表示在下次请求成功之前必须等待的 **秒数**。
+`Retry-After` 头部的值是一个整数，单位为 **秒**。对于每密钥限制，该值为 `60`：等待这么久总是足够的，因为计数器会在下一分钟开始时清零。
 
 批量快照端点在被限流时使用不同的错误码：
 
 ```json
-{ "code": "snapshot_rate_limited", "detail": "Snapshot rate limit exceeded. Retry after 60 seconds." }
+{ "code": "snapshot_rate_limited", "detail": "Snapshot is limited to 1/min. Poll less or cache it." }
 ```
 
-无需密钥的 `GET /v1/public/prices` 按 IP 地址而非按密钥限流，其 `429` 响应体没有 `code` 字段——请根据状态码和 `Retry-After` 处理：
+无需密钥的 `GET /v1/public/prices` 按 IP 地址而非密钥限流，其 `429` 响应体中没有 `code` 字段——请根据状态码和 `Retry-After` 处理：
 
 ```json
 { "error": "Rate limit exceeded, retry in 37 seconds", "statusCode": 429 }

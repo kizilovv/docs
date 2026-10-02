@@ -90,27 +90,31 @@ curl -X POST https://csboard.com/v1/orders \
 
 ## Example response
 
-A successful order returns `200` with the order details and your remaining balance:
+A new order returns `201` with the order details (a replay of the same `Idempotency-Key` returns `200` with the same body):
 
 ```json
 {
-  "order_id": "ord_01J9Z3K8Q2",
-  "status": "processing",
+  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+  "status": "paid",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
   "items": [
     {
-      "item_id": "itm_8841201",
-      "charged_usd": 14.37,
-      "delivery": "hold"
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": null
     },
     {
-      "item_id": "itm_8841340",
-      "charged_usd": 12.10,
-      "delivery": "instant"
+      "market_hash_name": "AWP | Atheris (Field-Tested)",
+      "price_usd": 12.1,
+      "status": null
     }
   ],
-  "total_charged_usd": 26.47,
-  "balance_after_usd": 73.53,
-  "created_at": "2026-06-29T17:12:04Z"
+  "delivery": "instant",
+  "expected_minutes": 1,
+  "created_at": "2026-06-29T17:12:04.000Z",
+  "updated_at": "2026-06-29T17:12:04.000Z"
 }
 ```
 
@@ -118,10 +122,12 @@ A successful order returns `200` with the order details and your remaining balan
 
 ## Delivery
 
-Each item in the order response includes a `delivery` field:
+The order response carries an order-level `delivery` field, plus `expected_minutes` when we can estimate it:
 
-- **`instant`** — the item is tradable now and will be sent to your Steam trade URL immediately.
-- **`hold`** — the item is under a Steam trade hold. Check the listing's `tradable_at` field (ISO 8601 timestamp) to see when it becomes tradable.
+- **`instant`** — bot delivery; the trade offer goes to your Steam trade URL within minutes.
+- **`pending`** — a seller or supplier still has to send the trade.
+
+Items bought inside a Steam trade hold wait for the hold to end — check the listing's `delivery` and `tradable_at` before buying. Follow the order with `GET /v1/orders/{id}`, which reports `hold` and `hold_until`, and release it with [`POST /v1/orders/{id}/claim`](/api-reference/post-orders-claim) or the `autoclaim` setting.
 
 ---
 

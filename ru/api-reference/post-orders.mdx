@@ -22,7 +22,7 @@ openapi: "POST /orders"
 ## Заголовки запроса
 
 <ParamField header="Idempotency-Key" type="string">
-  Необязательно. Уникальная строка (например, UUID), идентифицирующая эту попытку заказа. Если вы повторяете запрос с тем же ключом, сервер воспроизводит исходный ответ заказа вместо повторного исполнения покупки. Используйте это для безопасного повтора при сетевых таймаутах без риска двойного списания.
+  Необязательно, 8–128 символов (например, UUID) — идентификатор этой попытки заказа. Если вы повторяете запрос с тем же ключом, сервер отвечает `200` с заголовком `Idempotent-Replayed: true` и исходным ответом заказа вместо повторной покупки. Пока первый запрос ещё выполняется, повтор получает `409 idempotency_in_progress`. Так можно безопасно повторять запрос при сетевых таймаутах без риска двойного списания.
 </ParamField>
 
 ## Тело запроса
@@ -45,40 +45,58 @@ openapi: "POST /orders"
 
 ## Поля ответа
 
+Новый заказ отвечает **`201 Created`**. Идемпотентный повтор отвечает `200` с тем же телом.
+
 <ResponseField name="order_id" type="string" required>
-  Уникальный идентификатор этого заказа, например `ord_01J9Z3K8Q2`.
+  Уникальный идентификатор заказа. Передайте его в `GET /v1/orders/{id}`, чтобы следить за доставкой.
 </ResponseField>
 
 <ResponseField name="status" type="string" required>
-  Текущий статус заказа: `processing`, `completed` или `failed`.
+  Внутреннее состояние заказа в момент формирования ответа, например `paid` или `pending_delivery`. Это не нормализованный словарь `status` из `GET /v1/orders` — следите за заказом там или через [вебхуки](/guides/webhooks).
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  Всегда `USD`.
+</ResponseField>
+
+<ResponseField name="charged_total_usd" type="number" required>
+  Сумма, списанная с вашего баланса, в USD.
+</ResponseField>
+
+<ResponseField name="item_count" type="integer">
+  Количество предметов в заказе.
 </ResponseField>
 
 <ResponseField name="items" type="object[]">
-  Разбивка заказа по предметам.
+  По одной записи на каждый купленный предмет.
 
   <Expandable title="Item object">
-    <ResponseField name="item_id" type="string">
-      ID листинга, который был куплен.
+    <ResponseField name="market_hash_name" type="string | null">
+      Steam market hash name предмета.
     </ResponseField>
-    <ResponseField name="charged_usd" type="number">
-      Сумма, списанная за конкретный предмет по его живой цене.
+    <ResponseField name="price_usd" type="number | null">
+      Сколько списано за этот предмет, в USD.
     </ResponseField>
-    <ResponseField name="delivery" type="string">
-      Режим доставки для этого предмета: `instant` (передаётся сразу) или `hold` (с учётом торгового холда Steam).
+    <ResponseField name="status" type="string | null">
+      Внутреннее состояние предмета, если оно уже задано; сразу после покупки обычно `null`.
     </ResponseField>
   </Expandable>
 </ResponseField>
 
-<ResponseField name="total_charged_usd" type="number" required>
-  Сумма всех списаний по предметам. Это итоговая сумма, списанная с вашего баланса.
+<ResponseField name="delivery" type="string | null" required>
+  Способ доставки, если он уже известен: `instant` (доставка ботом) или `pending` (трейд ещё должен отправить продавец или поставщик). Заказы Dota 2 и Rust всегда отвечают `pending`.
 </ResponseField>
 
-<ResponseField name="balance_after_usd" type="number">
-  Ваш баланс CSBoard сразу после списания.
+<ResponseField name="expected_minutes" type="integer | null" required>
+  Примерное время доставки в минутах, когда мы можем его назвать. Для заказов Dota 2 и Rust всегда `null`.
 </ResponseField>
 
 <ResponseField name="created_at" type="datetime">
   Временная метка ISO 8601 создания заказа.
+</ResponseField>
+
+<ResponseField name="updated_at" type="datetime | null">
+  Временная метка ISO 8601 последнего изменения заказа.
 </ResponseField>
 
 ## Пример запроса
@@ -98,23 +116,27 @@ curl -X POST https://csboard.com/v1/orders \
 
 ```json
 {
-  "order_id": "ord_01J9Z3K8Q2",
-  "status": "processing",
+  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+  "status": "paid",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
   "items": [
     {
-      "item_id": "itm_8841201",
-      "charged_usd": 14.37,
-      "delivery": "hold"
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": null
     },
     {
-      "item_id": "itm_8841340",
-      "charged_usd": 12.10,
-      "delivery": "instant"
+      "market_hash_name": "AWP | Atheris (Field-Tested)",
+      "price_usd": 12.1,
+      "status": null
     }
   ],
-  "total_charged_usd": 26.47,
-  "balance_after_usd": 73.53,
-  "created_at": "2026-06-29T17:12:04Z"
+  "delivery": "instant",
+  "expected_minutes": 1,
+  "created_at": "2026-06-29T17:12:04.000Z",
+  "updated_at": "2026-06-29T17:12:04.000Z"
 }
 ```
 
@@ -122,13 +144,25 @@ curl -X POST https://csboard.com/v1/orders \
 
 | HTTP-статус | Код | Значение |
 |---|---|---|
-| 409 | `price_moved` | Живой итог по предметам превысил `max_price_usd`. Заказ отклонён; списания не было. Ответ включает `current_total_usd` с фактической ценой. |
-| 402 | `insufficient_balance` | Баланса недостаточно для покрытия суммы заказа. |
+| 400 | `invalid_request` | Некорректное тело — в `detail` карта ошибок по полям. |
+| 400 | `unsupported_item` | Этот ID нельзя купить через API. Используйте ID из `GET /v1/listings`. |
 | 400 | `steam_account_required` | К аккаунту CSBoard не привязан Steam-аккаунт или нет валидного trade URL. |
+| 400 | `cannot_mix_sources` / `one_external_per_order` | Эти предметы нельзя купить одним заказом. Разделите его. |
+| 400 | `unsupported_game` | Ваш ключ не может покупать в этом `appId`. В `supported_app_ids` — игры, где покупать можно. |
+| 401 | `missing_api_key` / `invalid_api_key` | Отсутствует или некорректный API-ключ. |
+| 402 | `insufficient_balance` | Баланса не хватает. В теле — `required_usd` и `current_usd`. |
+| 402 | `kyc_required` | Для покупки сначала нужна верификация личности. В теле — `kyc_url`. |
 | 403 | `trading_not_enabled` | Для API-ключа не включены покупки. Включите их в профиле. |
-| 400 | `unsupported_game` | Ваш ключ не может покупать в этом `appId`. Игры, где можно покупать, перечислены в `supported_app_ids`. |
-| 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
-| 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Перед повтором подождите время, указанное в заголовке `Retry-After`. |
+| 403 | `account_restricted` | Аккаунт ограничен. Обратитесь в поддержку. |
+| 409 | `price_moved` | Живой итог превысил `max_price_usd`. Заказ отклонён, списания не было. В теле — `quoted_max_usd`, `current_total_usd` и живая цена каждого предмета. |
+| 409 | `item_unavailable` | Предмет продан раньше, чем пришёл ваш заказ. В теле может быть `unavailable_ids`. |
+| 409 | `idempotency_in_progress` | Запрос с этим `Idempotency-Key` ещё выполняется. Подождите и повторите с тем же ключом. |
+| 409 | `pending_trades_limit` | У получателя слишком много непринятых офферов Steam. Лимит — в поле `limit`. |
+| 409 | `price_updating` / `concurrent_update` | Цены обновляются или параллельный заказ оказался быстрее. Ничего не списано — повторите. |
+| 429 | `rate_limit_exceeded` | Более 250 заказов/мин или превышен общий лимит ключа в минуту. Подождите время из заголовка `Retry-After`. |
+| 500 | `order_failed` | Непредвиденная ошибка. Перед повтором проверьте `GET /v1/orders/info` — заказ мог создаться. |
+| 503 | `market_unavailable` | Маркетплейс одного из предметов временно недоступен. Списания не было. |
+| 504 | `upstream_timeout` | Исход неизвестен. Повторяйте с тем же `Idempotency-Key` или опросите заказы — никогда с новым ключом. |
 
 <Warning>
   Всегда указывайте `max_price_usd` в запросе. Цены на живом маркетплейсе могут измениться между моментом запроса `/v1/listings` и моментом исполнения заказа. Без этой верхней границы с баланса может быть списана более высокая сумма, чем вы планировали, и автоматического отката нет.

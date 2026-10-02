@@ -90,27 +90,31 @@ curl -X POST https://csboard.com/v1/orders \
 
 ## Пример ответа
 
-Успешный ордер возвращает `200` с деталями ордера и вашим оставшимся балансом:
+Новый ордер возвращает `201` с деталями ордера (повтор с тем же `Idempotency-Key` возвращает `200` с тем же телом):
 
 ```json
 {
-  "order_id": "ord_01J9Z3K8Q2",
-  "status": "processing",
+  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+  "status": "paid",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
   "items": [
     {
-      "item_id": "itm_8841201",
-      "charged_usd": 14.37,
-      "delivery": "hold"
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": null
     },
     {
-      "item_id": "itm_8841340",
-      "charged_usd": 12.10,
-      "delivery": "instant"
+      "market_hash_name": "AWP | Atheris (Field-Tested)",
+      "price_usd": 12.1,
+      "status": null
     }
   ],
-  "total_charged_usd": 26.47,
-  "balance_after_usd": 73.53,
-  "created_at": "2026-06-29T17:12:04Z"
+  "delivery": "instant",
+  "expected_minutes": 1,
+  "created_at": "2026-06-29T17:12:04.000Z",
+  "updated_at": "2026-06-29T17:12:04.000Z"
 }
 ```
 
@@ -118,10 +122,12 @@ curl -X POST https://csboard.com/v1/orders \
 
 ## Доставка
 
-Каждый предмет в ответе ордера содержит поле `delivery`:
+В ответе ордера есть поле `delivery` на уровне всего ордера и `expected_minutes`, когда мы можем оценить срок:
 
-- **`instant`** — предмет торгуем прямо сейчас и будет отправлен по вашему Steam trade URL немедленно.
-- **`hold`** — предмет находится под trade hold в Steam. Смотрите поле `tradable_at` листинга (ISO 8601 timestamp), чтобы узнать, когда он станет торгуемым.
+- **`instant`** — доставка ботом; трейд-оффер придёт на ваш Steam trade URL в течение нескольких минут.
+- **`pending`** — трейд ещё должен отправить продавец или поставщик.
+
+Предметы, купленные под trade hold в Steam, ждут окончания холда — проверяйте `delivery` и `tradable_at` листинга до покупки. Следите за ордером через `GET /v1/orders/{id}`, где видны `hold` и `hold_until`, и забирайте его через [`POST /v1/orders/{id}/claim`](/ru/api-reference/post-orders-claim) или настройку `autoclaim`.
 
 ---
 

@@ -32,7 +32,7 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
 </ParamField>
 
 <ParamField query="wear" type="string">
-  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
+  按磨损档位过滤。可选值：`Factory New`、`Minimal Wear`、`Field-Tested`、`Well-Worn`、`Battle-Scarred` 之一。仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="rarity" type="string">
@@ -48,19 +48,35 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
 </ParamField>
 
 <ParamField query="min_float" type="number">
-  最小磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
+  最小磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="max_float" type="number">
-  最大磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
+  最大磨损值（含）。接受 `0.0` 到 `1.0` 之间的值。仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
+</ParamField>
+
+<ParamField query="delivery" type="string">
+  交付分组——与网站商品网格显示的三种相同。可选值：
+
+  - `instant` — 机器人交付。几秒到几分钟。
+  - `up_to_12h` — 需要来源市场上的真人卖家发起交易。网站上显示为 ≤12 小时。
+  - `hold` — 处于 Steam 交易锁定期，直到物品的 `tradable_at`。
+
+  **任何必须立即交付的流程都请使用 `delivery=instant`**——提现、机器人派发、正在屏幕前等待的用户。其他任何值都会返回 `400`，因此拼写错误会直接报错，而不会悄悄扩大结果范围。
+</ParamField>
+
+<ParamField query="min_refund_percent" type="number">
+  仅返回 `refund_percent` 不低于该值（0–100）的挂单。没有公布数值的挂单会被**排除**，而不会被默认视为符合条件。
+
+  `?delivery=instant&min_refund_percent=100` 正是提现流程需要的商品池：立即发货，且 Steam 交易回滚不会让任何人蒙受损失。
 </ParamField>
 
 <ParamField query="stat_trak" type="string">
-  StatTrak™ 过滤。`only` 仅返回 StatTrak™ 商品；`exclude` 将其从结果中移除。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
+  StatTrak™ 过滤。`only` 仅返回 StatTrak™ 商品；`exclude` 将其从结果中移除。仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="souvenir" type="string">
-  纪念品过滤。`only` 仅返回纪念品商品；`exclude` 将其从结果中移除。 仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
+  纪念品过滤。`only` 仅返回纪念品商品；`exclude` 将其从结果中移除。仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
 
 <ParamField query="available_after" type="string (ISO 8601)">
@@ -161,7 +177,13 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
     </ResponseField>
 
     <ResponseField name="delivery" type="string" required>
-      预期的交付模式：`instant`（即时转移）或 `hold`（受 Steam 交易冻结约束）。
+      预期交付模式：`instant`（机器人，几秒到几分钟）、`up_to_12h`（需要来源市场上的真人卖家发起交易）或 `hold`（处于 Steam 交易锁定期，直到 `tradable_at`）。
+    </ResponseField>
+
+    <ResponseField name="refund_percent" type="number | null">
+      如果 Valve 回滚 Steam 交易，这笔购买能退回多少。这是挂单来源市场的属性，而不是客服政策；在我们的各个来源中，该值介于 0 到 100 之间。
+
+      `null` 表示该挂单没有公布的数值——请视为未知，切勿当作 100。使用 `min_refund_percent` 过滤，可构建一个每件物品都能得到全额补偿的商品池。
     </ResponseField>
 
     <ResponseField name="listed_at" type="datetime | null">
@@ -218,7 +240,9 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
-      "delivery": "hold"
+      "delivery": "hold",
+      "refund_percent": 100,
+      "listed_at": "2026-06-29T08:41:17.000Z"
     }
   ],
   "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="

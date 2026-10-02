@@ -55,6 +55,22 @@ openapi: "GET /listings"
   Максимальное значение float (включительно). Принимает значения от `0.0` до `1.0`. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
 
+<ParamField query="delivery" type="string">
+  Срок доставки — те же три группы, что показывает сетка на сайте. Одно из:
+
+  - `instant` — доставка ботом. От нескольких секунд до нескольких минут.
+  - `up_to_12h` — трейд должен отправить продавец-человек на площадке-источнике. На сайте отображается как ≤12 ч.
+  - `hold` — внутри trade lock в Steam до `tradable_at` предмета.
+
+  **Используйте `delivery=instant` для любого сценария, где доставка нужна сейчас** — вывод, выплата ботом, пользователь, ждущий на экране. Любое другое значение вернёт `400`, поэтому опечатка проявится сразу, а не расширит выдачу незаметно.
+</ParamField>
+
+<ParamField query="min_refund_percent" type="number">
+  Только листинги, у которых `refund_percent` не меньше заданного (0–100). Листинги без опубликованного значения **исключаются**, а не считаются подходящими.
+
+  `?delivery=instant&min_refund_percent=100` — тот пул, который нужен сценарию вывода: доставка сразу, а откат трейда в Steam никому ничего не стоит.
+</ParamField>
+
 <ParamField query="stat_trak" type="string">
   Фильтр StatTrak™. `only` возвращает только предметы StatTrak™; `exclude` исключает их из результатов. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
@@ -161,7 +177,13 @@ openapi: "GET /listings"
     </ResponseField>
 
     <ResponseField name="delivery" type="string" required>
-      Ожидаемый режим доставки: `instant` (передаётся сразу) или `hold` (с учётом торгового холда Steam).
+      Ожидаемый режим доставки: `instant` (бот, от секунд до минут), `up_to_12h` (трейд должен отправить продавец-человек на площадке-источнике) или `hold` (внутри trade lock в Steam до `tradable_at`).
+    </ResponseField>
+
+    <ResponseField name="refund_percent" type="number | null">
+      Какая часть покупки вернётся, если Valve откатит трейд в Steam. Это свойство площадки, с которой пришёл листинг, а не политика поддержки; по нашим источникам значение лежит в диапазоне от 0 до 100.
+
+      `null` означает, что опубликованного значения для этого листинга нет — считайте его неизвестным, а не равным 100. Фильтруйте через `min_refund_percent`, чтобы собрать пул, где любой откат полностью компенсируется.
     </ResponseField>
 
     <ResponseField name="listed_at" type="datetime | null">
@@ -218,7 +240,9 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
-      "delivery": "hold"
+      "delivery": "hold",
+      "refund_percent": 100,
+      "listed_at": "2026-06-29T08:41:17.000Z"
     }
   ],
   "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="

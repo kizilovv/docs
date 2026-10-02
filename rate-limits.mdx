@@ -8,19 +8,19 @@ The CSBoard API enforces per-key rate limits to keep the service stable for all 
 
 ## Limits by endpoint
 
-All limits are **per API key** and reset on a rolling 60-second window. The one exception is the keyless price feed, which is limited per IP address.
+Limits are counted **per API key** in fixed one-minute windows: the counter starts again at the beginning of every minute. The one exception is the keyless price feed, which is limited per IP address.
 
 | Limit | Endpoint(s) |
 |---|---|
-| **100 / min** | Listings, prices, currency, balance, and order status — all standard `GET` endpoints |
-| **250 / min** | `POST /v1/orders` (places a buy order and spends real money) |
+| **100 / min** | Every request made with a key — listings, prices, games, currency, balance, order status, webhook management, P2P. This is the default; it can be raised per key. |
+| **250 / min** | `POST /v1/orders` and `POST /v1/market/buy` (place buy orders and spend real money). These requests also count toward the per-key limit above. |
+| **30 / min** | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the per-key limit above. |
 | **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed snapshot) |
-| **100 / min** | `/v1/webhooks*` management calls (registering and inspecting endpoints, not the deliveries themselves) |
-| **30 / min** | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the 100 / min above. |
+| **3 at once** | Concurrent `GET /v1/listings/stream` connections per key |
 | **1 / min per IP** | `GET /v1/public/prices` — no key, so the limit follows your IP address. The feed is rebuilt once a minute, so faster polling gains nothing. |
 
 <Note>
-  Sending more than 30 requests with **invalid or missing API keys** from the same IP address within one minute triggers an automatic 5-minute IP-level ban. During the ban every request from that IP returns `401 too_many_failed_auth` regardless of which key is used. Rotate to a valid key and wait out the cooldown before retrying.
+  Sending 30 requests with **invalid or missing API keys** from the same IP address within one minute triggers an automatic 5-minute IP-level ban. During the ban every request from that IP returns `429 too_many_failed_auth`, whichever key it carries. Fix the key and wait out the ban before retrying.
 </Note>
 
 <Tip>
@@ -29,22 +29,22 @@ All limits are **per API key** and reset on a rolling 60-second window. The one 
 
 ## 429 response format
 
-When you exceed a standard endpoint limit the API returns:
+When you exceed a per-key limit the API returns:
 
 ```http
 HTTP/1.1 429 Too Many Requests
-Retry-After: 14
+Retry-After: 60
 Content-Type: application/json
 
-{ "code": "rate_limit_exceeded", "detail": "Rate limit exceeded. Retry after 14 seconds." }
+{ "code": "rate_limit_exceeded", "detail": "Rate limit of 100 requests/min exceeded." }
 ```
 
-The `Retry-After` header value is an integer number of **seconds** you must wait before the next request will succeed.
+The `Retry-After` header value is an integer number of **seconds**. On the per-key limits it is `60`: waiting that long is always enough, because the counter resets at the start of the next minute.
 
 The bulk snapshot endpoint uses a distinct error code when rate-limited:
 
 ```json
-{ "code": "snapshot_rate_limited", "detail": "Snapshot rate limit exceeded. Retry after 60 seconds." }
+{ "code": "snapshot_rate_limited", "detail": "Snapshot is limited to 1/min. Poll less or cache it." }
 ```
 
 The keyless `GET /v1/public/prices` is limited by IP address rather than by key, and its `429` body has no `code` field — branch on the status and `Retry-After`:

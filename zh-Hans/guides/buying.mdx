@@ -90,27 +90,31 @@ curl -X POST https://csboard.com/v1/orders \
 
 ## 响应示例
 
-成功的订单返回 `200`，包含订单详情和您的剩余余额：
+新订单返回 `201` 及订单详情（使用相同 `Idempotency-Key` 的重放返回 `200`，响应体相同）：
 
 ```json
 {
-  "order_id": "ord_01J9Z3K8Q2",
-  "status": "processing",
+  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+  "status": "paid",
+  "currency": "USD",
+  "charged_total_usd": 26.47,
+  "item_count": 2,
   "items": [
     {
-      "item_id": "itm_8841201",
-      "charged_usd": 14.37,
-      "delivery": "hold"
+      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+      "price_usd": 14.37,
+      "status": null
     },
     {
-      "item_id": "itm_8841340",
-      "charged_usd": 12.10,
-      "delivery": "instant"
+      "market_hash_name": "AWP | Atheris (Field-Tested)",
+      "price_usd": 12.1,
+      "status": null
     }
   ],
-  "total_charged_usd": 26.47,
-  "balance_after_usd": 73.53,
-  "created_at": "2026-06-29T17:12:04Z"
+  "delivery": "instant",
+  "expected_minutes": 1,
+  "created_at": "2026-06-29T17:12:04.000Z",
+  "updated_at": "2026-06-29T17:12:04.000Z"
 }
 ```
 
@@ -118,10 +122,12 @@ curl -X POST https://csboard.com/v1/orders \
 
 ## 交付
 
-订单响应中的每个物品都包含一个 `delivery` 字段：
+订单响应包含订单级别的 `delivery` 字段，以及可估算时的 `expected_minutes`：
 
-- **`instant`** — 物品当前可交易，将立即发送到您的 Steam 交易 URL。
-- **`hold`** — 物品处于 Steam 交易冻结期。查看挂单的 `tradable_at` 字段（ISO 8601 时间戳）以了解何时可交易。
+- **`instant`** — 机器人交付；交易报价会在几分钟内发送到您的 Steam 交易 URL。
+- **`pending`** — 仍需卖家或供应商发起交易。
+
+在 Steam 交易冻结期内购买的物品需等待冻结结束——请在购买前查看挂单的 `delivery` 和 `tradable_at`。通过 `GET /v1/orders/{id}` 跟踪订单（其中会显示 `hold` 和 `hold_until`），并使用 [`POST /v1/orders/{id}/claim`](/zh-Hans/api-reference/post-orders-claim) 或 `autoclaim` 设置领取。
 
 ---
 

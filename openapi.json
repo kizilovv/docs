@@ -311,7 +311,9 @@
                       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
                       "tradable": false,
                       "tradable_at": "2026-07-06T12:00:00Z",
-                      "delivery": "hold"
+                      "delivery": "hold",
+                      "refund_percent": 100,
+                      "listed_at": "2026-06-29T08:41:17.000Z"
                     }
                   ],
                   "next_cursor": "eyJpZCI6Iml0bV84ODQxMjAxIn0="
@@ -1111,13 +1113,13 @@
           "Trading"
         ],
         "summary": "Buy listings from your balance",
-        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body. To buy Dota 2 or Rust listings, send `appId` in the body with the ids you read under that `appId`; such orders answer `delivery: \"pending\"` and `expected_minutes: null`.",
+        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Answers `201` with the new order. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body — a replay answers `200` with the original body. To buy Dota 2 or Rust listings, send `appId` in the body with the ids you read under that `appId`; such orders answer `delivery: \"pending\"` and `expected_minutes: null`.",
         "operationId": "createOrder",
         "parameters": [
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "description": "Optional. A retried request with the same key replays the original order instead of buying twice.",
+            "description": "Optional, 8–128 characters. A retried request with the same key replays the original order (`200` with `Idempotent-Replayed: true`) instead of buying twice; while the first request is still running it answers `409 idempotency_in_progress`.",
             "schema": {
               "type": "string"
             }
@@ -1142,37 +1144,82 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Order accepted and debited.",
+          "201": {
+            "description": "Order created and debited from your balance.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrderCreated"
                 },
                 "example": {
-                  "order_id": "ord_01J9Z3K8Q2",
-                  "status": "processing",
+                  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+                  "status": "paid",
+                  "currency": "USD",
+                  "charged_total_usd": 26.47,
+                  "item_count": 2,
                   "items": [
                     {
-                      "item_id": "itm_8841201",
-                      "charged_usd": 14.37,
-                      "delivery": "hold"
+                      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+                      "price_usd": 14.37,
+                      "status": null
                     },
                     {
-                      "item_id": "itm_8841340",
-                      "charged_usd": 12.1,
-                      "delivery": "instant"
+                      "market_hash_name": "AWP | Atheris (Field-Tested)",
+                      "price_usd": 12.1,
+                      "status": null
                     }
                   ],
-                  "total_charged_usd": 26.47,
-                  "balance_after_usd": 73.53,
-                  "created_at": "2026-06-29T17:12:04Z"
+                  "delivery": "instant",
+                  "expected_minutes": 1,
+                  "created_at": "2026-06-29T17:12:04.000Z",
+                  "updated_at": "2026-06-29T17:12:04.000Z"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay: a request with an `Idempotency-Key` (or `idempotency_key`) already used for a completed order returns that original response body, with the header `Idempotent-Replayed: true`. Nothing new is bought.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "`true` on a replayed response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCreated"
+                },
+                "example": {
+                  "order_id": "cmg9x2k1p0007qz3h5v8w2r4n",
+                  "status": "paid",
+                  "currency": "USD",
+                  "charged_total_usd": 26.47,
+                  "item_count": 2,
+                  "items": [
+                    {
+                      "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+                      "price_usd": 14.37,
+                      "status": null
+                    },
+                    {
+                      "market_hash_name": "AWP | Atheris (Field-Tested)",
+                      "price_usd": 12.1,
+                      "status": null
+                    }
+                  ],
+                  "delivery": "instant",
+                  "expected_minutes": 1,
+                  "created_at": "2026-06-29T17:12:04.000Z",
+                  "updated_at": "2026-06-29T17:12:04.000Z"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request — a malformed body, or an `appId` this key may not buy in (`unsupported_game`).",
+            "description": "Bad request — a malformed body (`invalid_request`, whose `detail` is the field-error map), an id that cannot be bought here, items that must be split into separate orders, no linked Steam account, or an `appId` this key may not buy in (`unsupported_game`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1183,7 +1230,14 @@
                     "summary": "Malformed body",
                     "value": {
                       "code": "invalid_request",
-                      "detail": "item_ids must contain 1–10 unique ids."
+                      "detail": {
+                        "formErrors": [],
+                        "fieldErrors": {
+                          "item_ids": [
+                            "Duplicate item ids are not allowed"
+                          ]
+                        }
+                      }
                     }
                   },
                   "unsupported_game": {
@@ -1197,13 +1251,41 @@
                         252490
                       ]
                     }
+                  },
+                  "unsupported_item": {
+                    "summary": "Id not buyable through the API",
+                    "value": {
+                      "code": "unsupported_item",
+                      "detail": "Live (ss_live_*) ids are not buyable via API. Use ids from /v1/listings."
+                    }
+                  },
+                  "steam_account_required": {
+                    "summary": "No linked Steam account or trade URL",
+                    "value": {
+                      "code": "steam_account_required",
+                      "detail": "Link your Steam account and trade URL on csboard.com before buying via API."
+                    }
+                  },
+                  "cannot_mix_sources": {
+                    "summary": "Items that cannot share one order",
+                    "value": {
+                      "code": "cannot_mix_sources",
+                      "detail": "Buy external-market and platform items in separate orders."
+                    }
+                  },
+                  "one_external_per_order": {
+                    "summary": "Only one such item per order",
+                    "value": {
+                      "code": "one_external_per_order",
+                      "detail": "Only one external-market item per order."
+                    }
                   }
                 }
               }
             }
           },
           "409": {
-            "description": "Conflict — the live price moved past your ceiling (nothing was charged), an item sold out, or a duplicate idempotency key is still processing.",
+            "description": "Conflict — the live price moved past your ceiling, an item sold out, a duplicate Idempotency-Key is still processing, the recipient has too many pending offers, prices are mid-refresh, or a concurrent order won the race. Nothing was charged.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1214,8 +1296,21 @@
                     "summary": "Live price exceeded max_price_usd",
                     "value": {
                       "code": "price_moved",
-                      "detail": "Live total 31.20 exceeds max_price_usd 30.00.",
-                      "current_total_usd": 31.2
+                      "detail": "Live price exceeds your max_price_usd. Re-read /v1/listings and retry.",
+                      "quoted_max_usd": 30.0,
+                      "current_total_usd": 31.2,
+                      "items": [
+                        {
+                          "id": "itm_8841201",
+                          "market_hash_name": "AK-47 | Redline (Minimal Wear)",
+                          "price_usd": 15.1
+                        },
+                        {
+                          "id": "itm_8841340",
+                          "market_hash_name": "AWP | Atheris (Field-Tested)",
+                          "price_usd": 16.1
+                        }
+                      ]
                     }
                   },
                   "item_unavailable": {
@@ -1232,7 +1327,7 @@
                     "summary": "Earlier request still running",
                     "value": {
                       "code": "idempotency_in_progress",
-                      "detail": "A request with this Idempotency-Key is still being processed."
+                      "detail": "A request with this Idempotency-Key is still processing."
                     }
                   },
                   "concurrent_update": {
@@ -1240,6 +1335,21 @@
                     "value": {
                       "code": "concurrent_update",
                       "detail": "Another order touched the same items at the same moment and this one was rolled back. Nothing was charged — retry."
+                    }
+                  },
+                  "pending_trades_limit": {
+                    "summary": "Recipient has too many unaccepted offers",
+                    "value": {
+                      "code": "pending_trades_limit",
+                      "detail": "The recipient has too many pending Steam trade offers; they must accept them before more can be delivered.",
+                      "limit": 5
+                    }
+                  },
+                  "price_updating": {
+                    "summary": "Prices mid-refresh",
+                    "value": {
+                      "code": "price_updating",
+                      "detail": "Prices are being updated — retry in a moment."
                     }
                   }
                 }
@@ -1250,35 +1360,93 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "402": {
-            "description": "Insufficient balance.",
+            "description": "Payment required — the balance does not cover the order, or the purchase needs identity verification first.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 },
-                "example": {
-                  "code": "insufficient_balance",
-                  "message": "Balance 10.00 is below order total 26.47."
+                "examples": {
+                  "insufficient_balance": {
+                    "summary": "Balance too low",
+                    "value": {
+                      "code": "insufficient_balance",
+                      "detail": "Top up your CSBoard balance to cover this order.",
+                      "required_usd": 26.47,
+                      "current_usd": 10.0
+                    }
+                  },
+                  "kyc_required": {
+                    "summary": "Identity verification needed",
+                    "value": {
+                      "code": "kyc_required",
+                      "detail": "Identity verification required before this purchase.",
+                      "kyc_url": "https://csboard.com/...",
+                      "reasons": [
+                        "..."
+                      ]
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "Trading not enabled on this key.",
+            "description": "Forbidden — trading is not enabled on this key, the account is restricted, or the account is not eligible for this purchase.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 },
-                "example": {
-                  "code": "trading_not_enabled",
-                  "message": "Enable buying for this key in your profile."
+                "examples": {
+                  "trading_not_enabled": {
+                    "summary": "Buying disabled for this key",
+                    "value": {
+                      "code": "trading_not_enabled",
+                      "detail": "Buying via API is disabled for this key. Enable it at https://csboard.com/profile?tab=api"
+                    }
+                  },
+                  "account_restricted": {
+                    "summary": "Account restricted",
+                    "value": {
+                      "code": "account_restricted",
+                      "detail": "Account is restricted — contact support."
+                    }
+                  }
                 }
               }
             }
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "description": "Unexpected failure. The order may still exist — check `GET /orders/info` with your `custom_id` before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "order_failed",
+                  "detail": "Could not complete the order."
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The marketplace for one of the items is temporarily unavailable. No charge was made.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "market_unavailable",
+                  "detail": "The marketplace for one of these items is temporarily unavailable — retry shortly. No charge was made."
+                }
+              }
+            }
           },
           "504": {
             "description": "Upstream marketplace did not answer in time. The outcome of the purchase is UNKNOWN — it may still have completed. Do NOT re-send blindly: poll the order list, or re-send the identical custom_id / Idempotency-Key, which replays the original result instead of buying again. A retry sent while the original is still unresolved returns 409 idempotency_in_progress.",
@@ -3949,21 +4117,21 @@
     },
     "responses": {
       "Unauthorized": {
-        "description": "Missing or invalid API key.",
+        "description": "Missing or invalid API key (`missing_api_key` or `invalid_api_key`).",
         "content": {
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
             },
             "example": {
-              "code": "unauthorized",
-              "message": "Missing or invalid API key."
+              "code": "missing_api_key",
+              "detail": "Provide your API key via `Authorization: Bearer csb_pub_…`. Generate one at https://csboard.com/profile?tab=api"
             }
           }
         }
       },
       "RateLimited": {
-        "description": "Rate limit exceeded. Includes a Retry-After header.",
+        "description": "Rate limit exceeded. Includes a Retry-After header (60 seconds on the per-key limits).",
         "headers": {
           "Retry-After": {
             "description": "Seconds to wait before retrying.",
@@ -3979,7 +4147,7 @@
             },
             "example": {
               "code": "rate_limit_exceeded",
-              "message": "Too many requests."
+              "detail": "Rate limit of 100 requests/min exceeded."
             }
           }
         }
@@ -4053,14 +4221,23 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "image": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
           },
           "slot": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 4
           },
@@ -4101,7 +4278,8 @@
               "Well-Worn",
               "Battle-Scarred",
               null
-            ]
+            ],
+            "description": "Wear bucket. `null` for items without wear, and for Dota 2 / Rust."
           },
           "doppler_phase": {
             "type": [
@@ -4114,19 +4292,22 @@
             "type": [
               "number",
               "null"
-            ]
+            ],
+            "description": "Float value between 0 and 1. `null` when not applicable."
           },
           "paint_seed": {
             "type": [
               "integer",
               "null"
-            ]
+            ],
+            "description": "Paint seed (pattern index). `null` when not applicable."
           },
           "stickers": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Sticker"
-            }
+            },
+            "description": "Applied stickers; `[]` when none."
           },
           "price_usd": {
             "type": "number",
@@ -4136,29 +4317,34 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Item category, e.g. `Rifle`, `Knife`, `Gloves`."
           },
           "rarity": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Rarity tier, e.g. `Classified`, `Covert`."
           },
           "image": {
             "type": [
               "string",
               "null"
             ],
-            "format": "uri"
+            "format": "uri",
+            "description": "Item image URL."
           },
           "inspect_link": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Steam inspect link. `null` when there is none, and for Dota 2 / Rust."
           },
           "tradable": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "`false` while the item is inside a Steam trade lock."
           },
           "tradable_at": {
             "type": [
@@ -4172,8 +4358,19 @@
             "type": "string",
             "enum": [
               "instant",
+              "up_to_12h",
               "hold"
-            ]
+            ],
+            "description": "Delivery bucket: `instant` — bot delivery, seconds to a few minutes; `up_to_12h` — a human seller has to send the trade; `hold` — inside a Steam trade lock until `tradable_at`."
+          },
+          "refund_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "How much of the purchase comes back if Valve reverses the Steam trade, 0–100. A property of the market the listing came from, not a support policy. `null` means we have no published figure — treat it as unknown, never as 100. Filter with `min_refund_percent`."
           },
           "listed_at": {
             "type": [
@@ -4276,11 +4473,15 @@
           },
           "max_price_usd": {
             "type": "number",
-            "description": "Total ceiling in USD. Strongly recommended — your overcharge protection, enforced atomically inside the locked debit."
+            "description": "Total ceiling in USD. Strongly recommended — your overcharge protection, enforced atomically inside the locked debit.",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
           },
           "idempotency_key": {
             "type": "string",
-            "description": "Optional; or send the Idempotency-Key header. Replays the original order on retry."
+            "description": "Optional; or send the Idempotency-Key header. Replays the original order on retry.",
+            "minLength": 8,
+            "maxLength": 128
           },
           "autoclaim": {
             "type": "boolean",
@@ -4303,48 +4504,58 @@
       },
       "OrderCreated": {
         "type": "object",
+        "description": "The order as it stands the moment it was created. `status` here is the internal state at that instant (for example `paid` or `pending_delivery`), not the normalised vocabulary of `GET /orders` — read the order there, or subscribe to webhooks, to follow it.",
         "properties": {
           "order_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Order id. Use it with `GET /orders/{id}`."
           },
           "status": {
             "type": "string",
+            "description": "Internal order state when the response was built, e.g. `paid` or `pending_delivery`. Poll `GET /orders/{id}` for the public `status`."
+          },
+          "currency": {
+            "type": "string",
             "enum": [
-              "processing",
-              "completed",
-              "failed"
+              "USD"
             ]
+          },
+          "charged_total_usd": {
+            "type": "number",
+            "description": "Total debited from your balance, in USD."
+          },
+          "item_count": {
+            "type": "integer",
+            "description": "Number of items in the order."
           },
           "items": {
             "type": "array",
+            "description": "One entry per item bought.",
             "items": {
               "type": "object",
               "properties": {
-                "item_id": {
-                  "type": "string"
-                },
-                "charged_usd": {
-                  "type": "number"
-                },
-                "delivery": {
-                  "type": "string",
-                  "enum": [
-                    "instant",
-                    "hold"
+                "market_hash_name": {
+                  "type": [
+                    "string",
+                    "null"
                   ]
+                },
+                "price_usd": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "What this item was charged, in USD."
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Internal item state, if one is set yet; usually `null` right after purchase."
                 }
               }
             }
-          },
-          "total_charged_usd": {
-            "type": "number"
-          },
-          "balance_after_usd": {
-            "type": "number"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
           },
           "delivery": {
             "type": [
@@ -4356,20 +4567,34 @@
               "pending",
               null
             ],
-            "description": "How the order is being delivered, when known. Dota 2 and Rust orders always answer `pending`: they are queued for delivery rather than handed over inline."
+            "description": "How the order is being delivered, when known: `instant` (bot delivery) or `pending` (a seller or supplier still has to send the trade). Dota 2 and Rust orders always answer `pending`."
           },
           "expected_minutes": {
             "type": [
               "integer",
               "null"
             ],
-            "description": "Expected delivery time in minutes, when we can state one. Always `null` for Dota 2 and Rust orders."
+            "description": "Rough delivery estimate in minutes, when we can state one. Always `null` for Dota 2 and Rust orders."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
           "order_id",
           "status",
-          "total_charged_usd"
+          "currency",
+          "charged_total_usd",
+          "delivery",
+          "expected_minutes"
         ]
       },
       "Balance": {
