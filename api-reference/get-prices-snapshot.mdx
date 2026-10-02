@@ -78,7 +78,7 @@ A `304 Not Modified` response means the snapshot is identical to the one you alr
 | HTTP status | Code | Meaning |
 |---|---|---|
 | 304 | _(no body)_ | Snapshot unchanged since the supplied `If-None-Match` ETag. |
-| 401 | `unauthorized` | Missing or invalid API key. |
+| 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |
 | 429 | `snapshot_rate_limited` | Over the 1 request/min snapshot-specific rate limit. Wait before retrying. |
 
 <Tip>

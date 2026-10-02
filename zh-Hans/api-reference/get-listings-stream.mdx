@@ -132,7 +132,7 @@ es.addEventListener("resync", () => {
 
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
-| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
 | 429 | `too_many_streams` | 该密钥的并发流超过 3 个。请先关闭已有连接。 |
 
 <Tip>

@@ -117,7 +117,7 @@ curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
 |---|---|---|
 | 400 | `invalid_param` | `wear` передан с `appId` Dota 2 или Rust. |
 | 400 | `unsupported_game` | Ваш ключ не может использовать этот `appId`. Доступные перечислены в `supported_app_ids`. |
-| 401 | `unauthorized` | Отсутствует или некорректный API-ключ. |
+| 401 | `missing_api_key`, `invalid_api_key` | Отсутствует или некорректный API-ключ. |
 | 429 | `rate_limit_exceeded` | Более 30 запросов/мин. Перед повтором подождите время, указанное в заголовке `Retry-After`. |
 
 <Warning>

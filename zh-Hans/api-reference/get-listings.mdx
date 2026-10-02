@@ -255,7 +255,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
 |---|---|---|
 | 400 | `invalid_param` | 参数格式错误，或在其他 `appId` 下发送了仅限 CS2 的过滤参数。 |
 | 400 | `unsupported_game` | 您的密钥无法使用该 `appId`。`supported_app_ids` 列出了可用的值。 |
-| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
 | 429 | `rate_limit_exceeded` | 超过该密钥的每分钟限额（默认 100 次/分钟）。请按照 `Retry-After` 响应头中的秒数退避。 |
 
 <Tip>

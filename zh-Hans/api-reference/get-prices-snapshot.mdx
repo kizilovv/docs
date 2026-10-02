@@ -78,7 +78,7 @@ curl https://csboard.com/v1/prices/snapshot.ndjson.gz \
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
 | 304 | _(无响应体)_ | 自所提供的 `If-None-Match` ETag 以来，快照未发生变化。 |
-| 401 | `unauthorized` | API 密钥缺失或无效。 |
+| 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
 | 429 | `snapshot_rate_limited` | 超过快照专属的 1 次/分钟速率限制。请稍后再试。 |
 
 <Tip>
