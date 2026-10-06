@@ -1,24 +1,73 @@
 ---
-title: "Instant Sell API — Sell CS2 Skins Programmatically (Invite-Only)"
+title: "Instant Sell API: Sell CS2, Dota 2 and Rust Skins Programmatically (Invite-Only)"
 sidebarTitle: "Instant Sell"
-description: "Sell CS2 skins from any Steam inventory through the CSBoard bot network and get paid to your CSBoard balance after the trade-protection hold clears."
+description: "Sell CS2, Dota 2 and Rust items from any Steam inventory through the CSBoard bot network and get paid to your CSBoard balance."
 tag: "Invite-only"
 ---
 
 <Note>
-  **Access on request.** Instant Sell is enabled per-account. Your API key can read `GET /v1/sell/status` out of the box, but quoting and selling return `selling_not_enabled` until access is granted. Contact support to request access.
+  **Access on request.** Instant Sell is enabled per account. Your API key can read [`GET /v1/sell/status`](/api-reference/get-sell-status) out of the box, but quoting and selling return `selling_not_enabled` until access is granted. Contact support to request access.
 </Note>
 
 ## How it works
 
-1. **Quote** — `POST /v1/sell/quotes` with a Steam trade URL returns every item in that inventory we are ready to buy, with the exact USD amount you will be credited per item.
-2. **Create an order** — `POST /v1/sell/orders` with the chosen `asset_ids`. A bot from the CSBoard network sends a Steam trade offer to the seller's trade URL. Large baskets may split into up to 3 offers from different bots — the order's `offers[]` array tracks each one.
-3. **Seller accepts** — the order moves to `received`. Steam's trade protection hold now runs (about 8 days). The pending amount is visible in `GET /v1/balance` under `incoming_hold`.
-4. **Settlement** — when the hold clears, the order completes and the full amount is credited to **your CSBoard balance**. There is no other payout destination: funds always settle to the balance of the API key that created the order.
+1. **Quote.** [`POST /v1/sell/quotes`](/api-reference/post-sell-quotes) with a Steam trade URL returns every item in that inventory we are ready to buy, with the exact USD amount you will be credited per item. Pick the game with `app_id` and the number of trade offers with `split`.
+2. **Create an order.** [`POST /v1/sell/orders`](/api-reference/post-sell-orders) with the chosen `asset_ids` and the same `app_id` and `split`. A bot from the CSBoard network sends a Steam trade offer to the seller's trade URL, or several offers when `split` is `true`. The order's `offers[]` array tracks each one.
+3. **Seller accepts.** The offer moves to `received`. The amount in flight is visible in [`GET /v1/balance`](/api-reference/get-balance) under `incoming_hold`.
+4. **Settlement.** Each offer is credited to **your CSBoard balance** on its own, at the time described in [when the money arrives](#when-the-money-arrives). There is no other payout destination: funds always settle to the balance of the API key that created the order.
 
 <Warning>
-  Money is credited **only after settlement**, never at offer-accept time. An order showing `received` is money in flight, not money on your balance. Plan cash flow around the ~8-day hold.
+  Money is credited **only at settlement**, never when the seller accepts. An order showing `received` is money in flight, not money on your balance.
 </Warning>
+
+## Choose the game
+
+Send `app_id` on both the quote and the order:
+
+| `app_id` | Game |
+| --- | --- |
+| `730` | CS2 (the default when you leave `app_id` out) |
+| `570` | Dota 2 |
+| `252490` | Rust |
+
+One order sells one game. Every quote item and every order carries `app_id`, so you can tell them apart in one list. A game that is not open for instant sell on your key answers `422 unsupported_game`, with the games you can use in `supported_app_ids`:
+
+```json
+{
+  "code": "unsupported_game",
+  "detail": "app_id 570 is not open for instant sell on this key. Supported: 730, 252490.",
+  "supported_app_ids": [730, 252490]
+}
+```
+
+## One offer or several
+
+Several markets buy through the CSBoard network, and they do not all pay the same for the same item. `split` decides how a sale is shared between them.
+
+**`split: false` (default): one trade offer.** The whole sale goes to the single market that leaves the seller with the most value. We count what that market pays for the items it takes, plus what the items it does not take are worth elsewhere, because those stay with the seller and can be sold later. Items that market does not take are left out of the quote, so everything you can order ships in one offer. Every quote item has `offer_group: "a"`.
+
+**`split: true`: the best price for every item.** Each item goes to the market that pays the most for it. That gives the widest coverage and the highest total, and the seller may get several trade offers from different bots. To keep a sale from breaking into offers nobody accepts:
+
+- an extra offer worth less than \$1 is dropped, and its items stay with the seller (the largest offer is always kept);
+- a sale is spread over a limited number of offers; items that do not fit are moved to the best-paying market already in the sale, or left out.
+
+The quote tells you how the sale will be split. `offer_group` is `a`, `b` and so on per item, biggest offer first, so the number of distinct letters is the number of offers the seller should expect. The quote groups the **whole** inventory. If you order only some of the items they are grouped again for that basket, and the order's `offers[]` is the final word. Each offer there carries the same `offer_group` letter, its own `trade_offer_id` and `status`, and a `status` on each of its items. `trade_offer_ids` lists every offer that went out.
+
+<Tip>
+  Send `min_total_usd` with every order. Grouping is the last thing that can move the total, and `min_total_usd` is checked against what the order will actually book. If it comes out lower, the order is refused with `409 price_drift` and nothing happens.
+</Tip>
+
+## When the money arrives
+
+Each offer is credited on its own, so `credited_usd` grows offer by offer.
+
+| Game | Credited | Why |
+| --- | --- | --- |
+| CS2 | About 7 days after the seller accepts | The market pays once Steam's 7-day trade protection ends, and we credit when it does. |
+| Dota 2 | 7 days after the seller accepts | The market settles at once, but Steam can still reverse the trade for 7 days. We hold the credit until that window closes. |
+| Rust | As soon as the market confirms the trade | Steam cannot reverse a Rust trade, so there is no hold. |
+
+While an offer waits, it shows `received` and `unhold_at` carries the expected credit time.
 
 ## Verify offers to your users
 
@@ -35,100 +84,22 @@ Every offer exposes the sending bot's profile and the Steam trade offer id:
 "trade_offer_id": "7654321098"
 ```
 
-Render this next to your own UI so the seller can match the incoming Steam offer against the expected `trade_offer_id` and bot `steam_id` before accepting — that check defeats impersonation scams regardless of which bot ships the offer.
+Render this next to your own UI so the seller can match each incoming Steam offer against the expected `trade_offer_id` and bot `steam_id` before accepting. That check defeats impersonation scams regardless of which bot ships the offer. On a split sale, show every entry of `offers[]`.
 
 ## Endpoints
 
 All endpoints live under `/v1/sell` and use the same `csb_pub_` Bearer key as the rest of the API.
 
-### GET /v1/sell/status
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | [`/v1/sell/status`](/api-reference/get-sell-status) | Is selling enabled for this key, and its limits. |
+| `POST` | [`/v1/sell/quotes`](/api-reference/post-sell-quotes) | Quote an inventory. Takes `app_id` and `split`. |
+| `POST` | [`/v1/sell/orders`](/api-reference/post-sell-orders) | Sell quoted items. Takes `app_id`, `split`, `min_total_usd`, `external_id` and an `Idempotency-Key` header. |
+| `GET` | [`/v1/sell/orders`](/api-reference/get-sell-orders) | Your sell orders, newest first, paginated like `GET /v1/orders`. Or one order by `?external_id=`. |
+| `GET` | [`/v1/sell/orders/{id}`](/api-reference/get-sell-order) | One order with all its offers. |
+| `POST` | [`/v1/sell/orders/{id}/cancel`](/api-reference/post-sell-order-cancel) | Cancel before any offer is accepted. |
 
-Feature discovery. Works for every key.
-
-```json
-{
-  "enabled": true,
-  "access": "invite_only",
-  "selling_enabled_for_key": false,
-  "min_item_usd": 0.5,
-  "max_items_per_order": 250,
-  "max_active_orders": 10,
-  "hold_days_estimate": 8
-}
-```
-
-### POST /v1/sell/quotes
-
-```json
-{ "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=…&token=…" }
-```
-
-Returns sellable items with the exact USD amount credited per item:
-
-```json
-{
-  "expires_at": "2026-07-11T18:03:00Z",
-  "items": [
-    {
-      "asset_id": "41165110534",
-      "market_hash_name": "AK-47 | Redline (Field-Tested)",
-      "price_usd": 21.37,
-      "float": 0.23,
-      "phase": null,
-      "icon_url": "https://…"
-    }
-  ]
-}
-```
-
-Quotes are valid for about two minutes. Re-quote before creating an order if they expire.
-
-### POST /v1/sell/orders
-
-```json
-{
-  "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=…&token=…",
-  "asset_ids": ["41165110534", "41165110599"],
-  "min_total_usd": 30.00,
-  "external_id": "my-shop-order-1017"
-}
-```
-
-- `min_total_usd` — optional price-drift floor. If the live total drops below it between quote and execution, the order is rejected with `price_drift` and no side effects.
-- `external_id` — your idempotency id, unique per key. Retrying with the same `external_id` returns the original order instead of creating a duplicate.
-- `Idempotency-Key` header — request-level replay protection, same semantics as `POST /v1/orders`.
-
-### GET /v1/sell/orders/:id
-
-Also available as `GET /v1/sell/orders?external_id=…`.
-
-```json
-{
-  "id": "so_cmqx…",
-  "external_id": "my-shop-order-1017",
-  "status": "received",
-  "total_usd": 30.10,
-  "credited_usd": 0,
-  "unhold_at": "2026-07-19T14:02:11Z",
-  "offers": [
-    {
-      "trade_offer_id": "7654321098",
-      "status": "received",
-      "amount_usd": 30.10,
-      "expires_at": "2026-07-11T14:17:11Z",
-      "items": [ { "asset_id": "…", "market_hash_name": "…", "price_usd": 21.37 } ],
-      "bot": { "name": "…", "avatar": "…", "steam_id": "…", "profile_url": "…", "level": 30 }
-    }
-  ],
-  "fail_reason": null
-}
-```
-
-`credited_usd` grows as offers settle — a split order can settle partially while the remaining offers are still in hold.
-
-### POST /v1/sell/orders/:id/cancel
-
-Allowed while the order is `pending` or `offer_sent` (before the seller accepts). Later stages return `409 not_cancellable`.
+Rather than polling, subscribe to the `sell.updated` [webhook](/guides/webhooks#sell-updated). Its `data` is the same order object.
 
 ## Order lifecycle
 
@@ -136,16 +107,18 @@ Allowed while the order is `pending` or `offer_sent` (before the seller accepts)
 | --- | --- |
 | `pending` | Order created, offers being prepared |
 | `offer_sent` | Steam trade offer(s) delivered to the seller |
-| `received` | Seller accepted; trade-protection hold running (~8 days) |
-| `completed` | Settled — full amount credited to your balance |
-| `cancelled` | Cancelled, or the offer expired / was declined |
-| `failed` | Could not be executed — see `fail_reason` |
+| `received` | Seller accepted; waiting for settlement (see [when the money arrives](#when-the-money-arrives)) |
+| `completed` | Settled, full amount credited to your balance |
+| `cancelled` | Cancelled, or the offer expired or was declined |
+| `failed` | Could not be executed, see `fail_reason` |
+
+On a sale with several offers each offer has its own status. If one offer is declined and the others go through, the order itself keeps a non-final status while each offer and `credited_usd` show exactly what was sold. Read `offers[]`.
 
 ## Errors
 
-Errors follow the standard `{ "code", "detail" }` envelope. Sell-specific codes: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`.
+Errors follow the standard `{ "code", "detail" }` envelope. Sell-specific codes: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift` (409, with `current_total_usd` and `min_total_usd`), `below_min_total`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `unsupported_game` (422, with `supported_app_ids`), `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`, `not_cancellable`, `order_not_found`.
 
 ## Limits
 
 - Quotes: 10 requests/min per key (inventory scans are expensive).
-- Orders: 5 creations/min per key, 10 active orders, \$2,000/day default volume cap. Caps are raised per-account — ask support.
+- Orders: 5 creations/min per key and a daily volume cap, \$2,000 by default. The basket and active-order limits for your key are in [`GET /v1/sell/status`](/api-reference/get-sell-status). Caps are raised per account, ask support.

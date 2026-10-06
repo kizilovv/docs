@@ -34,6 +34,10 @@
       "description": "Buy listings from your CSBoard balance. Opt-in, key-gated."
     },
     {
+      "name": "Instant Sell",
+      "description": "Sell CS2, Dota 2 and Rust items from any Steam inventory to the CSBoard network and get paid to your balance. Invite-only."
+    },
+    {
       "name": "P2P",
       "description": "List your own CS2 skins on the CSBoard P2P market. Free — any valid key, no balance requirement."
     },
@@ -3290,6 +3294,9 @@
                               "type": "string",
                               "enum": [
                                 "order.updated",
+                                "sell.updated",
+                                "withdrawal.updated",
+                                "deposit.updated",
                                 "webhook.test"
                               ]
                             },
@@ -3363,6 +3370,9 @@
                       "type": "string",
                       "enum": [
                         "order.updated",
+                        "sell.updated",
+                        "withdrawal.updated",
+                        "deposit.updated",
                         "webhook.test"
                       ]
                     },
@@ -3404,6 +3414,9 @@
                                 "type": "string",
                                 "enum": [
                                   "order.updated",
+                                  "sell.updated",
+                                  "withdrawal.updated",
+                                  "deposit.updated",
                                   "webhook.test"
                                 ]
                               },
@@ -3501,6 +3514,9 @@
                       "type": "string",
                       "enum": [
                         "order.updated",
+                        "sell.updated",
+                        "withdrawal.updated",
+                        "deposit.updated",
                         "webhook.test"
                       ]
                     }
@@ -3541,6 +3557,9 @@
                             "type": "string",
                             "enum": [
                               "order.updated",
+                              "sell.updated",
+                              "withdrawal.updated",
+                              "deposit.updated",
                               "webhook.test"
                             ]
                           },
@@ -4102,6 +4121,760 @@
           },
           "400": {
             "description": "`invalid_request` for a malformed entry, or `would_lock_you_out` when the list excludes the calling address (which is echoed back)."
+          }
+        }
+      }
+    },
+    "/sell/status": {
+      "get": {
+        "tags": [
+          "Instant Sell"
+        ],
+        "summary": "Instant Sell status",
+        "operationId": "getSellStatus",
+        "description": "Feature discovery. Works for every key, whether or not selling is enabled on it.",
+        "responses": {
+          "200": {
+            "description": "Status.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "enabled": true,
+                  "access": "invite_only",
+                  "selling_enabled_for_key": false,
+                  "margin": null,
+                  "min_item_usd": 1,
+                  "max_items_per_order": 250,
+                  "max_active_orders": 100000,
+                  "hold_days_estimate": 8
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/sell/quotes": {
+      "post": {
+        "tags": [
+          "Instant Sell"
+        ],
+        "summary": "Quote a Steam inventory",
+        "operationId": "createSellQuote",
+        "description": "Every item in the seller's inventory that the CSBoard network will buy right now, with the exact USD amount your balance is credited per item. 10 requests per minute per key.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellQuoteRequest"
+              },
+              "example": {
+                "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=AbCdEfGh",
+                "app_id": 730,
+                "split": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quoted items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellQuote"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "asset_id": "41165110534",
+                      "app_id": 730,
+                      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                      "price_usd": 48.3,
+                      "float": 0.23,
+                      "phase": null,
+                      "icon_url": null,
+                      "offer_group": "a"
+                    },
+                    {
+                      "asset_id": "41165110599",
+                      "app_id": 730,
+                      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+                      "price_usd": 13.12,
+                      "float": 0.11,
+                      "phase": null,
+                      "icon_url": null,
+                      "offer_group": "b"
+                    }
+                  ],
+                  "expires_at": "2026-10-06T14:04:11Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, or a trade URL that does not resolve to a Steam account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "invalid_trade_url",
+                  "detail": "The trade URL is malformed or does not resolve to a Steam account."
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Selling is not enabled for this key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "selling_not_enabled",
+                  "detail": "Instant Sell API is granted per-account. Contact support@csboard.com to request access."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The game is not open for instant sell on this key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "unsupported_game",
+                  "detail": "app_id 570 is not open for instant sell on this key. Supported: 730, 252490.",
+                  "supported_app_ids": [
+                    730,
+                    252490
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "Instant Sell is switched off right now. Reads keep working.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "sell_disabled",
+                  "detail": "Instant Sell API is temporarily disabled."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sell/orders": {
+      "post": {
+        "tags": [
+          "Instant Sell"
+        ],
+        "summary": "Create a sell order",
+        "operationId": "createSellOrder",
+        "description": "Sell quoted items. A bot from the CSBoard network sends the seller a Steam trade offer, or several when `split` is true. Send `Idempotency-Key` or `external_id` so a retried request replays the original order instead of selling twice. 5 orders per minute per key.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Request-level replay protection. Falls back to `external_id` when absent.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellOrderRequest"
+              },
+              "example": {
+                "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=AbCdEfGh",
+                "asset_ids": [
+                  "41165110534",
+                  "41165110599"
+                ],
+                "min_total_usd": 60,
+                "external_id": "my-shop-order-1017",
+                "app_id": 730,
+                "split": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellOrder"
+                },
+                "example": {
+                  "id": "cmgk2x9a10001qs01sell0001",
+                  "external_id": "my-shop-order-1017",
+                  "app_id": 730,
+                  "status": "offer_sent",
+                  "currency": "USD",
+                  "total_usd": 61.42,
+                  "credited_usd": 0,
+                  "created_at": "2026-10-06T14:02:11Z",
+                  "unhold_at": null,
+                  "trade_offer_ids": [
+                    "7654321098",
+                    "7654321111"
+                  ],
+                  "offers": [
+                    {
+                      "offer_group": "a",
+                      "trade_offer_id": "7654321098",
+                      "status": "offer_sent",
+                      "amount_usd": 48.3,
+                      "expires_at": "2026-10-06T14:17:11Z",
+                      "items": [
+                        {
+                          "asset_id": "41165110534",
+                          "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                          "price_usd": 48.3,
+                          "status": "offer_sent"
+                        }
+                      ],
+                      "bot": {
+                        "name": "CSBoard Bot #4",
+                        "avatar": "https://avatars.steamstatic.com/abc_full.jpg",
+                        "steam_id": "76561199000000004",
+                        "profile_url": "https://steamcommunity.com/profiles/76561199000000004",
+                        "level": 30
+                      }
+                    },
+                    {
+                      "offer_group": "b",
+                      "trade_offer_id": "7654321111",
+                      "status": "offer_sent",
+                      "amount_usd": 13.12,
+                      "expires_at": "2026-10-06T14:17:40Z",
+                      "items": [
+                        {
+                          "asset_id": "41165110599",
+                          "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+                          "price_usd": 13.12,
+                          "status": "offer_sent"
+                        }
+                      ],
+                      "bot": {
+                        "name": "CSBoard Bot #9",
+                        "avatar": "https://avatars.steamstatic.com/def_full.jpg",
+                        "steam_id": "76561199000000009",
+                        "profile_url": "https://steamcommunity.com/profiles/76561199000000009",
+                        "level": 24
+                      }
+                    }
+                  ],
+                  "fail_reason": null
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Replay of an order already created with this `Idempotency-Key` or `external_id` (`Idempotent-Replayed: true`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body or trade URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "invalid_request",
+                  "detail": "asset_ids: Duplicate asset ids are not allowed"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Selling is not enabled for this key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "selling_not_enabled",
+                  "detail": "Instant Sell API is granted per-account. Contact support@csboard.com to request access."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order was refused without side effects: `price_drift` (the total it would book is under your `min_total_usd`), `item_not_in_inventory`, `no_eligible_items`, `active_order_exists`, `too_many_active_orders` or `idempotency_in_progress`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "price_drift",
+                  "detail": "The live total dropped below your min_total_usd. Re-quote and retry.",
+                  "current_total_usd": 57.9,
+                  "min_total_usd": 60
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The game is not open for instant sell on this key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "unsupported_game",
+                  "detail": "app_id 570 is not open for instant sell on this key. Supported: 730, 252490.",
+                  "supported_app_ids": [
+                    730,
+                    252490
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "description": "Instant Sell is switched off right now. Reads keep working.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "sell_disabled",
+                  "detail": "Instant Sell API is temporarily disabled."
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Instant Sell"
+        ],
+        "summary": "List sell orders",
+        "operationId": "listSellOrders",
+        "description": "Your sell orders placed through the API, newest first, with keyset pagination. The same envelope and query contract as `GET /v1/orders`. With `external_id` it returns that one order instead of a page.",
+        "parameters": [
+          {
+            "name": "external_id",
+            "in": "query",
+            "description": "Look up one order by your `external_id`. Returns the order object, not a page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Results per page. 1 to 100. Default 50.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "start_unix_time",
+            "in": "query",
+            "description": "Only orders created at or after this Unix timestamp (seconds).",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "end_unix_time",
+            "in": "query",
+            "description": "Only orders created at or before this Unix timestamp (seconds).",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by order status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "offer_sent",
+                "received",
+                "completed",
+                "cancelled",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Keyset cursor from a previous response's `meta.next_cursor`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of sell orders, or one order when `external_id` is set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SellOrder"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "next_cursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "next_cursor",
+                        "per_page"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "cmgk2x9a10001qs01sell0001",
+                      "external_id": "my-shop-order-1017",
+                      "app_id": 730,
+                      "status": "offer_sent",
+                      "currency": "USD",
+                      "total_usd": 61.42,
+                      "credited_usd": 0,
+                      "created_at": "2026-10-06T14:02:11Z",
+                      "unhold_at": null,
+                      "trade_offer_ids": [
+                        "7654321098",
+                        "7654321111"
+                      ],
+                      "offers": [
+                        {
+                          "offer_group": "a",
+                          "trade_offer_id": "7654321098",
+                          "status": "offer_sent",
+                          "amount_usd": 48.3,
+                          "expires_at": "2026-10-06T14:17:11Z",
+                          "items": [
+                            {
+                              "asset_id": "41165110534",
+                              "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                              "price_usd": 48.3,
+                              "status": "offer_sent"
+                            }
+                          ],
+                          "bot": {
+                            "name": "CSBoard Bot #4",
+                            "avatar": "https://avatars.steamstatic.com/abc_full.jpg",
+                            "steam_id": "76561199000000004",
+                            "profile_url": "https://steamcommunity.com/profiles/76561199000000004",
+                            "level": 30
+                          }
+                        },
+                        {
+                          "offer_group": "b",
+                          "trade_offer_id": "7654321111",
+                          "status": "offer_sent",
+                          "amount_usd": 13.12,
+                          "expires_at": "2026-10-06T14:17:40Z",
+                          "items": [
+                            {
+                              "asset_id": "41165110599",
+                              "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+                              "price_usd": 13.12,
+                              "status": "offer_sent"
+                            }
+                          ],
+                          "bot": {
+                            "name": "CSBoard Bot #9",
+                            "avatar": "https://avatars.steamstatic.com/def_full.jpg",
+                            "steam_id": "76561199000000009",
+                            "profile_url": "https://steamcommunity.com/profiles/76561199000000009",
+                            "level": 24
+                          }
+                        }
+                      ],
+                      "fail_reason": null
+                    }
+                  ],
+                  "meta": {
+                    "next_cursor": null,
+                    "per_page": 50
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No such sell order on this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "order_not_found",
+                  "detail": "No such sell order on this account."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "invalid_request",
+                  "detail": "status must be one of: pending, offer_sent, received, completed, cancelled, failed."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sell/orders/{id}": {
+      "get": {
+        "tags": [
+          "Instant Sell"
+        ],
+        "summary": "Get a sell order",
+        "operationId": "getSellOrder",
+        "description": "One of your sell orders, with every trade offer and the status of each item.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellOrder"
+                },
+                "example": {
+                  "id": "cmgk2x9a10001qs01sell0001",
+                  "external_id": "my-shop-order-1017",
+                  "app_id": 730,
+                  "status": "offer_sent",
+                  "currency": "USD",
+                  "total_usd": 61.42,
+                  "credited_usd": 0,
+                  "created_at": "2026-10-06T14:02:11Z",
+                  "unhold_at": null,
+                  "trade_offer_ids": [
+                    "7654321098",
+                    "7654321111"
+                  ],
+                  "offers": [
+                    {
+                      "offer_group": "a",
+                      "trade_offer_id": "7654321098",
+                      "status": "offer_sent",
+                      "amount_usd": 48.3,
+                      "expires_at": "2026-10-06T14:17:11Z",
+                      "items": [
+                        {
+                          "asset_id": "41165110534",
+                          "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                          "price_usd": 48.3,
+                          "status": "offer_sent"
+                        }
+                      ],
+                      "bot": {
+                        "name": "CSBoard Bot #4",
+                        "avatar": "https://avatars.steamstatic.com/abc_full.jpg",
+                        "steam_id": "76561199000000004",
+                        "profile_url": "https://steamcommunity.com/profiles/76561199000000004",
+                        "level": 30
+                      }
+                    },
+                    {
+                      "offer_group": "b",
+                      "trade_offer_id": "7654321111",
+                      "status": "offer_sent",
+                      "amount_usd": 13.12,
+                      "expires_at": "2026-10-06T14:17:40Z",
+                      "items": [
+                        {
+                          "asset_id": "41165110599",
+                          "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+                          "price_usd": 13.12,
+                          "status": "offer_sent"
+                        }
+                      ],
+                      "bot": {
+                        "name": "CSBoard Bot #9",
+                        "avatar": "https://avatars.steamstatic.com/def_full.jpg",
+                        "steam_id": "76561199000000009",
+                        "profile_url": "https://steamcommunity.com/profiles/76561199000000009",
+                        "level": 24
+                      }
+                    }
+                  ],
+                  "fail_reason": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No such sell order on this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "order_not_found",
+                  "detail": "No such sell order on this account."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sell/orders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Instant Sell"
+        ],
+        "summary": "Cancel a sell order",
+        "operationId": "cancelSellOrder",
+        "description": "Allowed while the order is `pending` or `offer_sent` and no offer has been accepted. Later answers `409 not_cancellable`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order after cancelling.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No such sell order on this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "order_not_found",
+                  "detail": "No such sell order on this account."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order can no longer be cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "not_cancellable",
+                  "detail": "Only pending or offer_sent orders can be cancelled."
+                }
+              }
+            }
           }
         }
       }
@@ -5356,6 +6129,365 @@
           },
           "total_requested": {
             "type": "integer"
+          }
+        }
+      },
+      "SellQuoteRequest": {
+        "type": "object",
+        "required": [
+          "trade_url"
+        ],
+        "properties": {
+          "trade_url": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 300,
+            "description": "The seller's Steam trade URL. Their inventory is quoted and the offers are sent here."
+          },
+          "app_id": {
+            "type": "integer",
+            "enum": [
+              730,
+              570,
+              252490
+            ],
+            "default": 730,
+            "description": "Steam app to quote: `730` CS2, `570` Dota 2, `252490` Rust. Leave it out for CS2. A game your key cannot sell answers `422 unsupported_game`."
+          },
+          "split": {
+            "type": "boolean",
+            "default": false,
+            "description": "`false`: the whole sale ships as ONE trade offer. `true`: every item goes to the market that pays most for it, which can mean several offers. See the Instant Sell guide."
+          }
+        }
+      },
+      "SellQuoteItem": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "app_id",
+          "market_hash_name",
+          "price_usd",
+          "offer_group"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "description": "Steam asset id. Pass it back in `asset_ids` to sell the item."
+          },
+          "app_id": {
+            "type": "integer",
+            "description": "Steam app of the item."
+          },
+          "market_hash_name": {
+            "type": "string"
+          },
+          "price_usd": {
+            "type": "number",
+            "description": "Exactly what your balance is credited for this item, in USD."
+          },
+          "float": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "CS2 float, when known. Always null for Dota 2 and Rust."
+          },
+          "phase": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reserved. Always null today."
+          },
+          "icon_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reserved. Always null today."
+          },
+          "offer_group": {
+            "type": "string",
+            "description": "Which trade offer the item rides in if you sell the whole inventory: `a`, `b`, and so on, biggest offer first. Always `a` when `split` is false."
+          }
+        }
+      },
+      "SellQuote": {
+        "type": "object",
+        "required": [
+          "items",
+          "expires_at"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellQuoteItem"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Quotes are good for about two minutes."
+          }
+        }
+      },
+      "SellOrderRequest": {
+        "type": "object",
+        "required": [
+          "trade_url",
+          "asset_ids"
+        ],
+        "properties": {
+          "trade_url": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 300
+          },
+          "asset_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 250,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            },
+            "description": "Items to sell, from a quote of the same `trade_url`, `app_id` and `split`."
+          },
+          "min_total_usd": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Your floor for the total this order books. If the total the order would book is lower, it is refused with `409 price_drift` and nothing happens."
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Your id for the sale, unique per key. Sending it again returns the original order instead of creating a second one."
+          },
+          "app_id": {
+            "type": "integer",
+            "enum": [
+              730,
+              570,
+              252490
+            ],
+            "default": 730,
+            "description": "Must match the quote. Leave it out for CS2."
+          },
+          "split": {
+            "type": "boolean",
+            "default": false,
+            "description": "Must match the quote. `true` lets the sale ship as several trade offers."
+          }
+        }
+      },
+      "SellBot": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "description": "The Steam account sending this offer. Show it to the seller so they can check the incoming offer.",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avatar": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steam_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profile_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "level": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "SellOrderItem": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "market_hash_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price_usd": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "What this item books, in USD."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "offer_sent",
+              "received",
+              "completed",
+              "cancelled",
+              "failed"
+            ],
+            "description": "The status of the offer this item rides in."
+          }
+        }
+      },
+      "SellOffer": {
+        "type": "object",
+        "properties": {
+          "offer_group": {
+            "type": "string",
+            "description": "`a`, `b`, and so on, in the order the offers were created. Matches the quote's `offer_group` when you sell the whole quoted inventory."
+          },
+          "trade_offer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Steam trade offer id, once the offer exists."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "offer_sent",
+              "received",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "amount_usd": {
+            "type": "number",
+            "description": "What this offer books, in USD."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellOrderItem"
+            }
+          },
+          "bot": {
+            "$ref": "#/components/schemas/SellBot"
+          }
+        }
+      },
+      "SellOrder": {
+        "type": "object",
+        "required": [
+          "id",
+          "app_id",
+          "status",
+          "currency",
+          "total_usd",
+          "credited_usd",
+          "created_at",
+          "trade_offer_ids",
+          "offers"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "app_id": {
+            "type": "integer",
+            "description": "Steam app of the sale: `730`, `570` or `252490`."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "offer_sent",
+              "received",
+              "completed",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "total_usd": {
+            "type": "number",
+            "description": "What the whole order books, in USD."
+          },
+          "credited_usd": {
+            "type": "number",
+            "description": "What has already reached your balance. Grows offer by offer."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unhold_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Latest expected credit time across the offers, once known."
+          },
+          "trade_offer_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every Steam trade offer the seller should expect. Offers that never went out are not listed."
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellOffer"
+            }
+          },
+          "fail_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`cancelled_by_merchant`, `offer_declined`, `offer_expired`, `invalid_trade_url`, `item_not_tradable`, `reversed`, `price_drift` or `failed`."
           }
         }
       }

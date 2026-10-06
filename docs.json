@@ -69,6 +69,17 @@
                 ]
               },
               {
+                "group": "Instant Sell",
+                "pages": [
+                  "api-reference/get-sell-status",
+                  "api-reference/post-sell-quotes",
+                  "api-reference/post-sell-orders",
+                  "api-reference/get-sell-orders",
+                  "api-reference/get-sell-order",
+                  "api-reference/post-sell-order-cancel"
+                ]
+              },
+              {
                 "group": "P2P",
                 "pages": [
                   "api-reference/get-p2p-inventory",

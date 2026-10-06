@@ -1,0 +1,37 @@
+---
+title: "POST /v1/sell/orders/{id}/cancel: Cancel an Instant Sell Order"
+sidebarTitle: "POST /sell/orders/{id}/cancel"
+description: "Cancel a sell order before the seller accepts any of its trade offers."
+openapi: "POST /sell/orders/{id}/cancel"
+---
+
+Cancel a sell order while it is `pending` or `offer_sent` and no offer has been accepted. Nothing has been credited at that point, so nothing is reversed. Once the seller accepts an offer the order can no longer be cancelled.
+
+The Steam trade offer itself is not withdrawn. Its items stay committed until that offer expires, so selling them again right away answers `409 active_order_exists`.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Path parameters
+
+<ParamField path="id" type="string" required>
+  The order `id`.
+</ParamField>
+
+## Response fields
+
+The sell order after cancelling, in the shape described on [`POST /v1/sell/orders`](/api-reference/post-sell-orders#response-fields).
+
+## Example request
+
+```bash
+curl -X POST https://csboard.com/v1/sell/orders/cmgk2x9a10001qs01sell0001/cancel \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `invalid_api_key` | Missing or invalid API key. |
+| 404 | `order_not_found` | No such sell order on your account. |
+| 409 | `not_cancellable` | The order is past `offer_sent`, or one of its offers was already accepted. |

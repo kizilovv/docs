@@ -1,0 +1,53 @@
+---
+title: "GET /v1/sell/status: Is Instant Sell Enabled for My Key?"
+sidebarTitle: "GET /sell/status"
+description: "Check whether Instant Sell is enabled for your key, and read its limits, before you integrate."
+openapi: "GET /sell/status"
+---
+
+Feature discovery for Instant Sell. Works for every key, whether or not selling is enabled on it.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Response fields
+
+<ResponseField name="enabled" type="boolean" required>
+  `false` while Instant Sell is switched off for everyone.
+</ResponseField>
+<ResponseField name="access" type="string" required>
+  Always `"invite_only"`.
+</ResponseField>
+<ResponseField name="selling_enabled_for_key" type="boolean" required>
+  Whether this key may quote and sell. Ask support to enable it.
+</ResponseField>
+<ResponseField name="margin" type="null" required>
+  Not disclosed. Quotes are already the amount you are credited.
+</ResponseField>
+<ResponseField name="min_item_usd" type="number" required />
+<ResponseField name="max_items_per_order" type="integer" required />
+<ResponseField name="max_active_orders" type="integer" required />
+<ResponseField name="hold_days_estimate" type="integer" required>
+  Rough days from acceptance to credit for CS2. Dota 2 and Rust differ, see [when the money arrives](/guides/instant-sell#when-the-money-arrives).
+</ResponseField>
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/sell/status \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "enabled": true,
+  "access": "invite_only",
+  "selling_enabled_for_key": true,
+  "margin": null,
+  "min_item_usd": 1,
+  "max_items_per_order": 250,
+  "max_active_orders": 100000,
+  "hold_days_estimate": 8
+}
+```
