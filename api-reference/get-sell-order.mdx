@@ -1,0 +1,40 @@
+---
+title: "GET /v1/sell/orders/{id}: One Instant Sell Order"
+sidebarTitle: "GET /sell/orders/{id}"
+description: "Read one of your sell orders: every Steam trade offer, the status of each item, and how much has been credited so far."
+openapi: "GET /sell/orders/{id}"
+---
+
+One of your sell orders. A sale that ships as several trade offers is still one order: `offers[]` has an entry per offer, each with its own `status`, and `trade_offer_ids` lists every Steam offer the seller should expect.
+
+Reads work for every key, even while Instant Sell is switched off.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Path parameters
+
+<ParamField path="id" type="string" required>
+  The order `id` from [`POST /v1/sell/orders`](/api-reference/post-sell-orders).
+</ParamField>
+
+## Response fields
+
+The sell order, in the shape described on [`POST /v1/sell/orders`](/api-reference/post-sell-orders#response-fields).
+
+<Note>
+  Read the offers, not only the top-level `status`. When one offer of a split sale is declined and the others go through, the order keeps a non-final `status` while `credited_usd` and each offer's `status` show exactly what happened.
+</Note>
+
+## Example request
+
+```bash
+curl https://csboard.com/v1/sell/orders/cmgk2x9a10001qs01sell0001 \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `invalid_api_key` | Missing or invalid API key. |
+| 404 | `order_not_found` | No such sell order on your account. |

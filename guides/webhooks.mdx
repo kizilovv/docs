@@ -6,6 +6,8 @@ description: "Register an HTTPS endpoint and receive signed order updates the mo
 
 Register an endpoint and CSBoard POSTs order state to it as it changes, instead of you polling for it. The body is byte-identical to what `GET /v1/orders/:id` returns, so if you have already integrated the pull API there is no second format to learn.
 
+Besides your purchases, an endpoint can receive your instant sell orders, balance withdrawals and balance deposits. Each of those also arrives in the same shape its own read returns. See [event types](#event-types).
+
 **Authentication for management calls:** any valid read key. Registering an endpoint moves no money, so it does not need a trading key.
 
 ---
@@ -169,9 +171,9 @@ Every delivery has the same envelope. `data` is exactly the object `GET /v1/orde
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | Event id. Stable — the same order in the same state always produces the same id. Use it to dedupe. |
-| `type` | string | `order.updated` or `webhook.test`. |
+| `type` | string | `order.updated`, `sell.updated`, `withdrawal.updated`, `deposit.updated` or `webhook.test`. See [event types](#event-types). |
 | `created_at` | string (ISO 8601, UTC) | When the event was generated. |
-| `data` | object | The order, in the `GET /v1/orders/:id` shape. |
+| `data` | object | The subject of the event. For `order.updated`, the order in the `GET /v1/orders/:id` shape; the other types are below. |
 
 ### Order fields
 
@@ -204,6 +206,142 @@ Every delivery has the same envelope. `data` is exactly the object `GET /v1/orde
 <Note>
   A `hold` order is not a stuck order. The items are bought and paid for; Steam will not let them move until `hold_until`. If the account is set to auto-claim they release on their own, otherwise call `POST /v1/orders/{id}/claim` once `hold_until` has passed.
 </Note>
+
+---
+
+## Event types
+
+| Type | Sent when | `data` |
+|---|---|---|
+| `order.updated` | A purchase changes state. | The order, as `GET /v1/orders/:id` returns it (above). |
+| `sell.updated` | An instant sell order or any of its trade offers changes. | The sell order, as `GET /v1/sell/orders/:id` returns it. |
+| `withdrawal.updated` | A balance withdrawal changes state. | The withdrawal, below. |
+| `deposit.updated` | A balance deposit is completed, fails or is reversed. | The deposit, below. |
+| `webhook.test` | You call `POST /v1/webhooks/{id}/test`. | A sample payload. |
+
+An endpoint receives every type unless you pass `events` when you register or update it. Send only the types you want, for example `["sell.updated"]`.
+
+<a id="sell-updated" />
+### sell.updated
+
+`data` is the full sell order, exactly as [`GET /v1/sell/orders/{id}`](/api-reference/get-sell-order) returns it. A sale that ships as several trade offers is one event subject: when any offer changes you get the whole order again, with every offer in `offers[]`. A change that leaves the order looking the same produces no event.
+
+```json
+{
+  "id": "sell.updated:cmgk2x9a10001qs01sell0001:4b1e9c07a2d35f18",
+  "type": "sell.updated",
+  "created_at": "2026-10-06T14:20:05.112Z",
+  "data": {
+    "id": "cmgk2x9a10001qs01sell0001",
+    "external_id": "my-shop-order-1017",
+    "app_id": 730,
+    "status": "received",
+    "currency": "USD",
+    "total_usd": 61.42,
+    "credited_usd": 0,
+    "created_at": "2026-10-06T14:02:11.000Z",
+    "unhold_at": "2026-10-13T14:19:58.000Z",
+    "trade_offer_ids": ["7654321098", "7654321111"],
+    "offers": [
+      {
+        "offer_group": "a",
+        "trade_offer_id": "7654321098",
+        "status": "received",
+        "amount_usd": 48.3,
+        "expires_at": "2026-10-06T14:17:11.000Z",
+        "items": [
+          { "asset_id": "41165110534", "market_hash_name": "AK-47 | Redline (Field-Tested)", "price_usd": 48.3, "status": "received" }
+        ],
+        "bot": { "name": "CSBoard Bot #4", "avatar": "https://avatars.steamstatic.com/abc_full.jpg", "steam_id": "76561199000000004", "profile_url": "https://steamcommunity.com/profiles/76561199000000004", "level": 30 }
+      },
+      {
+        "offer_group": "b",
+        "trade_offer_id": "7654321111",
+        "status": "received",
+        "amount_usd": 13.12,
+        "expires_at": "2026-10-06T14:17:40.000Z",
+        "items": [
+          { "asset_id": "41165110599", "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)", "price_usd": 13.12, "status": "received" }
+        ],
+        "bot": { "name": "CSBoard Bot #9", "avatar": "https://avatars.steamstatic.com/def_full.jpg", "steam_id": "76561199000000009", "profile_url": "https://steamcommunity.com/profiles/76561199000000009", "level": 24 }
+      }
+    ],
+    "fail_reason": null
+  }
+}
+```
+
+The fields are described on [`POST /v1/sell/orders`](/api-reference/post-sell-orders#response-fields).
+
+<a id="withdrawal-updated" />
+### withdrawal.updated
+
+```json
+{
+  "id": "withdrawal.updated:cmgk7a1b20003qs01wdr00001:2c90d4a1e6f37b05",
+  "type": "withdrawal.updated",
+  "created_at": "2026-10-06T15:01:40.204Z",
+  "data": {
+    "id": "cmgk7a1b20003qs01wdr00001",
+    "status": "completed",
+    "currency": "USDT",
+    "amount_gross_usd": 500,
+    "fee_usd": 0,
+    "amount_net_usd": 500,
+    "destination": "TQ8r…h3Kd",
+    "tx_hash": null,
+    "created_at": "2026-10-06T14:40:02.000Z",
+    "updated_at": "2026-10-06T15:01:39.000Z"
+  }
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Withdrawal id. |
+| `status` | string | `in_review` · `processing` · `completed` · `failed`. An outcome we cannot confirm yet stays `processing`, never `failed`, so do not withdraw the same money again on it. |
+| `currency` | string \| null | Payout currency. |
+| `amount_gross_usd` | number | Taken from your balance. |
+| `fee_usd` | number | Withdrawal fee. |
+| `amount_net_usd` | number | What is sent out. |
+| `destination` | string | Payout address or card, masked to the first and last 4 characters. |
+| `tx_hash` | string \| null | Reserved. Always `null` today. |
+| `created_at` / `updated_at` | string (ISO 8601, UTC) | Timestamps. |
+
+<a id="deposit-updated" />
+### deposit.updated
+
+Sent when a deposit reaches an outcome and money was involved. An open deposit address that never received anything produces no event.
+
+```json
+{
+  "id": "deposit.updated:cmgk8c3d40005qs01dep00001:7e15a0c9b4d2f863",
+  "type": "deposit.updated",
+  "created_at": "2026-10-06T16:12:09.877Z",
+  "data": {
+    "id": "cmgk8c3d40005qs01dep00001",
+    "status": "completed",
+    "amount_usd": 1000,
+    "currency": "USDT",
+    "network": "TRC20",
+    "tx_hash": "9f3c2b7a…e41d",
+    "created_at": "2026-10-06T16:02:44.000Z",
+    "updated_at": "2026-10-06T16:12:08.000Z"
+  }
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Deposit id. |
+| `status` | string | `completed` · `failed` · `reversed`. `reversed` means a card chargeback or bank reversal took back money that had been credited. |
+| `amount_usd` | number | Credited amount. A crypto address that received several transfers reports their total. |
+| `currency` | string | Deposit currency. |
+| `network` | string \| null | Blockchain network, for crypto deposits. |
+| `tx_hash` | string \| null | On-chain transaction hash, when known. |
+| `created_at` / `updated_at` | string (ISO 8601, UTC) | Timestamps. |
+
+For `withdrawal.updated` and `deposit.updated` the event `id` is stable per state: a row touched without changing what you see produces the same id, and you can drop it as a repeat.
 
 ---
 

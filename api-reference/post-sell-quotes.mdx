@@ -1,0 +1,117 @@
+---
+title: "POST /v1/sell/quotes: Quote a Steam Inventory for Instant Sell"
+sidebarTitle: "POST /sell/quotes"
+description: "Price every CS2, Dota 2 or Rust item in a seller's Steam inventory. Each item comes back with the exact USD amount your balance is credited, and the trade offer it would ship in."
+openapi: "POST /sell/quotes"
+---
+
+Quote a seller's inventory before you sell it. Every item the CSBoard network will buy right now comes back with `price_usd`, the exact amount your balance is credited for it. Items nobody will buy are left out.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+**Selling capability required.** Instant Sell is invite-only. Until it is enabled for your key this answers `403 selling_not_enabled`. See the [Instant Sell guide](/guides/instant-sell).
+
+## Request body
+
+<ParamField body="trade_url" type="string" required>
+  The seller's Steam trade URL (20 to 300 characters). Their inventory is quoted, and the trade offers are later sent here.
+</ParamField>
+
+<ParamField body="app_id" type="integer" default="730">
+  Steam app to quote: `730` CS2, `570` Dota 2, `252490` Rust. Leave it out for CS2. A game your key cannot sell answers `422 unsupported_game` with the `supported_app_ids` it can.
+</ParamField>
+
+<ParamField body="split" type="boolean" default="false">
+  `false`: the whole sale ships as **one** trade offer. `true`: every item goes to the market that pays the most for it, which can mean several offers. Use the same value when you create the order. See [one offer or several](/guides/instant-sell#one-offer-or-several).
+</ParamField>
+
+## Response fields
+
+<ResponseField name="items" type="SellQuoteItem[]" required>
+  Sellable items.
+
+  <Expandable title="SellQuoteItem object">
+    <ResponseField name="asset_id" type="string" required>
+      Steam asset id. Pass it back in `asset_ids` to sell the item.
+    </ResponseField>
+    <ResponseField name="app_id" type="integer" required>
+      Steam app of the item.
+    </ResponseField>
+    <ResponseField name="market_hash_name" type="string" required />
+    <ResponseField name="price_usd" type="number" required>
+      Exactly what your balance is credited for this item, in USD. The order books this same price.
+    </ResponseField>
+    <ResponseField name="float" type="number | null">
+      CS2 float, when known. Always `null` for Dota 2 and Rust.
+    </ResponseField>
+    <ResponseField name="phase" type="string | null">
+      Reserved. Always `null` today.
+    </ResponseField>
+    <ResponseField name="icon_url" type="string | null">
+      Reserved. Always `null` today.
+    </ResponseField>
+    <ResponseField name="offer_group" type="string" required>
+      The trade offer this item rides in if you sell the whole inventory: `a`, `b` and so on, biggest offer first. Count the distinct letters to know how many offers the seller will get. Always `a` when `split` is `false`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="expires_at" type="datetime" required>
+  Quotes are good for about two minutes. Re-quote before you create an order if this has passed.
+</ResponseField>
+
+## Example request
+
+```bash
+curl -X POST https://csboard.com/v1/sell/quotes \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=AbCdEfGh",
+    "app_id": 730,
+    "split": true
+  }'
+```
+
+## Example response
+
+```json
+{
+  "items": [
+    {
+      "asset_id": "41165110534",
+      "app_id": 730,
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "price_usd": 48.3,
+      "float": 0.23,
+      "phase": null,
+      "icon_url": null,
+      "offer_group": "a"
+    },
+    {
+      "asset_id": "41165110599",
+      "app_id": 730,
+      "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+      "price_usd": 13.12,
+      "float": 0.11,
+      "phase": null,
+      "icon_url": null,
+      "offer_group": "b"
+    }
+  ],
+  "expires_at": "2026-10-06T14:04:11Z"
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Malformed body, or an `app_id` outside `730`, `570`, `252490`. |
+| 400 | `invalid_trade_url` | The trade URL does not resolve to a Steam account. |
+| 400 | `private_inventory` | The seller's Steam inventory is private. |
+| 403 | `selling_not_enabled` | Instant Sell is not enabled for this key. |
+| 422 | `unsupported_game` | The game is not open for instant sell on this key. Includes `supported_app_ids`. |
+| 429 | `rate_limited` | More than 10 quotes per minute on this key. Wait `Retry-After` seconds. |
+| 502 | `inventory_unavailable` | Steam did not return the inventory. Retry shortly. |
+| 503 | `sell_disabled` | Instant Sell is switched off right now. |

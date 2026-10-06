@@ -1,0 +1,176 @@
+---
+title: "POST /v1/sell/orders: Sell Items from a Steam Inventory"
+sidebarTitle: "POST /sell/orders"
+description: "Sell quoted CS2, Dota 2 or Rust items. CSBoard bots send the seller Steam trade offers and your balance is credited once each offer settles."
+openapi: "POST /sell/orders"
+---
+
+Sell items you quoted with [`POST /v1/sell/quotes`](/api-reference/post-sell-quotes). A bot from the CSBoard network sends the seller a Steam trade offer, or several when `split` is `true`. Your balance is credited per offer, once that offer settles. See [when the money arrives](/guides/instant-sell#when-the-money-arrives).
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+**Selling capability required.** Until Instant Sell is enabled for your key this answers `403 selling_not_enabled`.
+
+**Idempotent.** Send an `Idempotency-Key` header, or an `external_id`. A retry with the same value returns the original order with `Idempotent-Replayed: true` instead of selling twice.
+
+## Request body
+
+<ParamField body="trade_url" type="string" required>
+  The seller's Steam trade URL. Use the one you quoted.
+</ParamField>
+
+<ParamField body="asset_ids" type="string[]" required>
+  1 to 250 unique asset ids from the quote.
+</ParamField>
+
+<ParamField body="app_id" type="integer" default="730">
+  `730` CS2, `570` Dota 2, `252490` Rust. Must match the quote. Leave it out for CS2.
+</ParamField>
+
+<ParamField body="split" type="boolean" default="false">
+  Must match the quote. `true` lets the sale ship as several trade offers, one per market.
+</ParamField>
+
+<ParamField body="min_total_usd" type="number">
+  Your floor for what this order books. It is checked against the final total, after the items are grouped into offers. If the total is lower the order is refused with `409 price_drift` and nothing happens. Strongly recommended.
+</ParamField>
+
+<ParamField body="external_id" type="string">
+  Your id for the sale (1 to 128 characters), unique per key. Retrying with it returns the original order. You can also read the order back with `GET /v1/sell/orders?external_id=`.
+</ParamField>
+
+## Response fields
+
+`201` with the sell order. The same object is returned by [`GET /v1/sell/orders/{id}`](/api-reference/get-sell-order), by the list endpoint and in the `sell.updated` webhook.
+
+<ResponseField name="id" type="string" required />
+<ResponseField name="external_id" type="string | null" />
+<ResponseField name="app_id" type="integer" required>
+  Steam app of the sale.
+</ResponseField>
+<ResponseField name="status" type="string" required>
+  `pending`, `offer_sent`, `received`, `completed`, `cancelled` or `failed`. On a sale with several offers, read each offer's own `status` too.
+</ResponseField>
+<ResponseField name="currency" type="string" required>
+  Always `"USD"`.
+</ResponseField>
+<ResponseField name="total_usd" type="number" required>
+  What the whole order books.
+</ResponseField>
+<ResponseField name="credited_usd" type="number" required>
+  What has already reached your balance. It grows offer by offer.
+</ResponseField>
+<ResponseField name="created_at" type="datetime" required />
+<ResponseField name="unhold_at" type="datetime | null">
+  The latest expected credit time across the offers, once known.
+</ResponseField>
+<ResponseField name="trade_offer_ids" type="string[]" required>
+  Every Steam trade offer the seller should expect. An offer that never went out is not listed.
+</ResponseField>
+<ResponseField name="offers" type="SellOffer[]" required>
+  One entry per trade offer.
+
+  <Expandable title="SellOffer object">
+    <ResponseField name="offer_group" type="string" required>
+      `a`, `b` and so on, in the order the offers were created. When you sell the whole quoted inventory it matches the quote's `offer_group`.
+    </ResponseField>
+    <ResponseField name="trade_offer_id" type="string | null">
+      Steam trade offer id, once the offer exists.
+    </ResponseField>
+    <ResponseField name="status" type="string" required>
+      Status of this offer.
+    </ResponseField>
+    <ResponseField name="amount_usd" type="number" required>
+      What this offer books.
+    </ResponseField>
+    <ResponseField name="expires_at" type="datetime | null" />
+    <ResponseField name="items" type="object[]" required>
+      `asset_id`, `market_hash_name`, `price_usd` and `status` for each item. An item's `status` is the status of its offer.
+    </ResponseField>
+    <ResponseField name="bot" type="object | null">
+      The Steam account sending the offer: `name`, `avatar`, `steam_id`, `profile_url`, `level`. Show it to the seller so they can check the incoming offer.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="fail_reason" type="string | null">
+  `cancelled_by_merchant`, `offer_declined`, `offer_expired`, `invalid_trade_url`, `item_not_tradable`, `reversed`, `price_drift` or `failed`.
+</ResponseField>
+
+## Example request
+
+```bash
+curl -X POST https://csboard.com/v1/sell/orders \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: my-shop-order-1017" \
+  -d '{
+    "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=AbCdEfGh",
+    "asset_ids": ["41165110534", "41165110599"],
+    "app_id": 730,
+    "split": true,
+    "min_total_usd": 60.00,
+    "external_id": "my-shop-order-1017"
+  }'
+```
+
+## Example response
+
+```json
+{
+  "id": "cmgk2x9a10001qs01sell0001",
+  "external_id": "my-shop-order-1017",
+  "app_id": 730,
+  "status": "offer_sent",
+  "currency": "USD",
+  "total_usd": 61.42,
+  "credited_usd": 0,
+  "created_at": "2026-10-06T14:02:11Z",
+  "unhold_at": null,
+  "trade_offer_ids": ["7654321098", "7654321111"],
+  "offers": [
+    {
+      "offer_group": "a",
+      "trade_offer_id": "7654321098",
+      "status": "offer_sent",
+      "amount_usd": 48.3,
+      "expires_at": "2026-10-06T14:17:11Z",
+      "items": [
+        { "asset_id": "41165110534", "market_hash_name": "AK-47 | Redline (Field-Tested)", "price_usd": 48.3, "status": "offer_sent" }
+      ],
+      "bot": { "name": "CSBoard Bot #4", "avatar": "https://avatars.steamstatic.com/abc_full.jpg", "steam_id": "76561199000000004", "profile_url": "https://steamcommunity.com/profiles/76561199000000004", "level": 30 }
+    },
+    {
+      "offer_group": "b",
+      "trade_offer_id": "7654321111",
+      "status": "offer_sent",
+      "amount_usd": 13.12,
+      "expires_at": "2026-10-06T14:17:40Z",
+      "items": [
+        { "asset_id": "41165110599", "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)", "price_usd": 13.12, "status": "offer_sent" }
+      ],
+      "bot": { "name": "CSBoard Bot #9", "avatar": "https://avatars.steamstatic.com/def_full.jpg", "steam_id": "76561199000000009", "profile_url": "https://steamcommunity.com/profiles/76561199000000009", "level": 24 }
+    }
+  ],
+  "fail_reason": null
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Malformed body: no `asset_ids`, duplicates, more than 250, or an `app_id` outside `730`, `570`, `252490`. |
+| 400 | `invalid_trade_url` | The trade URL does not resolve to a Steam account. |
+| 400 | `below_min_total` | The order would book less than \$1. |
+| 403 | `selling_not_enabled` | Instant Sell is not enabled for this key. |
+| 409 | `price_drift` | The total the order would book is below your `min_total_usd`. Includes `current_total_usd` and `min_total_usd`. Re-quote and retry. |
+| 409 | `item_not_in_inventory` | An asset id has no live quote. Re-quote and retry. |
+| 409 | `no_eligible_items` | None of the items can be sold right now. |
+| 409 | `item_not_tradable` | The seller's account has a Steam trade hold. |
+| 409 | `active_order_exists` | This seller already has an open offer. Wait for it to finish or cancel it. |
+| 409 | `too_many_active_orders` | Too many open sell orders on this key. |
+| 409 | `idempotency_in_progress` | A request with this key is still processing. Retry after `Retry-After`. |
+| 422 | `unsupported_game` | The game is not open for instant sell on this key. Includes `supported_app_ids`. |
+| 429 | `rate_limited` | More than 5 orders per minute on this key. |
+| 429 | `daily_cap_exceeded` | The daily sell volume cap for this key is reached. |
+| 503 | `sell_disabled` | Instant Sell is switched off right now. |

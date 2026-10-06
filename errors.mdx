@@ -13,7 +13,7 @@ Every error returns the same JSON shape:
 Note the field is **`detail`**, not `message`. Match on `code` — it is stable and safe to branch on. `detail` is human-readable and may be reworded without notice.
 
 <Note>
-  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, `item_unavailable` may include `unavailable_ids`, `unsupported_game` includes `supported_app_ids`, and `price_below_market` includes `market_usd` and `floor_usd`. Ignore unknown fields rather than rejecting the body.
+  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, `item_unavailable` may include `unavailable_ids`, `unsupported_game` includes `supported_app_ids`, `price_drift` includes `current_total_usd` and `min_total_usd`, and `price_below_market` includes `market_usd` and `floor_usd`. Ignore unknown fields rather than rejecting the body.
 </Note>
 
 ---
@@ -83,6 +83,20 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 422 | `price_below_market` | The price is under half of our market price for the item. Over a key it cannot be confirmed past. | Raise `price_usd` to at least `floor_usd` from the body. The `Idempotency-Key` is not spent. |
 | 503 | `p2p_disabled` | The P2P market is switched off. | Retry later. |
 | 503 | `p2p_reprice_disabled` | Price changes on the P2P market are switched off. | Retry later. |
+
+## Instant sell
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 403 | `selling_not_enabled` | Instant Sell is invite-only and not enabled for this key. | Ask support to enable it. [`GET /v1/sell/status`](/api-reference/get-sell-status) shows the state. |
+| 409 | `price_drift` | The total the sell order would book is below your `min_total_usd`. It is checked after the items are grouped into offers. **Nothing happened.** | Re-quote, decide, retry. The body carries `current_total_usd` and `min_total_usd`. |
+| 409 | `item_not_in_inventory` | An asset id has no live quote any more. | Re-quote and retry. |
+| 409 | `active_order_exists` | This seller already has an open trade offer from us. | Wait for it to finish, or cancel the order. |
+| 409 | `not_cancellable` | The sell order is past `offer_sent`, or one of its offers was accepted. | Nothing to do; follow it to settlement. |
+| 422 | `unsupported_game` | The `app_id` is not open for instant sell on this key. | Use one of `supported_app_ids` from the body. Do not retry unchanged. |
+| 503 | `sell_disabled` | Instant Sell is switched off right now. Reads keep working. | Retry later. Orders in flight continue and settle as normal. |
+
+The full list is in the [Instant Sell guide](/guides/instant-sell#errors).
 
 ## Webhooks
 

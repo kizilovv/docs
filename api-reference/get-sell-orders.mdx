@@ -1,0 +1,107 @@
+---
+title: "GET /v1/sell/orders: List Your Instant Sell Orders"
+sidebarTitle: "GET /sell/orders"
+description: "Page through the sell orders you placed through the API, newest first, or look one up by your external_id."
+openapi: "GET /sell/orders"
+---
+
+Two modes on one path:
+
+- **List.** Without `external_id` you get your sell orders placed through the API, newest first, with keyset pagination. The envelope and the query parameters are the same as [`GET /v1/orders`](/api-reference/get-orders), so one pager reads both your buys and your sells. Walk older pages by passing `meta.next_cursor` back as `cursor`.
+- **Lookup.** With `external_id` you get that one order object, not a page, or `404 order_not_found`.
+
+Reads work for every key, even while Instant Sell is switched off, so you can always follow orders already in flight.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Query parameters
+
+<ParamField query="external_id" type="string">
+  Return the one order you created with this `external_id`. The other parameters are ignored.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  Results per page. Minimum `1`, maximum `100`.
+</ParamField>
+
+<ParamField query="start_unix_time" type="integer">
+  Only orders created at or after this Unix timestamp (seconds).
+</ParamField>
+
+<ParamField query="end_unix_time" type="integer">
+  Only orders created at or before this Unix timestamp (seconds).
+</ParamField>
+
+<ParamField query="status" type="string">
+  One of `pending`, `offer_sent`, `received`, `completed`, `cancelled`, `failed`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset cursor from a previous response's `meta.next_cursor`.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="data" type="SellOrder[]" required>
+  Sell orders for this page, in the shape described on [`POST /v1/sell/orders`](/api-reference/post-sell-orders#response-fields).
+</ResponseField>
+
+<ResponseField name="meta" type="object" required>
+  <Expandable title="meta object">
+    <ResponseField name="next_cursor" type="string | null" required>
+      Pass back as `cursor` for the next page. `null` on the last page.
+    </ResponseField>
+    <ResponseField name="per_page" type="integer" required />
+  </Expandable>
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/sell/orders?status=received&limit=20" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": [
+    {
+      "id": "cmgk2x9a10001qs01sell0001",
+      "external_id": "my-shop-order-1017",
+      "app_id": 252490,
+      "status": "received",
+      "currency": "USD",
+      "total_usd": 61.42,
+      "credited_usd": 0,
+      "created_at": "2026-10-06T14:02:11Z",
+      "unhold_at": "2026-10-06T14:20:03Z",
+      "trade_offer_ids": ["7654321098"],
+      "offers": [
+        {
+          "offer_group": "a",
+          "trade_offer_id": "7654321098",
+          "status": "received",
+          "amount_usd": 61.42,
+          "expires_at": "2026-10-06T14:17:11Z",
+          "items": [
+            { "asset_id": "5011234567890", "market_hash_name": "Tempered AK47", "price_usd": 61.42, "status": "received" }
+          ],
+          "bot": { "name": "CSBoard Bot #4", "avatar": "https://avatars.steamstatic.com/abc_full.jpg", "steam_id": "76561199000000004", "profile_url": "https://steamcommunity.com/profiles/76561199000000004", "level": 30 }
+        }
+      ],
+      "fail_reason": null
+    }
+  ],
+  "meta": { "next_cursor": null, "per_page": 20 }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 401 | `invalid_api_key` | Missing or invalid API key. |
+| 404 | `order_not_found` | No order with this `external_id` on your account. |
+| 422 | `invalid_request` | Unknown `status`, a malformed time bound, or an invalid `cursor`. |

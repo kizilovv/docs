@@ -4,6 +4,25 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 6, 2026">
+
+## New features
+
+**Instant Sell for Dota 2 and Rust, and sales across several offers**
+
+- [`POST /v1/sell/quotes`](/api-reference/post-sell-quotes) and [`POST /v1/sell/orders`](/api-reference/post-sell-orders) take `app_id`: `730` CS2 (the default), `570` Dota 2, `252490` Rust. A game your key cannot sell answers `422 unsupported_game` with `supported_app_ids`. Quote items and orders carry `app_id`.
+- New `split` flag. Leave it `false` and the sale ships as one trade offer, to the market that leaves the seller the most value. Set it `true` and every item goes to the market that pays the most for it, which can mean several offers. Quote items carry `offer_group` (`a`, `b`, and so on) so you know how many offers to expect.
+- Orders now carry `trade_offer_ids`, an `offer_group` on each offer and a `status` on each item. The `sell.updated` webhook sends the same object.
+- Credit timing per game: CS2 about 7 days after the seller accepts, Dota 2 7 days after the seller accepts, Rust as soon as the market confirms. See [when the money arrives](/guides/instant-sell#when-the-money-arrives).
+- `min_total_usd` is now checked against the total the order actually books, after the items are grouped into offers. Below it, the order is refused with `409 price_drift`.
+- The Instant Sell endpoints have their own pages in the API reference, including [`GET /v1/sell/orders`](/api-reference/get-sell-orders) with list mode and pagination.
+
+**Webhooks for sales, withdrawals and deposits**
+
+The [webhooks guide](/guides/webhooks#event-types) now documents `sell.updated`, `withdrawal.updated` and `deposit.updated` with their payloads.
+
+</Update>
+
 <Update label="October 2, 2026">
 
 ## New features
