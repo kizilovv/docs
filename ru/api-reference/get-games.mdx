@@ -38,6 +38,7 @@ curl https://csboard.com/v1/games \
 | [`GET /v1/prices`](/ru/api-reference/get-prices) | Query-параметр `appId` |
 | [`GET /v1/listings/availability`](/ru/api-reference/get-listings-availability) | Query-параметр `appId` |
 | [`POST /v1/orders`](/ru/api-reference/post-orders) | Поле тела `appId` |
+| [`POST /v1/market/buy`](/ru/api-reference/post-market-buy) | Поле тела `appId` |
 | [`GET /v1/public/prices`](/ru/api-reference/get-public-prices) | Query-параметр `appId` (ключ не нужен) |
 
 Если не передавать `appId`, каждый эндпоинт отвечает по CS2 — ровно так же, как до появления параметра.
@@ -49,7 +50,7 @@ curl https://csboard.com/v1/games \
 - **Заказы ставятся в очередь.** Заказ Dota 2 или Rust отвечает `delivery: "pending"` и `expected_minutes: null`. Следите за ним через [`GET /v1/orders/{id}`](/ru/api-reference/get-order).
 - **ID принадлежат своей игре.** Покупайте и проверяйте id с тем же `appId`, с которым вы их получили.
 
-Эти эндпоинты остаются **только для CS2** и не читают `appId`: [`GET /v1/listings/stream`](/ru/api-reference/get-listings-stream), [`GET /v1/prices/snapshot.ndjson.gz`](/ru/api-reference/get-prices-snapshot) и [`POST /v1/market/buy`](/ru/api-reference/post-market-buy).
+Эти эндпоинты остаются **только для CS2** и не читают `appId`: [`GET /v1/listings/stream`](/ru/api-reference/get-listings-stream) и [`GET /v1/prices/snapshot.ndjson.gz`](/ru/api-reference/get-prices-snapshot).
 
 ## Коды ошибок
 

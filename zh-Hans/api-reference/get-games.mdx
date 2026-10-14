@@ -38,6 +38,7 @@ curl https://csboard.com/v1/games \
 | [`GET /v1/prices`](/zh-Hans/api-reference/get-prices) | 查询参数 `appId` |
 | [`GET /v1/listings/availability`](/zh-Hans/api-reference/get-listings-availability) | 查询参数 `appId` |
 | [`POST /v1/orders`](/zh-Hans/api-reference/post-orders) | 请求体字段 `appId` |
+| [`POST /v1/market/buy`](/zh-Hans/api-reference/post-market-buy) | 请求体字段 `appId` |
 | [`GET /v1/public/prices`](/zh-Hans/api-reference/get-public-prices) | 查询参数 `appId`（无需密钥） |
 
 不传 `appId` 时，所有端点都按 CS2 返回，与引入该参数之前完全一致。
@@ -49,7 +50,7 @@ curl https://csboard.com/v1/games \
 - **订单进入队列。** Dota 2 或 Rust 订单返回 `delivery: "pending"` 和 `expected_minutes: null`。请通过 [`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 跟踪。
 - **id 归属于各自的游戏。** 购买和检查 id 时，请使用读取它们时所用的同一个 `appId`。
 
-以下端点仍然**仅支持 CS2**，不读取 `appId`：[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream)、[`GET /v1/prices/snapshot.ndjson.gz`](/zh-Hans/api-reference/get-prices-snapshot) 和 [`POST /v1/market/buy`](/zh-Hans/api-reference/post-market-buy)。
+以下端点仍然**仅支持 CS2**，不读取 `appId`：[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream) 和 [`GET /v1/prices/snapshot.ndjson.gz`](/zh-Hans/api-reference/get-prices-snapshot)。
 
 ## 错误代码
 

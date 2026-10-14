@@ -4,6 +4,20 @@ sidebarTitle: "Обзор"
 description: "Обновления продукта, новые возможности и исправления CSBoard API."
 ---
 
+<Update label="14 октября 2026">
+
+## Новые возможности
+
+**Покупка Dota 2 и Rust с доставкой на любой trade URL**
+
+[`POST /v1/market/buy`](/ru/api-reference/post-market-buy) теперь принимает `appId` в теле, как [`POST /v1/orders`](/ru/api-reference/post-orders): `570` для Dota 2, `252490` для Rust. Без `appId` эндпоинт покупает CS2, как раньше.
+
+- Оплата и доставка те же, что у CS2: только settled-баланс, скины уходят на trade URL из `partner` + `token`.
+- В заказе Dota 2 или Rust до 10 id. Больше — `400 too_many_items`.
+- Заказы Dota 2 и Rust ставятся в очередь, поэтому каждый скин сначала отвечает `pending`. Следите за заказом через [`GET /v1/orders/info`](/ru/api-reference/get-orders-info) или вебхук `order.updated`.
+
+</Update>
+
 <Update label="2 октября 2026">
 
 ## Новые возможности

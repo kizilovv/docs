@@ -4,6 +4,20 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年10月14日">
+
+## 新功能
+
+**购买 Dota 2 和 Rust 并交付到任意交易链接**
+
+[`POST /v1/market/buy`](/zh-Hans/api-reference/post-market-buy) 现在与 [`POST /v1/orders`](/zh-Hans/api-reference/post-orders) 一样，在请求体中接受 `appId`：Dota 2 为 `570`，Rust 为 `252490`。不传时该端点照旧购买 CS2。
+
+- 付款和交付方式与 CS2 相同：只使用已结算余额，皮肤发送到由 `partner` + `token` 组成的交易链接。
+- Dota 2 或 Rust 订单最多 10 个 id，超出返回 `400 too_many_items`。
+- Dota 2 和 Rust 订单进入队列，因此每个皮肤最初返回 `pending`。请通过 [`GET /v1/orders/info`](/zh-Hans/api-reference/get-orders-info) 或 `order.updated` 网络钩子跟踪订单。
+
+</Update>
+
 <Update label="2026年10月2日">
 
 ## 新功能

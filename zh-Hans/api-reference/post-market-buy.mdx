@@ -43,6 +43,10 @@ openapi: "POST /market/buy"
   如果为 `true`，跳过已不再可用的商品而不会让整个请求失败。
 </ParamField>
 
+<ParamField body="appId" type="integer" default="730">
+  `item_ids` 所属的游戏：`730` CS2（默认）、`570` Dota 2、`252490` Rust。请使用读取这些 id 时（[`GET /v1/listings`](/zh-Hans/api-reference/get-listings)）所用的同一个 `appId`。Dota 2 和 Rust 每个订单最多 10 个 id，并进入队列，因此每个皮肤最初返回 `pending`。
+</ParamField>
+
 ## 响应字段
 
 <ResponseField name="data" type="object" required>
@@ -112,6 +116,8 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 400 | `invalid_request` | 请求体格式错误（例如 `item_ids` 为空或超过 100）。 |
 | 400 | `unsupported_item` | 一个或多个商品无法通过此端点交付（例如 `ss_live_*` id）。 |
 | 400 | `invalid_trade_url` | `partner` + `token` 无法组成有效的 Steam 交易链接。 |
+| 400 | `unsupported_game` | 您的密钥无法使用该 `appId`。包含 `supported_app_ids`。 |
+| 400 | `too_many_items` | 一个订单中 Dota 2 或 Rust 的 id 超过 10 个。包含 `max_items`。 |
 | 401 | `invalid_api_key` | API 密钥缺失或无效。 |
 | 402 | `insufficient_settled_balance` | 已结算余额低于订单总额。返回中包含 `required_usd` 和 `settled_usd`。 |
 | 402 | `insufficient_balance` | 余额低于订单总额。 |

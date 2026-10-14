@@ -38,6 +38,7 @@ A game with `tradable: false` can be read through the market data endpoints but 
 | [`GET /v1/prices`](/api-reference/get-prices) | Query parameter `appId` |
 | [`GET /v1/listings/availability`](/api-reference/get-listings-availability) | Query parameter `appId` |
 | [`POST /v1/orders`](/api-reference/post-orders) | Body field `appId` |
+| [`POST /v1/market/buy`](/api-reference/post-market-buy) | Body field `appId` |
 | [`GET /v1/public/prices`](/api-reference/get-public-prices) | Query parameter `appId` (no key needed) |
 
 Leave `appId` out and every endpoint answers for CS2, exactly as it did before the parameter existed.
@@ -49,7 +50,7 @@ Leave `appId` out and every endpoint answers for CS2, exactly as it did before t
 - **Orders are queued.** A Dota 2 or Rust order answers `delivery: "pending"` and `expected_minutes: null`. Follow it with [`GET /v1/orders/{id}`](/api-reference/get-order).
 - **Ids belong to their game.** Buy and check ids under the same `appId` you read them with.
 
-These endpoints stay **CS2 only** and do not read `appId`: [`GET /v1/listings/stream`](/api-reference/get-listings-stream), [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot) and [`POST /v1/market/buy`](/api-reference/post-market-buy).
+These endpoints stay **CS2 only** and do not read `appId`: [`GET /v1/listings/stream`](/api-reference/get-listings-stream) and [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot).
 
 ## Error codes
 

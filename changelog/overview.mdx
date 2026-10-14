@@ -4,6 +4,20 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 14, 2026">
+
+## New features
+
+**Buy Dota 2 and Rust with delivery to any trade URL**
+
+[`POST /v1/market/buy`](/api-reference/post-market-buy) now takes `appId` in the body, like [`POST /v1/orders`](/api-reference/post-orders): `570` for Dota 2, `252490` for Rust. Leave it out and the endpoint buys CS2, as before.
+
+- Payment and delivery work as they do for CS2: settled balance only, and the skins go to the trade URL built from `partner` + `token`.
+- A Dota 2 or Rust order takes up to 10 ids. More answers `400 too_many_items`.
+- Dota 2 and Rust orders are queued, so every skin answers `pending` first. Follow the order with [`GET /v1/orders/info`](/api-reference/get-orders-info) or the `order.updated` webhook.
+
+</Update>
+
 <Update label="October 6, 2026">
 
 ## New features

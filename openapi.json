@@ -1968,7 +1968,7 @@
           "Trading"
         ],
         "summary": "Buy and deliver to a Steam trade URL",
-        "description": "Buy up to 100 items and deliver them straight to any Steam trade URL you supply (built from `partner` + `token`), paid from your **settled** (reversal-safe) balance. Built for wholesale and automated delivery. Idempotent via the `custom_id` body field — a retry with the same `custom_id` replays the original purchase and the response carries the `Idempotent-Replayed: true` header. This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. CS2 only — this endpoint does not read `appId`.",
+        "description": "Buy up to 100 items and deliver them straight to any Steam trade URL you supply (built from `partner` + `token`), paid from your **settled** (reversal-safe) balance. Built for wholesale and automated delivery. Idempotent via the `custom_id` body field — a retry with the same `custom_id` replays the original purchase and the response carries the `Idempotent-Replayed: true` header. This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. Pass `appId` (`570` Dota 2, `252490` Rust) to buy those games; leave it out for CS2. Dota 2 and Rust orders are queued, so every skin answers `pending` first.",
         "operationId": "marketBuy",
         "requestBody": {
           "required": true,
@@ -2054,6 +2054,24 @@
                     "value": {
                       "code": "invalid_trade_url",
                       "detail": "partner and token do not form a valid Steam trade URL."
+                    }
+                  },
+                  "unsupported_game": {
+                    "summary": "Game not available to this key",
+                    "value": {
+                      "code": "unsupported_game",
+                      "detail": "appId 570 is not available to this key. Supported: CS2 (730).",
+                      "supported_app_ids": [
+                        730
+                      ]
+                    }
+                  },
+                  "too_many_items": {
+                    "summary": "Over 10 Dota 2 / Rust ids",
+                    "value": {
+                      "code": "too_many_items",
+                      "detail": "Up to 10 Rust items per order.",
+                      "max_items": 10
                     }
                   }
                 }
@@ -5605,6 +5623,16 @@
           "autoclaim": {
             "type": "boolean",
             "description": "Sticky per-account setting (not per-order). Send `true` once to switch your key into auto-claim mode: every held order is then auto-released the moment its hold clears (your bot must auto-accept the Steam trade offer within ~15 minutes). Send `false` to switch back to manual claiming via `POST /orders/{id}/claim`. Omit to leave the setting unchanged."
+          },
+          "appId": {
+            "type": "integer",
+            "enum": [
+              730,
+              570,
+              252490
+            ],
+            "default": 730,
+            "description": "Game the `item_ids` belong to: `730` = CS2 (the default), `570` = Dota 2, `252490` = Rust. Send the same `appId` you read the ids with from `GET /listings`. Dota 2 and Rust take up to 10 ids per order. A game this key may not buy in answers `400 unsupported_game` — `tradable` in `GET /games` tells you in advance."
           }
         },
         "required": [

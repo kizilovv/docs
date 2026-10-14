@@ -43,6 +43,10 @@ The endpoint is **idempotent via the `custom_id` body field**: retrying with the
   If `true`, skip items that are no longer available instead of failing the whole request.
 </ParamField>
 
+<ParamField body="appId" type="integer" default="730">
+  Game the `item_ids` belong to: `730` CS2 (the default), `570` Dota 2, `252490` Rust. Send the same `appId` you read the ids with from [`GET /v1/listings`](/api-reference/get-listings). Dota 2 and Rust take up to 10 ids per order and are queued, so every skin answers `pending` first.
+</ParamField>
+
 ## Response fields
 
 <ResponseField name="data" type="object" required>
@@ -112,6 +116,8 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 400 | `invalid_request` | Malformed body (e.g. `item_ids` empty or over 100). |
 | 400 | `unsupported_item` | One or more items cannot be delivered via this endpoint (e.g. `ss_live_*` ids). |
 | 400 | `invalid_trade_url` | `partner` + `token` do not form a valid Steam trade URL. |
+| 400 | `unsupported_game` | The `appId` is not available to this key. Includes `supported_app_ids`. |
+| 400 | `too_many_items` | More than 10 Dota 2 or Rust ids in one order. Includes `max_items`. |
 | 401 | `invalid_api_key` | Missing or invalid API key. |
 | 402 | `insufficient_settled_balance` | Settled balance below the order total. Includes `required_usd` and `settled_usd`. |
 | 402 | `insufficient_balance` | Balance below the order total. |

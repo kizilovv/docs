@@ -43,6 +43,10 @@ openapi: "POST /market/buy"
   Если `true`, пропускать предметы, которые больше недоступны, вместо того чтобы отклонить весь запрос.
 </ParamField>
 
+<ParamField body="appId" type="integer" default="730">
+  Игра, к которой относятся `item_ids`: `730` CS2 (по умолчанию), `570` Dota 2, `252490` Rust. Передавайте тот же `appId`, с которым читали id из [`GET /v1/listings`](/ru/api-reference/get-listings). В заказе Dota 2 и Rust до 10 id; такие заказы ставятся в очередь, поэтому каждый скин сначала отвечает `pending`.
+</ParamField>
+
 ## Поля ответа
 
 <ResponseField name="data" type="object" required>
@@ -112,6 +116,8 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 400 | `invalid_request` | Некорректное тело (например, `item_ids` пуст или содержит более 100 элементов). |
 | 400 | `unsupported_item` | Один или несколько предметов нельзя доставить через этот эндпоинт (например, id `ss_live_*`). |
 | 400 | `invalid_trade_url` | `partner` + `token` не образуют валидный Steam trade URL. |
+| 400 | `unsupported_game` | `appId` недоступен вашему ключу. Содержит `supported_app_ids`. |
+| 400 | `too_many_items` | Больше 10 id Dota 2 или Rust в одном заказе. Содержит `max_items`. |
 | 401 | `invalid_api_key` | Отсутствует или некорректный API-ключ. |
 | 402 | `insufficient_settled_balance` | Подтверждённый баланс ниже суммы заказа. Включает `required_usd` и `settled_usd`. |
 | 402 | `insufficient_balance` | Баланс ниже суммы заказа. |
