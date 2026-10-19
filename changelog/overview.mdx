@@ -4,6 +4,20 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 20, 2026">
+
+## New features
+
+**One item's whole book, live: `GET /v1/listings/depth`**
+
+[`GET /v1/listings/depth`](/api-reference/get-listings-depth) takes a `market_hash_name`, refreshes that item's book from the upstream market first (your `min_float` / `max_float`, `phase` and `delivery` are passed through), then returns every lot we hold for the name, cheapest first, in the same `Listing` shape as `/v1/listings`. Every `id` goes straight into [`POST /v1/orders`](/api-reference/post-orders).
+
+- `refresh` on the response says whether the live refresh happened (`ok`) and, if not, why (`budget`, `timeout`, `unavailable`, `delivery`). Without it you still get the book as of its last sighting.
+- The shelf itself is now far deeper: per-asset stock from our Chinese supply is kept at up to 1,000 lots per item (was 30) and floats are filled in continuously, so `/v1/listings?name=`, the snapshot and the stream carry the whole book, not the cheapest few.
+- `/v1/listings` gained a `doppler_phase` filter (exact phase, as the response carries it).
+
+</Update>
+
 <Update label="October 14, 2026">
 
 ## New features
