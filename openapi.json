@@ -365,6 +365,228 @@
         }
       }
     },
+    "/listings/depth": {
+      "get": {
+        "tags": [
+          "Market data"
+        ],
+        "summary": "One item’s whole book, refreshed live",
+        "description": "Every lot we hold for one `market_hash_name`, cheapest first, after asking the upstream market for the item’s current book and putting it on the shelf.\n\n`/v1/listings?name=` already returns the lots we hold for a name. This endpoint is for the moment a buyer sizes a position: it refreshes the item’s book upstream first (your float window, phase and delivery mode are passed through), waits for that book to land, then answers with every source’s lots for the name in the exact `Listing` shape. Every `id` is accepted by `POST /v1/orders` right away; the buy re-resolves the lot’s price live before charging, so a stale cent here is a `price_moved`, never a loss.\n\nThe refresh is best-effort and bounded: a per-second budget shared by every caller, and a hard timeout. Past either the call still answers — from the shelf as of its last sighting — and `refresh` says so. Treat `refresh.ok=false` as “slightly older”, not as an error.\n\nYour negotiated discount, if any, is applied to every price here exactly as on `/v1/listings` and at checkout. CS2 only.",
+        "operationId": "getListingsDepth",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "name": "market_hash_name",
+            "in": "query",
+            "description": "Exact Steam `market_hash_name` (case-insensitive). Required.",
+            "schema": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "required": true
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "description": "Doppler / Gamma Doppler phase as `doppler_phase` carries it: `Phase 1`–`Phase 4`, `Ruby`, `Sapphire`, `Black Pearl`, `Emerald`. Passed upstream and applied to the answer.",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "delivery",
+            "in": "query",
+            "description": "Delivery bucket, as on `/v1/listings`. `hold` skips the upstream refresh — held rows only ever come from the shelf.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "up_to_12h",
+                "hold"
+              ]
+            }
+          },
+          {
+            "name": "min_float",
+            "in": "query",
+            "description": "Lower float bound, 0–1, inclusive. Passed upstream.",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          {
+            "name": "max_float",
+            "in": "query",
+            "description": "Upper float bound, 0–1, inclusive. Passed upstream.",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          {
+            "name": "min_price",
+            "in": "query",
+            "description": "Only lots at or above this USD price.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "max_price",
+            "in": "query",
+            "description": "Only lots at or below this USD price.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Keyset cursor from `next_cursor`. Pages are always cheapest-first.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–200. Default 100.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item’s book, cheapest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "market_hash_name": {
+                      "type": "string",
+                      "description": "The name you asked for."
+                    },
+                    "refresh": {
+                      "type": "object",
+                      "description": "What the upstream refresh did before the shelf was read.",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "description": "True when the upstream book was fetched (or was fresh in cache) and is on the shelf."
+                        },
+                        "at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When that book was taken. Null when it was not."
+                        },
+                        "skipped": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "budget",
+                            "timeout",
+                            "unavailable",
+                            "delivery",
+                            null
+                          ],
+                          "description": "Why not, when `ok` is false: this second’s refresh budget was spent (`budget`), the market did not answer in time (`timeout`), the refresh is switched off (`unavailable`), or `delivery=hold` (`delivery`)."
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "at",
+                        "skipped"
+                      ]
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Listing"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Pass back as `cursor` to fetch the next page. Null on the last page."
+                    }
+                  },
+                  "required": [
+                    "market_hash_name",
+                    "refresh",
+                    "items",
+                    "next_cursor"
+                  ]
+                },
+                "example": {
+                  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                  "refresh": {
+                    "ok": true,
+                    "at": "2026-10-20T08:14:02.481Z",
+                    "skipped": null
+                  },
+                  "items": [
+                    {
+                      "id": "3f1c0d2e-…",
+                      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                      "wear": "Field-Tested",
+                      "doppler_phase": null,
+                      "float_value": 0.1612,
+                      "paint_seed": 661,
+                      "stickers": [],
+                      "price_usd": 30.84,
+                      "category": "Rifle",
+                      "rarity": "Classified",
+                      "image": "https://cdn.csboard.com/…",
+                      "inspect_link": "steam://rungame/730/…",
+                      "tradable": true,
+                      "tradable_at": null,
+                      "delivery": "up_to_12h",
+                      "refund_percent": null,
+                      "listed_at": "2026-10-20T07:58:11.000Z"
+                    }
+                  ],
+                  "next_cursor": "eyJzIjoicHJpY2VfYXNjIiwicCI6MzAuODQsImlkIjoiM2YxYzBkMmUtLi4uIn0"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`market_hash_name` missing or too long, a float outside 0–1, an unknown `delivery`, or an `appId` other than 730 (`unsupported_game`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/listings/stream": {
       "get": {
         "tags": [
