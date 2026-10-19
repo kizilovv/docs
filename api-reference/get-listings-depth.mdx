@@ -1,0 +1,99 @@
+---
+title: "GET /v1/listings/depth — One Item's Whole Book, Live"
+sidebarTitle: "GET /listings/depth"
+description: "Every lot we hold for one market_hash_name, cheapest first, after refreshing the item's book from the upstream market. For sizing a position on a specific skin: float, phase, delivery."
+openapi: "GET /listings/depth"
+---
+
+Every lot we hold for one `market_hash_name`, cheapest first — after asking the upstream market for the item's current book and putting it on the shelf.
+
+[`GET /v1/listings?name=`](/api-reference/get-listings) already returns the lots we hold for a name, and the shelf is deep: per-asset stock from our Chinese supply is kept at up to 1,000 lots per item, floats filled in continuously, sold lots removed as they go. This endpoint is for the moment that is not enough — a buyer sizing a position wants the *live* ask. It refreshes the item's book upstream first, with your float window, phase and delivery mode passed through, waits for that book to land on the shelf, then answers with every source's lots for the name in the exact `Listing` shape.
+
+Every `id` in the answer is accepted by [`POST /v1/orders`](/api-reference/post-orders) right away. The buy re-resolves the lot's price live before charging and refuses above your `max_price_usd`, so a stale cent here is a `price_moved`, never a loss.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. Your negotiated discount, if any, is applied to every price here exactly as on `/v1/listings` and at checkout.
+
+## Query parameters
+
+<ParamField query="market_hash_name" type="string" required>
+  Exact Steam `market_hash_name`, case-insensitive. One item per call.
+</ParamField>
+
+<ParamField query="phase" type="string">
+  Doppler / Gamma Doppler phase as `doppler_phase` carries it: `Phase 1`–`Phase 4`, `Ruby`, `Sapphire`, `Black Pearl`, `Emerald`. Passed upstream and applied to the answer.
+</ParamField>
+
+<ParamField query="delivery" type="string">
+  `instant`, `up_to_12h` or `hold` — the same buckets every `Listing` carries. `hold` skips the upstream refresh: held rows only ever come from the shelf.
+</ParamField>
+
+<ParamField query="min_float" type="number">
+  Lower float bound, `0`–`1`, inclusive. Passed upstream, so a narrow window reaches lots the cheapest-first book alone would not.
+</ParamField>
+
+<ParamField query="max_float" type="number">
+  Upper float bound, `0`–`1`, inclusive. Passed upstream.
+</ParamField>
+
+<ParamField query="min_price" type="number">
+  Only lots at or above this USD price.
+</ParamField>
+
+<ParamField query="max_price" type="number">
+  Only lots at or below this USD price.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Keyset cursor from `next_cursor`. Pages are always cheapest-first.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  `1`–`200`. Default `100`.
+</ParamField>
+
+## The `refresh` object
+
+The upstream refresh is best-effort and bounded on purpose: a per-second budget shared by every caller (the market's own ceiling is shared with our site), and a hard timeout. Past either, the call still answers — from the shelf as of its last sighting — and `refresh` tells you which it was.
+
+| Field | Meaning |
+| --- | --- |
+| `ok` | `true` when the upstream book was fetched (or was fresh in cache) and is on the shelf. |
+| `at` | When that book was taken, ISO-8601. `null` when it was not. |
+| `skipped` | Why not, when `ok` is `false`: `budget` (this second's refresh budget was spent — retry in a second), `timeout` (the market did not answer in time), `unavailable` (the refresh is switched off), `delivery` (you asked for `hold`). |
+
+Treat `refresh.ok=false` as *slightly older*, not as an error. The book you get is still every lot we hold for the name.
+
+## Depth at scale
+
+For a position across many items, do not loop this endpoint: read the shelf in bulk with [`GET /v1/listings?name=`](/api-reference/get-listings), seed from the [price snapshot](/api-reference/get-prices-snapshot) and follow the [stream](/api-reference/get-listings-stream) for `new` and `gone`. Call `depth` on the item you are about to buy.
+
+## Example
+
+```bash
+curl "https://csboard.com/v1/listings/depth?market_hash_name=AK-47%20%7C%20Redline%20(Field-Tested)&max_float=0.2&limit=50" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+```json
+{
+  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+  "refresh": { "ok": true, "at": "2026-10-20T08:14:02.481Z", "skipped": null },
+  "items": [
+    {
+      "id": "3f1c0d2e-…",
+      "market_hash_name": "AK-47 | Redline (Field-Tested)",
+      "wear": "Field-Tested",
+      "doppler_phase": null,
+      "float_value": 0.1612,
+      "paint_seed": 661,
+      "stickers": [],
+      "price_usd": 30.84,
+      "delivery": "up_to_12h",
+      "listed_at": "2026-10-20T07:58:11.000Z"
+    }
+  ],
+  "next_cursor": "eyJzIjoicHJpY2VfYXNjIiwicCI6MzAuODQsImlkIjoiM2YxYzBkMmUtLi4uIn0"
+}
+```
+
+Errors are `{ "code", "detail" }`: `invalid_param` for a missing or overlong name, a float outside `0`–`1` or an unknown `delivery`; `unsupported_game` for an `appId` other than `730`. CS2 only.
