@@ -27,7 +27,11 @@ description: "Product updates, new features, and fixes for the CSBoard API."
 ## Changes
 
 - Trading calls (`POST /v1/orders`, `POST /v1/market/buy`, `GET /v1/orders*`, `POST /v1/orders/{id}/claim`, `GET /v1/balance`) now count against their own per-key budget of 10,000 requests/min instead of the 100/min read budget, so paging the catalogue can no longer block a buy or an order-status poll. See [Rate limits](/rate-limits).
-- The stream's `resync` event now names the snapshot as the way back in.
+- The stream keeps about two hours of history (was ~15 minutes at current volume) and a reconnect replays the whole gap, however long, instead of the first 5,000 events. The `resync` event now names the snapshot as the way back in.
+
+## Fixes
+
+- `price_usd` on `/v1/listings`, `/v1/listings/depth`, the stream and the snapshot is now exactly what the buy charges. Lots from about $100 whose price we lift toward the item's next-cheapest listing were shown at the pre-lift price, so sending that number as `max_price_usd` was refused with `price_moved` every time. If you saw `price_moved` repeat on the same item, this was it.
 
 </Update>
 
