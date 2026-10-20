@@ -50,6 +50,7 @@
                   "api-reference/get-listings",
                   "api-reference/get-listings-depth",
                   "api-reference/get-listings-stream",
+                  "api-reference/get-listings-snapshot",
                   "api-reference/get-listings-availability",
                   "api-reference/get-games",
                   "api-reference/get-prices",

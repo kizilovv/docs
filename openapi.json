@@ -986,6 +986,91 @@
         }
       }
     },
+    "/listings/snapshot.ndjson.gz": {
+      "get": {
+        "tags": [
+          "Market data"
+        ],
+        "summary": "Every buyable listing in one file (gzipped NDJSON)",
+        "description": "The whole shelf as gzipped NDJSON — one Listing JSON object per line, in the exact shape GET /listings returns, one listing per physical skin. Rebuilt every 10 minutes while anyone downloads it. Pair it with GET /listings/stream: connect with `last_event_id` set to this response's `X-Stream-Position` header and apply `new` as an upsert by id, `gone` as a delete. Reprices of listings that were already live are not stream events, so re-download on your own cadence; a stale price is refused at checkout with `price_moved`. Supports ETag / If-None-Match and Last-Modified / If-Modified-Since (304). Six full downloads per hour per key; a 304 is free. CS2 only — this endpoint does not read `appId`.",
+        "operationId": "getListingsSnapshot",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "Conditional request. Pass the ETag from a previous download to receive 304 if unchanged.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Modified-Since",
+            "in": "header",
+            "description": "Conditional request by the previous Last-Modified value.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gzipped NDJSON. Each decompressed line is one Listing JSON object.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque snapshot version. Send back as If-None-Match to skip unchanged downloads.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "When this snapshot was built.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Stream-Position": {
+                "description": "The /listings/stream event id to connect with (`last_event_id`) so nothing between this file and your live view is missed.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Row-Count": {
+                "description": "Number of listings in the file.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Snapshot-At": {
+                "description": "Build time, ISO-8601 with milliseconds.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "No snapshot exists yet (the first minutes after a deploy). Body `{ code: \"snapshot_building\", retry_after_seconds }`; retry after `Retry-After` seconds."
+          },
+          "304": {
+            "description": "Not Modified — the snapshot has not changed since the ETag or date you sent."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "description": "`snapshot_rate_limited` — more than six full downloads this hour. Send If-None-Match and take live changes from the stream."
+          }
+        }
+      }
+    },
     "/prices/snapshot.ndjson.gz": {
       "get": {
         "tags": [

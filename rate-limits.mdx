@@ -12,10 +12,12 @@ Limits are counted **per API key** in fixed one-minute windows: the counter star
 
 | Limit | Endpoint(s) |
 |---|---|
-| **100 / min** | Every request made with a key — listings, prices, games, currency, balance, order status, webhook management, P2P. This is the default; it can be raised per key. |
-| **250 / min** | `POST /v1/orders` and `POST /v1/market/buy` (place buy orders and spend real money). These requests also count toward the per-key limit above. |
-| **30 / min** | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the per-key limit above. |
-| **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed snapshot) |
+| **100 / min** | Reads made with a key — listings, prices, games, currency, webhook management, P2P. This is the default; it can be raised per key. |
+| **10,000 / min** | Trading — `POST /v1/orders`, `POST /v1/market/buy`, `GET /v1/orders`, `GET /v1/orders/{id}`, `GET /v1/orders/info`, `POST /v1/orders/{id}/claim`, `GET /v1/balance`. A separate budget, so reading the catalogue at its ceiling never blocks a buy or an order-status poll. |
+| **250 / min** | `POST /v1/orders` and `POST /v1/market/buy` (place buy orders and spend real money). On top of the trading budget above. |
+| **30 / min** | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the per-key read limit above. |
+| **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed price list) |
+| **6 / hour** | Full downloads of `GET /v1/listings/snapshot.ndjson.gz` (every listing in one file). A `304` answer to `If-None-Match` is free. |
 | **3 at once** | Concurrent `GET /v1/listings/stream` connections per key |
 | **1 / min per IP** | `GET /v1/public/prices` — no key, so the limit follows your IP address. The feed is rebuilt once a minute, so faster polling gains nothing. |
 

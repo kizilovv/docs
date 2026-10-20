@@ -16,6 +16,19 @@ description: "Product updates, new features, and fixes for the CSBoard API."
 - The shelf itself is now far deeper: per-asset stock from our Chinese supply is kept at up to 1,000 lots per item (was 30) and floats are filled in continuously, so `/v1/listings?name=`, the snapshot and the stream carry the whole book, not the cheapest few.
 - `/v1/listings` gained a `doppler_phase` filter (exact phase, as the response carries it).
 
+**The whole shelf in one file: `GET /v1/listings/snapshot.ndjson.gz`**
+
+[`GET /v1/listings/snapshot.ndjson.gz`](/api-reference/get-listings-snapshot) is every buyable listing as gzipped NDJSON, one `Listing` per line in the exact shape `/v1/listings` returns. Download it once, then open [`/v1/listings/stream`](/api-reference/get-listings-stream) with `last_event_id` set to the file's `X-Stream-Position` header and your copy stays current from there. This replaces walking the catalogue page by page.
+
+- Rebuilt every 10 minutes while anyone is downloading it. `ETag` / `Last-Modified` with `If-None-Match` / `If-Modified-Since` answer `304` when nothing changed.
+- Same one-listing-per-physical-skin rule as `/v1/listings`, same negotiated discount applied.
+- Six full downloads per hour per key; a `304` is free.
+
+## Changes
+
+- Trading calls (`POST /v1/orders`, `POST /v1/market/buy`, `GET /v1/orders*`, `POST /v1/orders/{id}/claim`, `GET /v1/balance`) now count against their own per-key budget of 10,000 requests/min instead of the 100/min read budget, so paging the catalogue can no longer block a buy or an order-status poll. See [Rate limits](/rate-limits).
+- The stream's `resync` event now names the snapshot as the way back in.
+
 </Update>
 
 <Update label="October 14, 2026">

@@ -1,0 +1,92 @@
+---
+title: "GET /v1/listings/snapshot.ndjson.gz — Every Listing in One File"
+sidebarTitle: "GET /listings/snapshot"
+description: "Download every buyable CSBoard listing as one gzipped NDJSON file, then keep it current from the SSE stream. The replacement for paging the whole catalogue."
+openapi: "GET /listings/snapshot.ndjson.gz"
+---
+
+Every buyable listing as one gzipped NDJSON file. Each decompressed line is one `Listing` JSON object — the exact shape [`GET /v1/listings`](/api-reference/get-listings) returns, with the same one-listing-per-physical-skin rule and your negotiated discount already applied.
+
+This is the way to hold a complete local copy of the shelf. Walking [`/v1/listings`](/api-reference/get-listings) page by page works for a filtered subset; for everything, it is tens of thousands of reads per pass. Download this file once instead, then open [`/v1/listings/stream`](/api-reference/get-listings-stream) from the position the file hands you, and your copy stays current from there.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+**Limit:** six full downloads per hour per key. A `304` answer to a conditional request is free.
+
+## The pairing: file + stream
+
+1. Download the file. Keep the `ETag` and the `X-Stream-Position` response headers.
+2. Connect to `/v1/listings/stream?last_event_id=<X-Stream-Position>`. The stream replays everything that happened since the file was built, then goes live. Apply `new` as an **upsert by `id`** (a listing may already be in your copy) and `gone` as a delete.
+3. Re-download on your own cadence — hourly is plenty — with `If-None-Match`. A reprice of a listing that was already live is not a stream event; the next file carries it. Between files a stale price is refused at checkout with `price_moved`, never filled.
+
+If the stream answers `resync`, your position has aged out of its history: download the file again and reconnect from its new `X-Stream-Position`.
+
+## Request headers
+
+<ParamField header="If-None-Match" type="string">
+  The `ETag` from your previous download. Unchanged → `304 Not Modified`, no body, no charge against the hourly limit.
+</ParamField>
+
+<ParamField header="If-Modified-Since" type="string">
+  The `Last-Modified` from your previous download. Same effect as `If-None-Match`.
+</ParamField>
+
+## Response headers
+
+| Header | Description |
+|---|---|
+| `ETag` | Opaque version of this file. Send it back as `If-None-Match`. |
+| `Last-Modified` | When this file was built (HTTP date). |
+| `X-Snapshot-At` | The same build time, ISO-8601 with milliseconds. |
+| `X-Stream-Position` | The stream event id to connect with (`last_event_id`) so nothing between this file and your live view is missed. |
+| `X-Row-Count` | Number of listings in the file. |
+| `Content-Encoding` | `gzip` — the body is always compressed; `Content-Length` is the compressed size. |
+
+## Response body
+
+A gzip stream. Every decompressed line is a `Listing`:
+
+```jsonl
+{"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f","market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"float_value":0.2613,"paint_seed":661,"stickers":[{"name":"Sticker | Natus Vincere | Katowice 2015","image":"https://…","slot":2,"wear":0.12}],"price_usd":31.2,"category":"Rifle","rarity":"Classified","image":"https://…","inspect_link":"steam://rungame/730/…","tradable":true,"tradable_at":null,"delivery":"instant","refund_percent":100,"listed_at":"2026-10-20T09:14:02.481Z"}
+```
+
+The file is not filtered: all three `delivery` buckets (`instant`, `up_to_12h`, `hold`) are in it. Filter on the field locally. It is rebuilt every 10 minutes while anyone is downloading it, CS2 only (`appId` is not read).
+
+## Example: download, then stream from the file's position
+
+```bash
+curl https://csboard.com/v1/listings/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  --dump-header headers.txt \
+  --output listings.ndjson.gz
+
+POS=$(grep -i '^x-stream-position' headers.txt | awk '{print $2}' | tr -d '\r')
+
+curl -N "https://csboard.com/v1/listings/stream?last_event_id=$POS" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Accept: text/event-stream"
+```
+
+## Example: conditional re-download
+
+```bash
+curl https://csboard.com/v1/listings/snapshot.ndjson.gz \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H 'If-None-Match: "lsnap-1792000000000-3900000"' \
+  --output listings.ndjson.gz
+```
+
+`304` means your file is the current one.
+
+## Responses other than 200
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 202 | `snapshot_building` | No file exists yet — the first minutes after a deploy. Retry after `Retry-After` seconds (also in `retry_after_seconds`). |
+| 304 | _(no body)_ | Unchanged since the `ETag` or date you sent. |
+| 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |
+| 429 | `snapshot_rate_limited` | More than six full downloads this hour. Send `If-None-Match` and take live changes from the stream. |
+
+<Note>
+  The price list by name — one row per `market_hash_name` with its cheapest ask — is a different, much smaller file: [`GET /v1/prices/snapshot.ndjson.gz`](/api-reference/get-prices-snapshot).
+</Note>
