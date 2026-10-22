@@ -4,6 +4,20 @@ sidebarTitle: "Обзор"
 description: "Обновления продукта, новые возможности и исправления CSBoard API."
 ---
 
+<Update label="22 октября 2026">
+
+## Новые возможности
+
+**Ручная доставка теперь видна в каждом заказе**
+
+У заказов появились `delivery_type` (`instant` | `manual`) и `delivery_deadline_at` — в [`GET /v1/orders`](/ru/api-reference/get-orders), [`GET /v1/orders/info`](/ru/api-reference/get-orders-info), [`GET /v1/orders/{id}`](/ru/api-reference/get-order) и вебхуке `order.updated`, включая P2P-строки. Заказ `manual` отправляет человек, это может занять до 12 часов, и всё это время заказ может быть в `delivering` без трейд-оффера. `delivery_deadline_at` заполнен, пока заказ `pending` или `delivering`; если продавец не успел, заказ отменяется и деньги возвращаются автоматически.
+
+**Отмена недоставленного заказа: `POST /v1/orders/{id}/cancel`**
+
+[`POST /v1/orders/{id}/cancel`](/ru/api-reference/post-orders-cancel) отменяет заказ, который ещё никто не отправил, и возвращает деньги на баланс. Отмена открывается через 31 минуту после покупки при ручной доставке и через 15 минут в остальных случаях; раньше — ответ `425 too_early` с `retry_after_sec`. Лоты игроков (P2P) здесь не отменяются.
+
+</Update>
+
 <Update label="14 октября 2026">
 
 ## Новые возможности

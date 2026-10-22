@@ -61,6 +61,12 @@ orders 端点返回您的购买历史，按时间倒序排列，使用键集分�
     <ResponseField name="hold_until" type="datetime | null">
       订单中冻结商品的解冻时间，否则为 `null`。
     </ResponseField>
+    <ResponseField name="delivery_type" type="string">
+      `instant`（机器人在几分钟内发送交易）或 `manual`（由真人发送交易，最长可能需要 12 小时；在此期间订单可能一直处于 `delivering` 且没有交易报价）。玩家（P2P）挂单始终为 `manual`。
+    </ResponseField>
+    <ResponseField name="delivery_deadline_at" type="datetime | null">
+      交付截止时间：`manual` 交付为购买后 12 小时，其他情况为供应商的接受窗口。仅在 `status` 为 `pending` 或 `delivering` 时有值；之后以及持有中的订单（它们等待 `hold_until`）为 `null`。如果卖家未能按时交付，订单会被自动取消并退款。如需提前停止等待，请使用 [`POST /v1/orders/{id}/cancel`](/zh-Hans/api-reference/post-orders-cancel)。
+    </ResponseField>
     <ResponseField name="created_at" type="datetime" required>
       ISO 8601 创建时间戳。
     </ResponseField>
@@ -121,6 +127,8 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "charged_total_usd": 26.47,
       "item_count": 2,
       "hold_until": null,
+      "delivery_type": "instant",
+      "delivery_deadline_at": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
       "items": [

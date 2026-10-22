@@ -31,6 +31,12 @@ openapi: "GET /orders/{id}"
 <ResponseField name="charged_total_usd" type="number" required />
 <ResponseField name="item_count" type="integer" required />
 <ResponseField name="hold_until" type="datetime | null" />
+<ResponseField name="delivery_type" type="string">
+  `instant` или `manual`. `manual` — трейд отправляет человек, до 12 часов, и всё это время заказ может быть в `delivering` без трейд-оффера. P2P-лот всегда `manual`.
+</ResponseField>
+<ResponseField name="delivery_deadline_at" type="datetime | null">
+  Срок доставки; заполнен, только пока `status` — `pending` или `delivering` (у заказов в холде — `null`). Если продавец не успел, заказ отменяется и деньги возвращаются автоматически. См. [`POST /v1/orders/{id}/cancel`](/ru/api-reference/post-orders-cancel).
+</ResponseField>
 <ResponseField name="created_at" type="datetime" required />
 <ResponseField name="updated_at" type="datetime | null" />
 <ResponseField name="items" type="OrderItem[]" required>
@@ -56,6 +62,8 @@ curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
   "charged_total_usd": 26.47,
   "item_count": 2,
   "hold_until": null,
+  "delivery_type": "instant",
+  "delivery_deadline_at": null,
   "created_at": "2026-06-29T17:12:04Z",
   "updated_at": "2026-06-29T17:15:40Z",
   "items": [

@@ -65,6 +65,12 @@ The orders endpoint returns your purchase history, newest first, using keyset pa
     <ResponseField name="hold_until" type="datetime | null">
       When the order's held items clear, or `null`.
     </ResponseField>
+    <ResponseField name="delivery_type" type="string">
+      `instant` (a bot sends the trade within minutes) or `manual` (a person sends it, which can take up to 12 hours; the order may stay `delivering` that long with no trade offer). A player's (P2P) lot is always `manual`.
+    </ResponseField>
+    <ResponseField name="delivery_deadline_at" type="datetime | null">
+      Delivery deadline: 12 hours after purchase for `manual` delivery, the vendor's accept window otherwise. Set only while `status` is `pending` or `delivering`; `null` after that and on held orders (they wait on `hold_until`). If the seller misses it, the order is cancelled and refunded automatically. To stop waiting earlier, use [`POST /v1/orders/{id}/cancel`](/api-reference/post-orders-cancel).
+    </ResponseField>
     <ResponseField name="refund" type="Refund | null">
       Money credited back for this order, or `null` if none was.
 
@@ -140,6 +146,8 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "charged_total_usd": 26.47,
       "item_count": 2,
       "hold_until": null,
+      "delivery_type": "instant",
+      "delivery_deadline_at": null,
       "refund": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
@@ -164,6 +172,8 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "charged_total_usd": 1.28,
       "item_count": 1,
       "hold_until": null,
+      "delivery_type": "instant",
+      "delivery_deadline_at": null,
       "refund": {
         "amount_usd": 1.28,
         "refunded_at": "2026-06-29T17:20:11Z",

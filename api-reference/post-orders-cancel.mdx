@@ -1,0 +1,41 @@
+---
+title: "POST /v1/orders/:id/cancel — Cancel an Undelivered Order"
+sidebarTitle: "POST /orders/:id/cancel"
+description: "Cancel an order nobody has shipped yet and get the money back on your balance. Opens 31 minutes after purchase for manual delivery, 15 minutes otherwise."
+openapi: "POST /orders/{id}/cancel"
+---
+
+Some orders are delivered by hand: a person (or a slow desk) sends the Steam trade, and that can take up to 12 hours. Such an order shows `delivery_type: "manual"` in `GET /v1/orders` and `GET /v1/orders/{id}`, and it may sit in `delivering` with no trade offer for a long time. `delivery_deadline_at` tells you when the seller's time runs out. If the seller misses it, the order is cancelled and refunded automatically.
+
+If you no longer want to wait, cancel the order yourself. No request body. Cancel is open for:
+
+- **A manual-delivery order** whose seller has sent nothing 31 minutes after purchase.
+- **A held order** before its unban, where the source allows it.
+- **Any other order** still undelivered 15 minutes after purchase, with no trade offer and nothing in flight upstream.
+
+A player's (P2P) lot cannot be cancelled here. It closes and refunds itself if the seller misses `delivery_deadline_at`.
+
+## Recommended flow
+
+1. Place a buy with `POST /v1/orders` or `POST /v1/market/buy`.
+2. Poll `GET /v1/orders/{id}` (or listen for the `order.updated` webhook). Read `delivery_type` and `delivery_deadline_at`.
+3. If a `manual` order still has no trade offer and you no longer want it, `POST /v1/orders/{id}/cancel` once 31 minutes have passed.
+4. On `425 too_early`, retry after `retry_after_sec`. On `200`, the money is back on your balance. On `202`, it lands within minutes, with the order's next update.
+
+## Responses at a glance
+
+| Status | Meaning |
+| --- | --- |
+| `200` `refunded: true` | Cancelled and refunded to your balance. An already cancelled order returns the same answer. |
+| `202` `refunded: false` | Cancel placed. The refund lands within minutes, with the order's next update (webhook or `GET /v1/orders/{id}`). |
+| `425 too_early` | Cancel is not open yet (31 min for manual delivery, 15 min otherwise). Retry after the returned `retry_after_sec`. |
+| `409 offer_sent` | The Steam trade offer is already out. Accept or decline it in Steam. |
+| `409 in_progress` | Delivery or a cancel is already running. If delivery fails, the order is refunded automatically. |
+| `409 not_cancellable` | The order can no longer be cancelled: delivered, finished, a P2P lot, or not eligible. |
+| `429 cancel_limit_reached` | Too many cancels for now. Try again later. |
+| `503 cancel_unavailable` | We could not check the order upstream right now. Nothing was changed; retry shortly. |
+| `404 order_not_found` | No such order on this account. |
+
+<Warning>
+Cancel is idempotent: calling it again on a cancelled order returns the same `200`, never a second refund. Retrying after a network timeout or a `503` is safe.
+</Warning>

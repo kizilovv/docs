@@ -31,6 +31,12 @@ openapi: "GET /orders/{id}"
 <ResponseField name="charged_total_usd" type="number" required />
 <ResponseField name="item_count" type="integer" required />
 <ResponseField name="hold_until" type="datetime | null" />
+<ResponseField name="delivery_type" type="string">
+  `instant` 或 `manual`。`manual` 表示由真人发送交易，最长 12 小时，在此期间订单可能一直处于 `delivering` 且没有交易报价。P2P 挂单始终为 `manual`。
+</ResponseField>
+<ResponseField name="delivery_deadline_at" type="datetime | null">
+  交付截止时间，仅在 `status` 为 `pending` 或 `delivering` 时有值（持有中的订单为 `null`）。如果卖家未能按时交付，订单会被自动取消并退款。参见 [`POST /v1/orders/{id}/cancel`](/zh-Hans/api-reference/post-orders-cancel)。
+</ResponseField>
 <ResponseField name="created_at" type="datetime" required />
 <ResponseField name="updated_at" type="datetime | null" />
 <ResponseField name="items" type="OrderItem[]" required>
@@ -56,6 +62,8 @@ curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
   "charged_total_usd": 26.47,
   "item_count": 2,
   "hold_until": null,
+  "delivery_type": "instant",
+  "delivery_deadline_at": null,
   "created_at": "2026-06-29T17:12:04Z",
   "updated_at": "2026-06-29T17:15:40Z",
   "items": [

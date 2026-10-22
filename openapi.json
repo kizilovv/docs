@@ -1374,6 +1374,8 @@
                       "charged_total_usd": 26.47,
                       "item_count": 2,
                       "hold_until": null,
+                      "delivery_type": "instant",
+                      "delivery_deadline_at": null,
                       "created_at": "2026-06-29T17:12:04Z",
                       "updated_at": "2026-06-29T17:15:40Z",
                       "items": [
@@ -1987,6 +1989,8 @@
                       "charged_total_usd": 26.47,
                       "item_count": 2,
                       "hold_until": null,
+                      "delivery_type": "instant",
+                      "delivery_deadline_at": null,
                       "created_at": "2026-06-29T17:12:04Z",
                       "updated_at": "2026-06-29T17:15:40Z",
                       "items": []
@@ -2055,6 +2059,8 @@
                   "charged_total_usd": 26.47,
                   "item_count": 2,
                   "hold_until": null,
+                  "delivery_type": "instant",
+                  "delivery_deadline_at": null,
                   "created_at": "2026-06-29T17:12:04Z",
                   "updated_at": "2026-06-29T17:15:40Z",
                   "items": [
@@ -2262,6 +2268,227 @@
                   "code": "delivery_failed",
                   "detail": "The hold was cancelled upstream; your balance was refunded.",
                   "refunded": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Trading"
+        ],
+        "summary": "Cancel an undelivered order",
+        "description": "Cancel an order nobody has shipped yet; the money goes back to your balance. No request body. Cancel opens 31 minutes after purchase for a `manual` delivery order whose seller has sent nothing, before the unban for a held order (where the source allows it), and 15 minutes after purchase for any other order that is still undelivered, with no trade offer and nothing in flight upstream. A player's (P2P) lot cannot be cancelled here; it is cancelled and refunded automatically if the seller misses `delivery_deadline_at`. Idempotent: calling it on an already cancelled order returns the same `200`.",
+        "operationId": "cancelOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "CSBoard order id of the order to cancel.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled and refunded to your balance. Also the answer for an order that was already cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order_id": {
+                      "type": "string"
+                    },
+                    "cancelled": {
+                      "type": "boolean"
+                    },
+                    "refunded": {
+                      "type": "boolean",
+                      "description": "`true`: the money is already back on your balance. `false`: the cancel is placed and the refund lands with the order's next update."
+                    },
+                    "detail": {
+                      "type": "string",
+                      "description": "Present when the refund is still on its way (`202`)."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "cancelled",
+                    "refunded"
+                  ]
+                },
+                "example": {
+                  "order_id": "ord_01J9Z3K8Q2",
+                  "cancelled": true,
+                  "refunded": true
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Cancel placed. The refund lands on your balance within minutes and shows up with the order's next update (`order.updated` webhook, `GET /orders/{id}`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order_id": {
+                      "type": "string"
+                    },
+                    "cancelled": {
+                      "type": "boolean"
+                    },
+                    "refunded": {
+                      "type": "boolean",
+                      "description": "`true`: the money is already back on your balance. `false`: the cancel is placed and the refund lands with the order's next update."
+                    },
+                    "detail": {
+                      "type": "string",
+                      "description": "Present when the refund is still on its way (`202`)."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "cancelled",
+                    "refunded"
+                  ]
+                },
+                "example": {
+                  "order_id": "ord_01J9Z3K8Q2",
+                  "cancelled": true,
+                  "refunded": false,
+                  "detail": "Cancel placed; the refund lands on your balance within minutes."
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No order with that id on this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "order_not_found",
+                  "detail": "No such order on this account."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order cannot be cancelled. `offer_sent`: the Steam trade offer is already out — accept or decline it in Steam. `in_progress`: delivery or a cancel is already running; if delivery fails the order is refunded automatically. `not_cancellable`: the order is delivered, finished, a player's (P2P) lot, or not eligible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "offer_sent": {
+                    "summary": "Trade offer already sent",
+                    "value": {
+                      "code": "offer_sent",
+                      "detail": "The Steam trade offer is already out; accept or decline it in Steam."
+                    }
+                  },
+                  "in_progress": {
+                    "summary": "Delivery or cancel already running",
+                    "value": {
+                      "code": "in_progress",
+                      "detail": "Delivery is in progress; if it fails, the order is refunded automatically."
+                    }
+                  },
+                  "not_cancellable": {
+                    "summary": "No longer cancellable",
+                    "value": {
+                      "code": "not_cancellable",
+                      "detail": "This order can no longer be cancelled."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "425": {
+            "description": "Cancel is not open yet: 31 minutes after purchase for `manual` delivery, 15 minutes otherwise. Retry after `retry_after_sec`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "retry_after_sec": {
+                      "type": "integer",
+                      "description": "Seconds until cancel opens."
+                    }
+                  }
+                },
+                "example": {
+                  "code": "too_early",
+                  "detail": "Cancel opens 15 minutes after purchase.",
+                  "retry_after_sec": 540
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`cancel_limit_reached`: too many cancels for now — try again later. `rate_limit_exceeded`: the per-key trading budget is spent — wait `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (on `rate_limit_exceeded`).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "cancel_limit_reached": {
+                    "summary": "Too many cancels",
+                    "value": {
+                      "code": "cancel_limit_reached",
+                      "detail": "Cancel limit reached for now; try again later."
+                    }
+                  },
+                  "rate_limit_exceeded": {
+                    "summary": "Rate limit",
+                    "value": {
+                      "code": "rate_limit_exceeded",
+                      "detail": "Trading rate limit of 10000 requests/min exceeded."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The order could not be checked upstream right now. Nothing was changed; retry shortly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": "cancel_unavailable",
+                  "detail": "The order could not be checked upstream right now and nothing was changed; retry shortly."
                 }
               }
             }
@@ -5847,6 +6074,22 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "delivery_type": {
+            "type": "string",
+            "enum": [
+              "instant",
+              "manual"
+            ],
+            "description": "How the order ships. `instant`: a bot sends the Steam trade within minutes. `manual`: a person (or a slow desk) sends it, which can take up to 12 hours, so the order may stay `delivering` that long with no trade offer yet. A player's (P2P) lot is always `manual`."
+          },
+          "delivery_deadline_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The delivery deadline: 12 hours after purchase for `manual` delivery, the vendor's accept window otherwise. Set only while `status` is `pending` or `delivering`; `null` once the order is completed, cancelled or failed, and on a held order (it waits on `hold_until`). If the seller misses it, the order is cancelled and refunded automatically."
           },
           "refund": {
             "description": "Refund credited for this order, or `null` if none. A `cancelled` or `failed` order is ALWAYS refunded — this field is the receipt, so you never have to infer it from the status or reconcile against your balance.",

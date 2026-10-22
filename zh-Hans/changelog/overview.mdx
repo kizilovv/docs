@@ -4,6 +4,20 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年10月22日">
+
+## 新功能
+
+**每个订单都会标明人工交付**
+
+订单现在在 [`GET /v1/orders`](/zh-Hans/api-reference/get-orders)、[`GET /v1/orders/info`](/zh-Hans/api-reference/get-orders-info)、[`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 和 `order.updated` 网络钩子中带有 `delivery_type`（`instant` | `manual`）和 `delivery_deadline_at`，P2P 行也包括在内。`manual` 订单由真人发送，最长可能需要 12 小时，在此期间订单可能一直处于 `delivering` 且没有交易报价。`delivery_deadline_at` 在订单为 `pending` 或 `delivering` 时有值；如果卖家未能按时交付，订单会被自动取消并退款。
+
+**取消尚未交付的订单：`POST /v1/orders/{id}/cancel`**
+
+[`POST /v1/orders/{id}/cancel`](/zh-Hans/api-reference/post-orders-cancel) 可取消尚无人发货的订单，并将款项退回您的余额。人工交付的订单在购买 31 分钟后可取消，其他订单在 15 分钟后可取消；过早调用会返回 `425 too_early` 及 `retry_after_sec`。玩家（P2P）挂单无法通过此接口取消。
+
+</Update>
+
 <Update label="2026年10月14日">
 
 ## 新功能

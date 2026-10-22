@@ -129,6 +129,8 @@ The order response carries an order-level `delivery` field, plus `expected_minut
 
 Items bought inside a Steam trade hold wait for the hold to end — check the listing's `delivery` and `tradable_at` before buying. Follow the order with `GET /v1/orders/{id}`, which reports `hold` and `hold_until`, and release it with [`POST /v1/orders/{id}/claim`](/api-reference/post-orders-claim) or the `autoclaim` setting.
 
+`GET /v1/orders/{id}` also carries `delivery_type`. A `manual` order is sent by a person and can take up to 12 hours; `delivery_deadline_at` says when the seller's time runs out, after which the order is cancelled and refunded automatically. To stop waiting sooner, cancel it with [`POST /v1/orders/{id}/cancel`](/api-reference/post-orders-cancel) once 31 minutes have passed.
+
 ---
 
 ## Error reference

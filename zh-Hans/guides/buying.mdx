@@ -129,6 +129,8 @@ curl -X POST https://csboard.com/v1/orders \
 
 在 Steam 交易冻结期内购买的物品需等待冻结结束——请在购买前查看挂单的 `delivery` 和 `tradable_at`。通过 `GET /v1/orders/{id}` 跟踪订单（其中会显示 `hold` 和 `hold_until`），并使用 [`POST /v1/orders/{id}/claim`](/zh-Hans/api-reference/post-orders-claim) 或 `autoclaim` 设置领取。
 
+`GET /v1/orders/{id}` 还会返回 `delivery_type`。`manual` 订单由真人发送，最长可能需要 12 小时；`delivery_deadline_at` 表示卖家的截止时间，逾期后订单会被自动取消并退款。如不想再等，可在 31 分钟后通过 [`POST /v1/orders/{id}/cancel`](/zh-Hans/api-reference/post-orders-cancel) 取消。
+
 ---
 
 ## 错误参考

@@ -65,6 +65,7 @@
                   "api-reference/post-orders",
                   "api-reference/post-market-buy",
                   "api-reference/post-orders-claim",
+                  "api-reference/post-orders-cancel",
                   "api-reference/get-orders",
                   "api-reference/get-orders-info",
                   "api-reference/get-order"
@@ -183,6 +184,7 @@
                   "ru/api-reference/post-orders",
                   "ru/api-reference/post-market-buy",
                   "ru/api-reference/post-orders-claim",
+                  "ru/api-reference/post-orders-cancel",
                   "ru/api-reference/get-orders",
                   "ru/api-reference/get-orders-info",
                   "ru/api-reference/get-order"
@@ -273,6 +275,7 @@
                   "zh-Hans/api-reference/post-orders",
                   "zh-Hans/api-reference/post-market-buy",
                   "zh-Hans/api-reference/post-orders-claim",
+                  "zh-Hans/api-reference/post-orders-cancel",
                   "zh-Hans/api-reference/get-orders",
                   "zh-Hans/api-reference/get-orders-info",
                   "zh-Hans/api-reference/get-order"

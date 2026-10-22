@@ -1,0 +1,41 @@
+---
+title: "POST /v1/orders/:id/cancel — 取消尚未交付的订单"
+sidebarTitle: "POST /orders/:id/cancel"
+description: "取消尚无人发货的订单，款项退回您的余额。人工交付的订单在购买 31 分钟后可取消，其他订单在 15 分钟后可取消。"
+openapi: "POST /orders/{id}/cancel"
+---
+
+部分订单由人工交付：Steam 交易由真人（或较慢的处理台）发送，最长可能需要 12 小时。此类订单在 `GET /v1/orders` 和 `GET /v1/orders/{id}` 中显示为 `delivery_type: "manual"`，可能会长时间停留在 `delivering` 状态且没有交易报价。`delivery_deadline_at` 表示卖家的交付截止时间。如果卖家未能按时交付，订单会被自动取消并退款。
+
+如果您不想再等，可以自行取消订单。无需请求体。以下情况可以取消：
+
+- **人工交付的订单**：购买 31 分钟后卖家仍未发送任何内容。
+- **持有中的订单**：在解除封禁之前，且货源允许取消。
+- **其他任何订单**：购买 15 分钟后仍未交付，没有交易报价，且上游没有正在进行的操作。
+
+玩家（P2P）挂单无法通过此接口取消。如果卖家错过 `delivery_deadline_at`，该订单会自动关闭并退款。
+
+## 推荐流程
+
+1. 使用 `POST /v1/orders` 或 `POST /v1/market/buy` 下单购买。
+2. 轮询 `GET /v1/orders/{id}`（或监听 `order.updated` 网络钩子），查看 `delivery_type` 和 `delivery_deadline_at`。
+3. 如果 `manual` 订单仍没有交易报价且您不再需要它，在 31 分钟后调用 `POST /v1/orders/{id}/cancel`。
+4. 收到 `425 too_early` 时，在 `retry_after_sec` 秒后重试。收到 `200` 时，款项已退回余额。收到 `202` 时，款项会在几分钟内随订单的下一次更新到账。
+
+## 响应一览
+
+| 状态 | 含义 |
+| --- | --- |
+| `200` `refunded: true` | 已取消并退款到您的余额。对已取消的订单调用也返回相同结果。 |
+| `202` `refunded: false` | 取消已提交。退款会在几分钟内随订单的下一次更新到账（网络钩子或 `GET /v1/orders/{id}`）。 |
+| `425 too_early` | 尚未开放取消（人工交付为 31 分钟，其他为 15 分钟）。请在返回的 `retry_after_sec` 之后重试。 |
+| `409 offer_sent` | Steam 交易报价已发出。请在 Steam 中接受或拒绝。 |
+| `409 in_progress` | 交付或取消已在进行中。如果交付失败，订单会自动退款。 |
+| `409 not_cancellable` | 订单已无法取消：已交付、已结束、属于 P2P 挂单或不符合条件。 |
+| `429 cancel_limit_reached` | 近期取消次数过多。请稍后再试。 |
+| `503 cancel_unavailable` | 暂时无法在上游核实订单。未做任何更改，请稍后重试。 |
+| `404 order_not_found` | 此账户下不存在该订单。 |
+
+<Warning>
+取消是幂等的：对已取消的订单再次调用会返回相同的 `200`，绝不会重复退款。网络超时或 `503` 后重试是安全的。
+</Warning>

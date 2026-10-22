@@ -4,6 +4,20 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 22, 2026">
+
+## New features
+
+**Manual delivery is flagged on every order**
+
+Orders now carry `delivery_type` (`instant` | `manual`) and `delivery_deadline_at` in [`GET /v1/orders`](/api-reference/get-orders), [`GET /v1/orders/info`](/api-reference/get-orders-info), [`GET /v1/orders/{id}`](/api-reference/get-order) and the `order.updated` webhook, P2P rows included. A `manual` order is sent by a person and can take up to 12 hours, so it may sit in `delivering` with no trade offer that long. `delivery_deadline_at` is set while the order is `pending` or `delivering`; if the seller misses it, the order is cancelled and refunded automatically.
+
+**Cancel an undelivered order: `POST /v1/orders/{id}/cancel`**
+
+[`POST /v1/orders/{id}/cancel`](/api-reference/post-orders-cancel) calls off an order nobody has shipped yet and refunds it to your balance. It opens 31 minutes after purchase for manual delivery and 15 minutes for everything else; earlier calls answer `425 too_early` with `retry_after_sec`. Player (P2P) lots cannot be cancelled here.
+
+</Update>
+
 <Update label="October 20, 2026">
 
 ## New features

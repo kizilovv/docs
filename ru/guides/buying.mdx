@@ -129,6 +129,8 @@ curl -X POST https://csboard.com/v1/orders \
 
 Предметы, купленные под trade hold в Steam, ждут окончания холда — проверяйте `delivery` и `tradable_at` листинга до покупки. Следите за ордером через `GET /v1/orders/{id}`, где видны `hold` и `hold_until`, и забирайте его через [`POST /v1/orders/{id}/claim`](/ru/api-reference/post-orders-claim) или настройку `autoclaim`.
 
+В `GET /v1/orders/{id}` есть и `delivery_type`. Заказ `manual` отправляет человек, это может занять до 12 часов; `delivery_deadline_at` показывает, когда у продавца кончается время, после чего заказ отменяется и деньги возвращаются автоматически. Чтобы не ждать, отмените его через [`POST /v1/orders/{id}/cancel`](/ru/api-reference/post-orders-cancel) спустя 31 минуту.
+
 ---
 
 ## Справочник ошибок

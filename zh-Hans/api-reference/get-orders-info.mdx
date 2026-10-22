@@ -26,7 +26,7 @@ openapi: "GET /orders/info"
 ## 响应字段
 
 <ResponseField name="data" type="Order[]" required>
-  匹配的订单数组。每个 `Order` 的结构与 [`GET /v1/orders`](/api-reference/get-orders) 中相同——包括 `order_id`、`status`、`charged_total_usd` 以及逐件 `items` 明细。
+  匹配的订单数组。每个 `Order` 的结构与 [`GET /v1/orders`](/api-reference/get-orders) 中相同——包括 `order_id`、`status`、`charged_total_usd`、`delivery_type`、`delivery_deadline_at` 以及逐件 `items` 明细。
 </ResponseField>
 
 ## 示例请求
@@ -50,6 +50,8 @@ curl "https://csboard.com/v1/orders/info?custom_ids=batch-2026-06-29-01,batch-20
       "charged_total_usd": 26.47,
       "item_count": 2,
       "hold_until": null,
+      "delivery_type": "instant",
+      "delivery_deadline_at": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
       "items": []
