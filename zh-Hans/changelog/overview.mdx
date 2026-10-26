@@ -8,6 +8,10 @@ description: "CSBoard API 的产品更新、新功能和修复。"
 
 ## 新功能
 
+**流：磨损值或图案稍后到达时的 `update` 事件**
+
+[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream) 现在会在您已收到的挂单补充 `float_value` 或 `paint_seed` 时发送 `update`。部分市场会在挂单上架几分钟后才提供这些数据；此前流中它们一直为 `null`，您需要重新读取 `GET /v1/listings` 才能看到。负载是完整的 `Listing`，与 `new` 相同：请按 `id` 替换您的副本。忽略未知事件类型的客户端无需任何改动。
+
 **订单失败的原因：`fail_reason`、`fail_side`、`fail_message`**
 
 订单现在会说明失败原因，适用于 [`GET /v1/orders`](/zh-Hans/api-reference/get-orders)、[`GET /v1/orders/info`](/zh-Hans/api-reference/get-orders-info)、[`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 和 `order.updated` 网络钩子，P2P 行也包括在内。对于 `failed` 或 `cancelled` 的订单，`fail_reason` 是用于程序分支判断的代码，`fail_side` 表示需要采取行动的一方（`recipient`、`seller`、`buyer` 或 `market`），`fail_message` 用一句话说明发生了什么、该怎么做。其他状态下这三个字段都为 `null`。此前这类订单只显示 `unavailable`，即使原因是收货方的库存未公开——而这恰恰只有您能解决。代码列表可能会扩充：遇到不认识的值时请按 `unavailable` 处理。参见 [订单失败的原因](/zh-Hans/api-reference/get-orders#fail-reasons)。

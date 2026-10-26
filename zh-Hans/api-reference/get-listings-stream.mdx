@@ -59,6 +59,12 @@ openapi: "GET /listings/stream"
   该事件既会在真正的新库存出现时触发，**也会**在重新上架时触发——来自已取消订单、已过期交易报价或已解除冻结的商品。重新上架的商品对您而言就是新的，即使它此前已经存在。
 </ResponseField>
 
+<ResponseField name="update" type="Listing">
+  您已收到的挂单补充了数据：`float_value` 或 `paint_seed` 在其 `new` 事件之后才到达。负载是完整的 `Listing` 对象，与 `new` 相同。请按 `id` 替换您的副本；如果您还没有该 `id` 的挂单，请将其添加。
+
+  部分市场会在挂单上架几分钟后才提供磨损值和图案。在此事件之前，流中这类挂单的 `float_value` 一直为 `null`，只能重新读取 `GET /v1/listings` 才能看到该值。过滤条件对 `update` 的作用与对 `new` 相同。贴纸磨损按市场提供的原样返回：市场未提供时，它在此处和 `/v1/listings` 中都为 `null`。
+</ResponseField>
+
 <ResponseField name="gone" type="object">
   有挂单离开目录——售出、被预留或被下架。负载为 `{ "id": "..." }`。
 
@@ -116,6 +122,12 @@ const live = new Map();
 es.addEventListener("new", (e) => {
   const listing = JSON.parse(e.data);
   live.set(listing.id, listing);
+});
+
+es.addEventListener("update", (e) => {
+  const listing = JSON.parse(e.data);
+  live.set(listing.id, listing);
+  // float_value / paint_seed 稍后到达
 });
 
 es.addEventListener("gone", (e) => {

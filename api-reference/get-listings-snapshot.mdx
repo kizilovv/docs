@@ -16,7 +16,7 @@ This is the way to hold a complete local copy of the shelf. Walking [`/v1/listin
 ## The pairing: file + stream
 
 1. Download the file. Keep the `ETag` and the `X-Stream-Position` response headers.
-2. Connect to `/v1/listings/stream?last_event_id=<X-Stream-Position>`. The stream replays everything that happened since the file was built, then goes live. Apply `new` as an **upsert by `id`** (a listing may already be in your copy) and `gone` as a delete.
+2. Connect to `/v1/listings/stream?last_event_id=<X-Stream-Position>`. The stream replays everything that happened since the file was built, then goes live. Apply `new` and `update` as an **upsert by `id`** (a listing may already be in your copy) and `gone` as a delete.
 3. Re-download on your own cadence — hourly is plenty — with `If-None-Match`. A reprice of a listing that was already live is not a stream event; the next file carries it. Between files a stale price is refused at checkout with `price_moved`, never filled.
 
 If the stream answers `resync`, your position has aged out of its history: download the file again and reconnect from its new `X-Stream-Position`.

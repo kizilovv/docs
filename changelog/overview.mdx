@@ -8,6 +8,10 @@ description: "Product updates, new features, and fixes for the CSBoard API."
 
 ## New features
 
+**Stream: `update` event when float or pattern arrives later**
+
+[`GET /v1/listings/stream`](/api-reference/get-listings-stream) now sends `update` when a listing you already received gets `float_value` or `paint_seed` filled in. Some markets send these a few minutes after the lot goes on sale; until now the stream kept them `null` and you had to re-read `GET /v1/listings` to see them. The payload is the full `Listing`, same as `new`: replace your copy by `id`. Clients that ignore unknown event types keep working unchanged.
+
 **Why an order failed: `fail_reason`, `fail_side`, `fail_message`**
 
 Orders now say why they failed, in [`GET /v1/orders`](/api-reference/get-orders), [`GET /v1/orders/info`](/api-reference/get-orders-info), [`GET /v1/orders/{id}`](/api-reference/get-order) and the `order.updated` webhook, P2P rows included. On a `failed` or `cancelled` order, `fail_reason` is a code to branch on, `fail_side` says who has to act (`recipient`, `seller`, `buyer` or `market`), and `fail_message` is one sentence saying what happened and what to do. All three are `null` on other statuses. Until now such an order read only as `unavailable`, even when the recipient's inventory was private — a case only you can fix. The list of codes may grow: treat an unknown value as `unavailable`. See [why an order failed](/api-reference/get-orders#fail-reasons).
