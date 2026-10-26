@@ -24,6 +24,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 |---|---|---|---|
 | 401 | `missing_api_key` | No key sent, or it does not start with `csb_pub_`. | Send `Authorization: Bearer csb_pub_...`. |
 | 401 | `invalid_api_key` | Key unrecognised or revoked. | Generate a new key at `/profile?tab=api`. Do not retry. |
+| 401 | `api_key_in_query_string` | The key was sent in the URL (`?api_key=`). Keys are accepted only in a header, because URLs leak into logs, history and `Referer`. | Send `Authorization: Bearer csb_pub_...`. If the key was ever in a URL, rotate it at `/profile?tab=api`. |
 | 429 | `too_many_failed_auth` | 30 bad or missing keys from one IP within a minute — 5-minute IP ban. | Stop, fix the key, wait out the cooldown. Retrying extends nothing but your own outage. |
 | 403 | `ip_not_allowed` | The key is restricted to an IP allowlist and your address is not on it. | The response quotes the address we saw — add it (or its range) at `/profile?tab=api`, or clear the list. |
 | 403 | `trading_not_enabled` | Valid key, but trading was never enabled on it. | Toggle trading on that key at `/profile?tab=api`. |
@@ -46,6 +47,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 400 | `invalid_param` | A query parameter is malformed — a bad `available_after` timestamp, or a `delivery` value outside `instant` / `up_to_12h` / `hold`, or a `min_refund_percent` outside 0-100. Also a CS2-only filter (`wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after`, `sort=newest`) sent with a Dota 2 or Rust `appId`, and an unavailable `appId` on `GET /v1/public/prices`. | Fix the parameter. This is deliberately an error rather than a silently ignored filter. |
 | 400 | `unsupported_game` | The `appId` is unknown, switched off, or not open to your key. On `POST /v1/orders` it also means your key cannot buy in that game. | Use one of `supported_app_ids` from the body, or check [`GET /v1/games`](/api-reference/get-games). Do not retry unchanged. |
 | 402 | `insufficient_settled_balance` | The price feed requires a funded account. | Top up. `GET /v1/health` and `GET /v1/balance` stay open so you can integrate before funding. |
+| 202 | `snapshot_building` | `GET /v1/listings/snapshot.ndjson.gz`: the file is being built (first request in a while). Not an error, nothing was counted. | Retry in about two minutes. |
 
 ## Buying
 
@@ -56,16 +58,23 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 400 | `invalid_trade_url` | The trade URL on `POST /v1/market/buy` is malformed or private. | Have the end user re-copy their trade URL. |
 | 400 | `cannot_mix_sources` | One order mixed external-market and platform items. | Split into separate orders. |
 | 400 | `one_external_per_order` | More than one external-market item in a single order. | One per order. |
+| 400 | `too_many_items` | More Dota 2 or Rust items than one order takes. `max_items` is in the body (10). | Split into several orders. |
 | 402 | `insufficient_balance` | Balance does not cover the order. | Top up on the site — there is no card or crypto rail through the API. |
 | 403 | `external_buy_disabled` | Deliver-to-any-trade-URL buying is not enabled for you. | Ask us to enable it for your account. |
 | 403 | `kyc_required` | The purchase tripped a KYC threshold. | The account owner completes verification on the site. |
 | 409 | `price_moved` | Live price rose past your `max_price_usd`. **Nothing was charged.** | Re-read `price_usd` from `/v1/listings`, decide, retry. The response carries the current total. |
 | 409 | `item_unavailable` | The listing left the catalogue before your order landed. On CS2 buys, `unknown_ids` names the ids we have no record of: not a listing id (a Steam asset id is the usual mix-up), or a listing gone for over an hour. | Pick another listing, by the `id` from `/v1/listings` or the stream. Subscribe to the [SSE stream](/api-reference/get-listings-stream) — `gone` events remove sold items before you try to buy them. |
 | 409 | `pending_trades_limit` | The recipient has too many unaccepted Steam offers. | Have them accept pending offers first. `limit` is in the body. |
+| 409 | `held_balance_blocked` | Part of your balance is still inside its reversal hold and cannot fund this order yet. **Nothing was charged.** | Wait for the hold to clear (`held_usd` in `GET /v1/balance`), or keep the order within `settled_balance_usd`. |
+| 409 | `concurrent_update` | Another order touched the same items at the same moment, and this one was rolled back. **Nothing was charged.** | Retry. |
 | 409 | `idempotency_in_progress` | A request with the same `Idempotency-Key` / `custom_id` is still running. | Wait and poll `GET /v1/orders/info`; do not re-send with a new key or you will double-buy. |
 | 409 | `price_updating` | Prices are mid-refresh. | Retry in a moment. |
 | 409 | `not_claimable` | The order is not in a claimable state. | Read `status` — it is already delivering, completed, or failed. |
+| 404 | `order_not_found` | No such order on this account (`GET /v1/orders/{id}`, `POST /v1/orders/{id}/claim`). | Check the id. Orders are visible only to the account that placed them. |
+| 425 | `hold_not_cleared` | `POST /v1/orders/{id}/claim`: the item is still inside its hold window. | Retry after `hold_until`, which is in the body. |
+| 502 | `delivery_failed` | `POST /v1/orders/{id}/claim`: the marketplace rejected the withdrawal. `refunded` in the body says whether the money is already back. | If `refunded` is true, nothing to do. Otherwise we retry or refund on our side; follow the order. |
 | 503 | `market_unavailable` | The upstream source for that item is temporarily down. **No charge was made.** | Retry shortly, or pick a listing from elsewhere in the catalogue. |
+| 504 | `upstream_timeout` | The marketplace did not answer in time, so the outcome is **unknown**: the purchase may still have gone through. | Do not re-send blindly. Poll `GET /v1/orders/info` with your `custom_id`, or re-send the identical request with the same `custom_id` / `Idempotency-Key`, which replays the original result instead of buying twice. |
 | 500 | `order_failed` | Unexpected failure. | Check `GET /v1/orders/info` with your `custom_id` before retrying — the order may exist. |
 
 <Note>
@@ -79,6 +88,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 400 | `idempotency_key_required` | `POST /v1/p2p/listings` without an `Idempotency-Key` header of 8–128 characters. | Send one, unique per publish request. |
 | 400 | `no_capable_client` | Nothing on your side can send the Steam trade. | Run the CSBoard extension or app, then retry. |
 | 403 | `contact_required` | No verified email and no linked Telegram to tell you about a sale. | Add one on the site. |
+| 403 | `account_banned` | This account is banned. | Contact support. Retrying will not clear it. |
 | 403 | `shop_locked` / `p2p_cooldown` / `p2p_suspended` / `trading_banned` | Selling on P2P is locked for this account. | Wait until the time in the body, where there is one. Retrying sooner changes nothing. |
 | 409 | `asset_revision_changed` | The item changed after you read the inventory. | Read [`GET /v1/p2p/inventory`](/api-reference/get-p2p-inventory) again and resend with the new `asset_revision`. |
 | 409 | `snapshot_stale` | Our read of your inventory is out of date. The body carries `inventory_proof`. | Poll the inventory after `retry_after_ms`, then resend. |
@@ -87,6 +97,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 422 | `price_below_market` | The price is under half of our market price for the item. Over a key it cannot be confirmed past. | Raise `price_usd` to at least `floor_usd` from the body. The `Idempotency-Key` is not spent. |
 | 503 | `p2p_disabled` | The P2P market is switched off. | Retry later. |
 | 503 | `p2p_reprice_disabled` | Price changes on the P2P market are switched off. | Retry later. |
+| 500 | `internal_error` | Something went wrong on our side. Also answered by Instant Sell. | Retry later. Before retrying a write, read the current state (`GET /v1/p2p/listings`, `GET /v1/sell/orders`). |
 
 ## Instant sell
 
@@ -111,6 +122,12 @@ The full list is in the [Instant Sell guide](/guides/instant-sell#errors).
 | 409 | `too_many_webhooks` | 5 endpoints already registered. | Delete one first. |
 | 409 | `already_delivered` | You retried a delivery that already succeeded. | Nothing to do. |
 
+## MCP server
+
+| HTTP | `code` | Cause | What to do |
+|---|---|---|---|
+| 405 | `method_not_allowed` | `GET` on `/mcp`. The server is stateless and speaks only `POST`. | Send JSON-RPC with `POST /mcp`. See [automation](/guides/automation). |
+
 ## Not available through the API
 
 | HTTP | `code` | Meaning |
@@ -125,7 +142,7 @@ The distinction that matters is whether money moved.
 
 <CardGroup cols={2}>
   <Card title="Safe to retry" icon="rotate">
-    `429` (after `Retry-After`), `price_updating`, `market_unavailable`, `503`, and network timeouts. Nothing was charged. Reuse the **same** `Idempotency-Key` so a request that actually succeeded replays instead of buying twice.
+    `429` (after `Retry-After`), `price_updating`, `market_unavailable`, `concurrent_update`, `held_balance_blocked` (once the hold clears), `503`, and network timeouts. Nothing was charged. Reuse the **same** `Idempotency-Key` so a request that actually succeeded replays instead of buying twice.
   </Card>
   <Card title="Do not retry unchanged" icon="ban">
     `400`, `401`, `403`, `invalid_webhook_url`, `unsupported_item`. The request is wrong; repeating it produces the same error and, on auth failures, an IP ban.
@@ -134,7 +151,7 @@ The distinction that matters is whether money moved.
     `price_moved` and `item_unavailable`. The market changed under you. Re-read the listing, apply your own pricing rule, and issue a **new** order with a **new** idempotency key.
   </Card>
   <Card title="Check before retrying" icon="magnifying-glass">
-    `order_failed`, `idempotency_in_progress`, and any timeout on `POST`. Call `GET /v1/orders/info` with your `custom_id` first — the order may already exist.
+    `order_failed`, `upstream_timeout`, `idempotency_in_progress`, and any timeout on `POST`. Call `GET /v1/orders/info` with your `custom_id` first — the order may already exist.
   </Card>
 </CardGroup>
 
