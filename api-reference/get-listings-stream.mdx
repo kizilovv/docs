@@ -70,7 +70,7 @@ Filters are applied on our side, before anything is sent to you. They exist to s
 
   With `new`, `update` and `gone` you can keep the whole catalogue yourself — load it once from the [snapshot](/api-reference/get-listings-snapshot), then apply the stream — instead of polling `GET /v1/listings`. Filters apply to `update` like to `new`, except `min_price` / `max_price`: a listing you hold that reprices out of your range still reaches you, so you never keep it at an old price. Some markets send float and pattern a few minutes after the lot goes on sale, which is why they can come in an `update`. Sticker wear comes as the market reports it: when the market does not know it, it is `null` both here and in `/v1/listings`.
 
-  On lots from $100 the price can still move at checkout because of other listings of the same item. Send `max_price_usd` with your order: a higher price is refused with `price_moved`, never charged.
+  Lots from $100 are priced against the next listing of the same item, so an `update` also comes when that other listing changes. Still send `max_price_usd` with your order: the price is checked again at purchase, and a higher one is refused with `price_moved`, never charged.
 </ResponseField>
 
 <ResponseField name="gone" type="object">

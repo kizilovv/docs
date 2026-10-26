@@ -1025,7 +1025,7 @@
           "Market data"
         ],
         "summary": "Every buyable listing in one file (gzipped NDJSON)",
-        "description": "The whole shelf as gzipped NDJSON — one Listing JSON object per line, in the exact shape GET /listings returns, one listing per physical skin. Rebuilt every 10 minutes while anyone downloads it. Pair it with GET /listings/stream: connect with `last_event_id` set to this response's `X-Stream-Position` header and apply `new` and `update` as an upsert by id, `gone` as a delete. Reprices come as `update`, so your copy keeps current prices without re-downloading; on lots from $100 the price can still move at checkout and is refused with `price_moved`, never charged. Supports ETag / If-None-Match and Last-Modified / If-Modified-Since (304). Six full downloads per hour per key; a 304 is free. CS2 only — this endpoint does not read `appId`.",
+        "description": "The whole shelf as gzipped NDJSON — one Listing JSON object per line, in the exact shape GET /listings returns, one listing per physical skin. Rebuilt every 10 minutes while anyone downloads it. Pair it with GET /listings/stream: connect with `last_event_id` set to this response's `X-Stream-Position` header and apply `new` and `update` as an upsert by id, `gone` as a delete. Reprices come as `update`, so your copy keeps current prices without re-downloading; a price that moves between an event and your order is refused at checkout with `price_moved`, never charged. Supports ETag / If-None-Match and Last-Modified / If-Modified-Since (304). Six full downloads per hour per key; a 304 is free. CS2 only — this endpoint does not read `appId`.",
         "operationId": "getListingsSnapshot",
         "parameters": [
           {

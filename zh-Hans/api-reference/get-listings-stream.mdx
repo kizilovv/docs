@@ -64,7 +64,7 @@ openapi: "GET /listings/stream"
 
   借助 `new`、`update` 和 `gone`，您可以自行维护整个目录——先从[快照](/api-reference/get-listings-snapshot)加载一次，然后应用流——而无需轮询 `GET /v1/listings`。过滤条件对 `update` 的作用与对 `new` 相同，但 `min_price` / `max_price` 除外：您持有的挂单即使价格移出您的范围也仍会推送给您，以免您保留旧价格。部分市场会在挂单上架几分钟后才提供磨损值和图案，因此它们可能通过 `update` 到达。贴纸磨损按市场提供的原样返回：市场未提供时，它在此处和 `/v1/listings` 中都为 `null`。
 
-  对于 $100 及以上的挂单，由于同一商品的其他挂单，购买时价格仍可能变动。请在订单中传入 `max_price_usd`：更高的价格会以 `price_moved` 被拒绝，而不会被扣款。
+  $100 及以上的挂单以同一商品的下一个挂单为参照定价，因此当该挂单变化时也会推送 `update`。请仍在订单中传入 `max_price_usd`：购买时会重新核对价格，更高的价格会以 `price_moved` 被拒绝，而不会被扣款。
 </ResponseField>
 
 <ResponseField name="gone" type="object">
