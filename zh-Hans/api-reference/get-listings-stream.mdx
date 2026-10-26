@@ -79,7 +79,9 @@ openapi: "GET /listings/stream"
 
 ## 限制
 
-每个 API 密钥最多 3 个并发流。连接本身不受速率限制——一旦建立，事件将以目录变化的速度推送。
+每个 API 密钥最多 3 个并发流。连接本身不受速率限制——一旦建立，事件将以目录变化的速度推送。挂单进入目录后约 0.3 秒，`new` 事件就会同时推送给所有密钥，因此轮询 `/v1/listings` 不可能更早看到它。详见 [轮询与流](/zh-Hans/rate-limits#polling-vs-stream)。
+
+第 4 个连接会收到 `429 too_many_streams`，并带有 `Retry-After: 90`。未正常关闭就断开的连接最多会继续占用名额 90 秒，因此网络中断后立即重连可能需要等待这么久。
 
 ## 示例请求
 
@@ -133,7 +135,7 @@ es.addEventListener("resync", () => {
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
 | 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
-| 429 | `too_many_streams` | 该密钥的并发流超过 3 个。请先关闭已有连接。 |
+| 429 | `too_many_streams` | 该密钥的并发流超过 3 个。请先关闭已有连接，或等待 `Retry-After`（90）秒，让已断开的连接释放名额。响应体包含 `max_connections` 和 `retry_after_sec`。 |
 
 <Tip>
   如果您使用流式订阅，就完全不需要定时轮询 `/v1/listings`——请将其保留用于首次加载目录，以及在收到 `resync` 后的恢复。如果您无法维持长连接，次优方案是带 `available_after` 参数的 `GET /v1/listings`，它能把每次轮询变成一次增量读取。

@@ -37,6 +37,15 @@ openapi: "GET /orders/{id}"
 <ResponseField name="delivery_deadline_at" type="datetime | null">
   交付截止时间，仅在 `status` 为 `pending` 或 `delivering` 时有值（持有中的订单为 `null`）。如果卖家未能按时交付，订单会被自动取消并退款。参见 [`POST /v1/orders/{id}/cancel`](/zh-Hans/api-reference/post-orders-cancel)。
 </ResponseField>
+<ResponseField name="fail_reason" type="string | null">
+  订单失败的原因，是用于程序分支判断的代码，例如 `recipient_inventory_private` 或 `listing_gone`。仅在 `status` 为 `failed` 或 `cancelled` 时有值。[代码列表](/zh-Hans/api-reference/get-orders#fail-reasons) 可能会扩充——遇到不认识的值时请按 `unavailable` 处理。
+</ResponseField>
+<ResponseField name="fail_side" type="string | null">
+  需要采取行动的一方：`recipient`、`seller`、`buyer` 或 `market`。仅在 `status` 为 `failed` 或 `cancelled` 时有值。
+</ResponseField>
+<ResponseField name="fail_message" type="string | null">
+  一句英文说明：发生了什么、该怎么做。可原样展示；程序逻辑请依据 `fail_reason`，因为措辞可能会变。
+</ResponseField>
 <ResponseField name="created_at" type="datetime" required />
 <ResponseField name="updated_at" type="datetime | null" />
 <ResponseField name="items" type="OrderItem[]" required>
@@ -64,6 +73,9 @@ curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
   "hold_until": null,
   "delivery_type": "instant",
   "delivery_deadline_at": null,
+  "fail_reason": null,
+  "fail_side": null,
+  "fail_message": null,
   "created_at": "2026-06-29T17:12:04Z",
   "updated_at": "2026-06-29T17:15:40Z",
   "items": [

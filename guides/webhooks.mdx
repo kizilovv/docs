@@ -141,6 +141,9 @@ Every delivery has the same envelope. `data` is exactly the object `GET /v1/orde
     "hold_until": "2026-08-08T12:03:58.000Z",
     "delivery_type": "instant",
     "delivery_deadline_at": null,
+    "fail_reason": null,
+    "fail_side": null,
+    "fail_message": null,
     "refund": null,
     "created_at": "2026-07-31T12:03:58.000Z",
     "updated_at": "2026-07-31T12:04:11.000Z",
@@ -191,6 +194,9 @@ Every delivery has the same envelope. `data` is exactly the object `GET /v1/orde
 | `hold_until` | string \| null | **The order-level hold end time.** Set when any item is still trade-locked; null once nothing is held. Derived from the items, not from a coarse internal flag. |
 | `delivery_type` | string | `instant` · `manual`. `manual` means a person sends the trade, which can take up to 12 hours; the order may stay `delivering` that long with no trade offer. A player's (P2P) lot is always `manual`. |
 | `delivery_deadline_at` | string (ISO 8601, UTC) \| null | **The delivery deadline.** 12 hours after purchase for `manual`, the vendor's accept window otherwise. Set only while `status` is `pending` or `delivering`; null after that and on held orders. Missed by the seller → the order is cancelled and refunded automatically, or call [`POST /v1/orders/{id}/cancel`](/api-reference/post-orders-cancel) to stop waiting. |
+| `fail_reason` | string \| null | **Why the order failed.** A code such as `recipient_inventory_private` or `listing_gone`, set when `status` is `failed` or `cancelled`, `null` otherwise. The [list of codes](/api-reference/get-orders#fail-reasons) may grow: treat a value you do not know as `unavailable`. |
+| `fail_side` | string \| null | Who has to act on the failure: `recipient` · `seller` · `buyer` · `market`. |
+| `fail_message` | string \| null | One English sentence: what happened and what to do. Show it; branch on `fail_reason`. |
 | `refund` | object \| null | `{ amount_usd, refunded_at, partial }` once money has gone back. `null` means no refund credited — not "refund pending". `partial: true` means one leg of a basket died and we returned less than the full charge. |
 | `created_at` / `updated_at` | string (ISO 8601, UTC) | Order timestamps. |
 | `items` | array | Per-item detail, below. |

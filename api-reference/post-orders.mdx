@@ -155,11 +155,11 @@ curl -X POST https://csboard.com/v1/orders \
 | 403 | `trading_not_enabled` | The API key does not have buying enabled. Enable it in your profile. |
 | 403 | `account_restricted` | The account is restricted. Contact support. |
 | 409 | `price_moved` | The live total exceeded `max_price_usd`. Order rejected; no charge made. The body carries `quoted_max_usd`, `current_total_usd` and the live price of each item. |
-| 409 | `item_unavailable` | An item sold before your order landed. The body may carry `unavailable_ids`. |
+| 409 | `item_unavailable` | An item left the catalogue before your order landed. The body may carry `unavailable_ids` and, for CS2, `unknown_ids`. See [unavailable items](#unavailable-items) below. |
 | 409 | `idempotency_in_progress` | A request with this `Idempotency-Key` is still running. Wait and retry with the same key. |
 | 409 | `pending_trades_limit` | The recipient has too many unaccepted Steam offers. `limit` is in the body. |
 | 409 | `price_updating` / `concurrent_update` | Prices are mid-refresh, or a concurrent order won the race. Nothing was charged — retry. |
-| 429 | `rate_limit_exceeded` | Over 250 orders/min, or over your key's general per-minute limit. Wait for the `Retry-After` header value. |
+| 429 | `rate_limit_exceeded` | Over 250 buy orders/min (`bucket: "buy_orders"`), or over your key's trading limit (`bucket: "trading"`). Wait for the `Retry-After` header value. |
 | 500 | `order_failed` | Unexpected failure. Check `GET /v1/orders/info` before retrying — the order may exist. |
 | 503 | `market_unavailable` | The marketplace for one of the items is temporarily down. No charge was made. |
 | 504 | `upstream_timeout` | The outcome is unknown. Re-send with the same `Idempotency-Key` or poll your orders — never with a new key. |
@@ -175,3 +175,19 @@ curl -X POST https://csboard.com/v1/orders \
 <Note>
   **Dota 2 and Rust.** Orders with `appId` `570` or `252490` are queued for delivery and answer `delivery: "pending"` with `expected_minutes: null`. Follow them with [`GET /v1/orders/{id}`](/api-reference/get-order). The price ceiling, balance check and idempotency work exactly as for CS2.
 </Note>
+
+<a id="unavailable-items" />
+## Unavailable items
+
+Listings can leave the catalogue between your read and your buy. The `409 item_unavailable` body lists every missing id in `unavailable_ids`. On a CS2 order it may also carry `unknown_ids`: the missing ids we have no record of at all. Either the id is not a CSBoard listing id, or the listing left the catalogue more than an hour ago. A Steam asset id is the usual mix-up — CSBoard listing ids are never all digits, so send the `id` of a row from `/v1/listings` or the stream.
+
+```json
+{
+  "code": "item_unavailable",
+  "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+  "unavailable_ids": ["31846262931"],
+  "unknown_ids": ["31846262931"]
+}
+```
+
+To drop sold listings before you try to buy them, subscribe to the `gone` events of [`GET /v1/listings/stream`](/api-reference/get-listings-stream).

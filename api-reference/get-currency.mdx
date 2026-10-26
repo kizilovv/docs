@@ -75,7 +75,7 @@ curl https://csboard.com/v1/currency \
 | HTTP status | Code | Meaning |
 |---|---|---|
 | 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |
-| 429 | `rate_limit_exceeded` | Over 30 requests/min. Check the `Retry-After` header before retrying. |
+| 429 | `rate_limit_exceeded` | Over your key's read limit (100/min by default). Check the `Retry-After` header before retrying. |
 
 <Tip>
   Cache the rates response client-side and refresh it no more than once per hour. Rates are updated on the same ~1 hour cycle, so polling more frequently won't give you fresher data and consumes your rate limit budget.

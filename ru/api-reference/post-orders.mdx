@@ -155,11 +155,11 @@ curl -X POST https://csboard.com/v1/orders \
 | 403 | `trading_not_enabled` | Для API-ключа не включены покупки. Включите их в профиле. |
 | 403 | `account_restricted` | Аккаунт ограничен. Обратитесь в поддержку. |
 | 409 | `price_moved` | Живой итог превысил `max_price_usd`. Заказ отклонён, списания не было. В теле — `quoted_max_usd`, `current_total_usd` и живая цена каждого предмета. |
-| 409 | `item_unavailable` | Предмет продан раньше, чем пришёл ваш заказ. В теле может быть `unavailable_ids`. |
+| 409 | `item_unavailable` | Предмет ушёл из каталога раньше, чем пришёл ваш заказ. В теле может быть `unavailable_ids`, а для CS2 — и `unknown_ids`. См. [«Недоступные предметы»](#unavailable-items) ниже. |
 | 409 | `idempotency_in_progress` | Запрос с этим `Idempotency-Key` ещё выполняется. Подождите и повторите с тем же ключом. |
 | 409 | `pending_trades_limit` | У получателя слишком много непринятых офферов Steam. Лимит — в поле `limit`. |
 | 409 | `price_updating` / `concurrent_update` | Цены обновляются или параллельный заказ оказался быстрее. Ничего не списано — повторите. |
-| 429 | `rate_limit_exceeded` | Более 250 заказов/мин или превышен общий лимит ключа в минуту. Подождите время из заголовка `Retry-After`. |
+| 429 | `rate_limit_exceeded` | Более 250 заказов на покупку в минуту (`bucket: "buy_orders"`) или превышен торговый лимит ключа (`bucket: "trading"`). Подождите время из заголовка `Retry-After`. |
 | 500 | `order_failed` | Непредвиденная ошибка. Перед повтором проверьте `GET /v1/orders/info` — заказ мог создаться. |
 | 503 | `market_unavailable` | Маркетплейс одного из предметов временно недоступен. Списания не было. |
 | 504 | `upstream_timeout` | Исход неизвестен. Повторяйте с тем же `Idempotency-Key` или опросите заказы — никогда с новым ключом. |
@@ -175,3 +175,19 @@ curl -X POST https://csboard.com/v1/orders \
 <Note>
   **Dota 2 и Rust.** Заказы с `appId` `570` или `252490` ставятся в очередь на доставку и отвечают `delivery: "pending"` с `expected_minutes: null`. Следите за ними через [`GET /v1/orders/{id}`](/ru/api-reference/get-order). Верхняя граница цены, проверка баланса и идемпотентность работают так же, как для CS2.
 </Note>
+
+<a id="unavailable-items" />
+## Недоступные предметы
+
+Листинг может уйти из каталога между вашим чтением и покупкой. В теле `409 item_unavailable` все пропавшие id перечислены в `unavailable_ids`. В заказе CS2 там может быть и `unknown_ids` — те из пропавших id, о которых у нас нет никакой записи. Либо это не id листинга CSBoard, либо листинг ушёл из каталога больше часа назад. Чаще всего вместо id листинга присылают asset id из Steam. У листингов CSBoard id никогда не состоит из одних цифр, поэтому отправляйте `id` строки из `/v1/listings` или стрима.
+
+```json
+{
+  "code": "item_unavailable",
+  "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+  "unavailable_ids": ["31846262931"],
+  "unknown_ids": ["31846262931"]
+}
+```
+
+Чтобы убирать проданные листинги до попытки покупки, подпишитесь на события `gone` в [`GET /v1/listings/stream`](/ru/api-reference/get-listings-stream).

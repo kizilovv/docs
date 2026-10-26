@@ -37,6 +37,15 @@ The response is a single `Order` object with the same shape as the items in [`GE
 <ResponseField name="delivery_deadline_at" type="datetime | null">
   Delivery deadline, set only while `status` is `pending` or `delivering` (`null` on held orders). If the seller misses it, the order is cancelled and refunded automatically. See [`POST /v1/orders/{id}/cancel`](/api-reference/post-orders-cancel).
 </ResponseField>
+<ResponseField name="fail_reason" type="string | null">
+  Why the order failed, as a code to branch on, such as `recipient_inventory_private` or `listing_gone`. Set only when `status` is `failed` or `cancelled`. The [list of codes](/api-reference/get-orders#fail-reasons) may grow — treat a value you do not know as `unavailable`.
+</ResponseField>
+<ResponseField name="fail_side" type="string | null">
+  Who has to act on the failure: `recipient`, `seller`, `buyer` or `market`. Set only when `status` is `failed` or `cancelled`.
+</ResponseField>
+<ResponseField name="fail_message" type="string | null">
+  One English sentence saying what happened and what to do. Show it as is; branch on `fail_reason`, since the wording can change.
+</ResponseField>
 <ResponseField name="refund" type="Refund | null">
   Money credited back for this order, or `null` if none was. Carries `amount_usd`, `refunded_at`, and `partial`. A `cancelled` or `failed` order is always refunded — read this instead of inferring it from the status.
 </ResponseField>
@@ -67,6 +76,9 @@ curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
   "hold_until": null,
   "delivery_type": "instant",
   "delivery_deadline_at": null,
+  "fail_reason": null,
+  "fail_side": null,
+  "fail_message": null,
   "refund": null,
   "created_at": "2026-06-29T17:12:04Z",
   "updated_at": "2026-06-29T17:15:40Z",

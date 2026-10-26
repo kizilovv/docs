@@ -85,7 +85,9 @@ A `: heartbeat` comment arrives every 25 seconds. Treat a longer silence as a de
 
 ## Limits
 
-Three concurrent streams per API key. The connection itself is not rate-limited — once open, events flow as fast as the catalogue changes.
+Three concurrent streams per API key. The connection itself is not rate-limited — once open, events flow as fast as the catalogue changes. A `new` event goes out about 0.3 seconds after a listing enters the catalogue, to every key at the same moment, so polling `/v1/listings` cannot see a listing sooner. See [polling versus the stream](/rate-limits#polling-vs-stream).
+
+A fourth connection answers `429 too_many_streams` with `Retry-After: 90`. A connection that dropped without closing keeps its slot for up to 90 seconds, so a reconnect right after a network blip may have to wait that long.
 
 ## Example request
 
@@ -139,7 +141,7 @@ es.addEventListener("resync", () => {
 | HTTP status | Code | Meaning |
 | --- | --- | --- |
 | 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |
-| 429 | `too_many_streams` | More than 3 concurrent streams for this key. Close an existing connection first. |
+| 429 | `too_many_streams` | More than 3 concurrent streams for this key. Close an existing connection first, or wait `Retry-After` (90) seconds for a dropped one to free its slot. The body carries `max_connections` and `retry_after_sec`. |
 
 <Tip>
   If you are streaming, you do not need to poll `/v1/listings` on a timer at all — keep it for your initial catalogue load and for recovering after a `resync`. If you cannot hold a long-lived connection, the next best thing is `GET /v1/listings` with `available_after`, which turns each poll into a delta read.

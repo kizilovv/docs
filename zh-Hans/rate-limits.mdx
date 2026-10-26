@@ -1,23 +1,27 @@
 ---
 title: "CSBoard API 速率限制以及如何处理 429 错误"
 sidebarTitle: "速率限制"
-description: "了解所有 CSBoard API 端点的每密钥请求限制、读取 Retry-After 头部，并实现正确的 429 退避逻辑。"
+description: "了解所有 CSBoard API 端点的每密钥请求限制、读取 X-RateLimit 和 Retry-After 头部，并实现正确的 429 退避逻辑。"
 ---
 
-CSBoard API 强制执行每密钥的速率限制，以确保服务对所有用户保持稳定。如果您超出限制，会立即收到 `429` 响应——不会有请求被部分处理。请构建您的客户端以检查 `Retry-After` 头部并在重试前暂停，而不是在紧密循环中持续冲击端点。
+CSBoard API 强制执行每密钥的速率限制，以确保服务对所有用户保持稳定。如果您超出限制，会立即收到 `429` 响应——不会有请求被部分处理。每个响应都会告诉您当前这一分钟还剩多少额度，因此客户端可以在触及限制之前就放慢速度。如果仍然收到 `429`，请读取 `Retry-After` 头部并在重试前暂停，而不是在紧密循环中持续冲击端点。
 
 ## 各端点的限制
 
-限制按 **每个 API 密钥** 以固定的一分钟窗口计数：计数器在每分钟开始时清零。唯一的例外是无需密钥的价格数据源，它按 IP 地址限流。
+携带 API 密钥的请求按 **每个密钥** 以固定的一分钟窗口计数：计数器在每分钟开始时清零。下表中密钥自身的限制是这类请求受到的唯一限制——不会再叠加任何按 IP 的限制。无需密钥的端点 `GET /v1/health` 和 `GET /v1/public/prices` 没有密钥可供计数，因此按 IP 地址限流。
 
-| 限制 | 端点 |
-|---|---|
-| **100 / 分钟** | 所有携带密钥的请求——挂单、价格、游戏、货币、余额、订单状态、Webhook 管理、P2P。这是默认值，可针对单个密钥提高。 |
-| **250 / 分钟** | `POST /v1/orders` 和 `POST /v1/market/buy`（下达购买订单并消费真实资金）。这些请求同时计入上面的每密钥限制。 |
-| **30 / 分钟** | P2P 写操作——`POST /v1/p2p/listings`、`PATCH` 和 `DELETE /v1/p2p/listings/{id}` 共用一个额度。一次最多 50 件物品的批量请求只算一次。这些调用同时计入上面的每密钥限制。 |
-| **1 / 分钟** | `GET /v1/prices/snapshot.ndjson.gz`（批量压缩快照） |
-| **同时 3 个** | 每个密钥对 `GET /v1/listings/stream` 的并发连接数 |
-| **每 IP 1 / 分钟** | `GET /v1/public/prices`——无需密钥，因此限制跟随您的 IP 地址。该数据源每分钟重建一次，更频繁地轮询没有任何收益。 |
+| 限制 | 额度 | 端点 |
+|---|---|---|
+| **100 / 分钟** | `read` | 读取以及交易以外的所有携带密钥的请求——挂单、单品深度、可用性、价格、游戏、货币、Webhook 管理、P2P。这是默认值，可应要求针对单个密钥提高。 |
+| **3,000 / 分钟** | `trading` | 交易——`POST /v1/orders`、`POST /v1/market/buy`、`GET /v1/orders`、`GET /v1/orders/{id}`、`GET /v1/orders/info`、`POST /v1/orders/{id}/claim`、`POST /v1/orders/{id}/cancel`、`GET /v1/balance`。如果密钥的读取限制被提高到 3,000 以上，交易限制与之相同。这是独立的额度，因此即使以上限速度读取目录，也不会阻塞购买或订单状态轮询。 |
+| **250 / 分钟** | `buy_orders` | `POST /v1/orders` 和 `POST /v1/market/buy`（下达购买订单并消费真实资金）。这是在上面交易额度之上的额外限制。 |
+| **30 / 分钟** | — | P2P 写操作——`POST /v1/p2p/listings`、`PATCH` 和 `DELETE /v1/p2p/listings/{id}` 共用一个额度。一次最多 50 件物品的批量请求只算一次。这些调用同时计入上面的读取限制。 |
+| **1 / 分钟** | — | `GET /v1/prices/snapshot.ndjson.gz`（批量压缩价格列表） |
+| **6 / 小时** | — | `GET /v1/listings/snapshot.ndjson.gz` 的完整下载（一个文件包含全部挂单）。对 `If-None-Match` 返回的 `304` 不计入次数。 |
+| **同时 3 个** | — | 每个密钥对 `GET /v1/listings/stream` 的并发连接数 |
+| **每 IP 1 / 分钟** | — | `GET /v1/public/prices`——无需密钥，因此限制跟随您的 IP 地址。该数据源每分钟重建一次，更频繁地轮询没有任何收益。 |
+
+[`GET /v1/key`](/api-reference/get-key) 一次调用即可在 `rate_limits` 中返回密钥的全部限制。
 
 <Note>
   同一 IP 地址在一分钟内发送 30 个使用 **无效或缺失 API 密钥** 的请求，将自动触发 5 分钟的 IP 级封禁。封禁期间，来自该 IP 的每个请求无论携带哪个密钥，都会返回 `429 too_many_failed_auth`。请修正密钥并等待封禁结束后再重试。
@@ -27,24 +31,68 @@ CSBoard API 强制执行每密钥的速率限制，以确保服务对所有用�
   保持在限制之内最省力的方法，是不再轮询那些我们可以主动推送的内容。[Webhooks](/guides/webhooks) 会在订单状态变化时推送，[SSE 挂单流](/zh-Hans/api-reference/get-listings-stream) 则通过一个连接推送 `new` 和 `gone` 事件——两者都不会按事件消耗您的请求额度。
 </Tip>
 
+## 速率限制响应头
+
+只要密钥通过验证，每个响应都会带有四个头部，描述该请求所消耗的额度：
+
+| 头部 | 含义 |
+|---|---|
+| `X-RateLimit-Limit` | 该额度每分钟的上限。 |
+| `X-RateLimit-Remaining` | 当前这一分钟内剩余的请求数。 |
+| `X-RateLimit-Reset` | 距离窗口重新开始的秒数，取值 `1` 到 `60`。 |
+| `X-RateLimit-Bucket` | `read` 或 `trading`。购买订单限制返回的 `429` 中为 `buy_orders`。 |
+
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 3000
+X-RateLimit-Remaining: 2987
+X-RateLimit-Reset: 41
+X-RateLimit-Bucket: trading
+```
+
+请根据这些头部控制请求节奏，而不是靠撞上限来摸清上限。当 `X-RateLimit-Remaining` 降到 `0` 时，暂停该额度上的请求 `X-RateLimit-Reset` 秒。
+
 ## 429 响应格式
 
 当您超出每密钥限制时，API 返回：
 
 ```http
 HTTP/1.1 429 Too Many Requests
-Retry-After: 60
+Retry-After: 23
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 23
+X-RateLimit-Bucket: read
 Content-Type: application/json
 
-{ "code": "rate_limit_exceeded", "detail": "Rate limit of 100 requests/min exceeded." }
+{
+  "code": "rate_limit_exceeded",
+  "detail": "Read rate limit of 100 requests/min exceeded. The counter restarts in 23 s. For new listings use GET /v1/listings/stream instead of polling.",
+  "bucket": "read",
+  "limit_per_min": 100,
+  "retry_after_sec": 23
+}
 ```
 
-`Retry-After` 头部的值是一个整数，单位为 **秒**。对于每密钥限制，该值为 `60`：等待这么久总是足够的，因为计数器会在下一分钟开始时清零。
+`bucket` 指明已耗尽的额度（`read`、`trading` 或 `buy_orders`），`limit_per_min` 是它的上限。`Retry-After` 头部的值是一个整数，单位为 **秒**：距离这一分钟的窗口重新开始还剩的时间，取值 `1` 到 `60`。`retry_after_sec` 携带相同的数值。等待这么久总是足够的，因为计数器会随窗口一起清零。
 
-批量快照端点在被限流时使用不同的错误码：
+批量价格快照端点在被限流时使用不同的错误码：
 
 ```json
 { "code": "snapshot_rate_limited", "detail": "Snapshot is limited to 1/min. Poll less or cache it." }
+```
+
+它的 `Retry-After` 同样是本分钟剩余的精确秒数，P2P 写操作限制（`rate_limit_exceeded`）和 Instant Sell 报价限制（`rate_limited`）也是如此。这些响应体只有 `code` 和 `detail`。
+
+同一密钥的第 4 个并发挂单流会收到 `429 too_many_streams`，并带有 `Retry-After: 90`。未正常关闭就断开的连接最多会继续占用名额 90 秒，因此网络中断后立即重连可能需要等待这么久：
+
+```json
+{
+  "code": "too_many_streams",
+  "detail": "At most 3 concurrent streams per key. Close an existing connection first — one stream carries the whole catalogue, so you do not need several. A connection that dropped without closing frees its slot within 90 s.",
+  "max_connections": 3,
+  "retry_after_sec": 90
+}
 ```
 
 无需密钥的 `GET /v1/public/prices` 按 IP 地址而非密钥限流，其 `429` 响应体中没有 `code` 字段——请根据状态码和 `Retry-After` 处理：
@@ -55,9 +103,13 @@ Content-Type: application/json
 
 ## 在客户端中处理 429
 
-读取 `Retry-After` 并至少休眠相应秒数后再重试。下方示例展示了 bash 中的一个简单重试循环：
+读取 `Retry-After` 并至少休眠相应秒数后再重试。更好的做法是在每个响应中读取 `X-RateLimit-Remaining`，在额度用完之前就放慢速度。下方示例展示了 bash 中同时做到这两点的一个简单循环：
 
 ```bash
+header() {
+  echo "$RESPONSE" | grep -i "^$1:" | awk '{print $2}' | tr -d '\r'
+}
+
 while true; do
   RESPONSE=$(curl -si https://csboard.com/v1/listings \
     -H "Authorization: Bearer csb_pub_...")
@@ -65,11 +117,16 @@ while true; do
   STATUS=$(echo "$RESPONSE" | head -1 | awk '{print $2}')
 
   if [ "$STATUS" = "429" ]; then
-    RETRY_AFTER=$(echo "$RESPONSE" | grep -i "retry-after" | awk '{print $2}' | tr -d '\r')
+    RETRY_AFTER=$(header retry-after)
     echo "Rate limited. Waiting ${RETRY_AFTER}s..."
     sleep "$RETRY_AFTER"
   else
     echo "$RESPONSE" | tail -1  # print body
+
+    # 本分钟的最后一次请求：等窗口重新开始后再发下一次。
+    if [ "$(header x-ratelimit-remaining)" = "0" ]; then
+      sleep "$(header x-ratelimit-reset)"
+    fi
     break
   fi
 done
@@ -78,6 +135,14 @@ done
 <Tip>
   在并行运行多个工作线程时，添加少量抖动（例如 `sleep $((RETRY_AFTER + RANDOM % 5))`），这样它们就不会在同一瞬间全部恢复并立即再次触发限制。
 </Tip>
+
+<a id="polling-vs-stream" />
+## 轮询与流
+
+[挂单流](/zh-Hans/api-reference/get-listings-stream) 会在挂单进入目录后约 0.3 秒发布 `new` 事件。2026 年 10 月 26 日的实测：中位数 0.34 秒，最大值不到 0.5 秒。无论以多快的频率轮询 `GET /v1/listings`，都不可能比流更早看到一个挂单。所有密钥在同一时刻收到同一个流——不存在优先级。
+
+- 获取新挂单和 `gone` 事件时，请保持一个流连接。使用 `Last-Event-ID` 重连，或从 [挂单快照](/api-reference/get-listings-snapshot) 的 `X-Stream-Position` 开始，就不会遗漏任何事件。
+- 带筛选条件的读取——某一件物品、某个磨损值区间、某个价格区间——请使用 `GET /v1/listings`。
 
 ## 提高您的限制
 

@@ -1,25 +1,27 @@
 ---
 title: "CSBoard API Rate Limits and How to Handle 429 Errors"
 sidebarTitle: "Rate Limits"
-description: "Understand per-key request limits across all CSBoard API endpoints, read the Retry-After header, and implement correct 429 back-off logic."
+description: "Understand per-key request limits across all CSBoard API endpoints, read the X-RateLimit and Retry-After headers, and implement correct 429 back-off logic."
 ---
 
-The CSBoard API enforces per-key rate limits to keep the service stable for all users. If you exceed a limit you receive a `429` response immediately — no request is partially processed. Build your client to inspect the `Retry-After` header and pause before retrying, rather than hammering the endpoint in a tight loop.
+The CSBoard API enforces per-key rate limits to keep the service stable for all users. If you exceed a limit you receive a `429` response immediately — no request is partially processed. Every answer tells you how much of the current minute's budget is left, so your client can slow down before it reaches a limit. If a `429` still arrives, read the `Retry-After` header and pause before retrying, rather than hammering the endpoint in a tight loop.
 
 ## Limits by endpoint
 
-Limits are counted **per API key** in fixed one-minute windows: the counter starts again at the beginning of every minute. The one exception is the keyless price feed, which is limited per IP address.
+Calls made with an API key are counted **per key** in fixed one-minute windows: the counter starts again at the beginning of every minute. The key's own limits below are the only ones such a call meets — there is no per-IP limit on top of them. The keyless endpoints, `GET /v1/health` and `GET /v1/public/prices`, have no key to count against, so they are limited per IP address.
 
-| Limit | Endpoint(s) |
-|---|---|
-| **100 / min** | Reads made with a key — listings, prices, games, currency, webhook management, P2P. This is the default; it can be raised per key. |
-| **10,000 / min** | Trading — `POST /v1/orders`, `POST /v1/market/buy`, `GET /v1/orders`, `GET /v1/orders/{id}`, `GET /v1/orders/info`, `POST /v1/orders/{id}/claim`, `GET /v1/balance`. A separate budget, so reading the catalogue at its ceiling never blocks a buy or an order-status poll. |
-| **250 / min** | `POST /v1/orders` and `POST /v1/market/buy` (place buy orders and spend real money). On top of the trading budget above. |
-| **30 / min** | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the per-key read limit above. |
-| **1 / min** | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed price list) |
-| **6 / hour** | Full downloads of `GET /v1/listings/snapshot.ndjson.gz` (every listing in one file). A `304` answer to `If-None-Match` is free. |
-| **3 at once** | Concurrent `GET /v1/listings/stream` connections per key |
-| **1 / min per IP** | `GET /v1/public/prices` — no key, so the limit follows your IP address. The feed is rebuilt once a minute, so faster polling gains nothing. |
+| Limit | Bucket | Endpoint(s) |
+|---|---|---|
+| **100 / min** | `read` | Reads and every other keyed call not listed under trading — listings, depth, availability, prices, games, currency, webhook management, P2P. This is the default; it can be raised per key on request. |
+| **3,000 / min** | `trading` | Trading — `POST /v1/orders`, `POST /v1/market/buy`, `GET /v1/orders`, `GET /v1/orders/{id}`, `GET /v1/orders/info`, `POST /v1/orders/{id}/claim`, `POST /v1/orders/{id}/cancel`, `GET /v1/balance`. A key whose read limit was raised above 3,000 gets that number here too. A separate budget, so reading the catalogue at its ceiling never blocks a buy or an order-status poll. |
+| **250 / min** | `buy_orders` | `POST /v1/orders` and `POST /v1/market/buy` (place buy orders and spend real money). On top of the trading budget above. |
+| **30 / min** | — | P2P writes — `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}` share one budget. A batch of up to 50 items counts as one request. These calls also count toward the per-key read limit above. |
+| **1 / min** | — | `GET /v1/prices/snapshot.ndjson.gz` (bulk compressed price list) |
+| **6 / hour** | — | Full downloads of `GET /v1/listings/snapshot.ndjson.gz` (every listing in one file). A `304` answer to `If-None-Match` is free. |
+| **3 at once** | — | Concurrent `GET /v1/listings/stream` connections per key |
+| **1 / min per IP** | — | `GET /v1/public/prices` — no key, so the limit follows your IP address. The feed is rebuilt once a minute, so faster polling gains nothing. |
+
+[`GET /v1/key`](/api-reference/get-key) returns every limit of your key in one call, under `rate_limits`.
 
 <Note>
   Sending 30 requests with **invalid or missing API keys** from the same IP address within one minute triggers an automatic 5-minute IP-level ban. During the ban every request from that IP returns `429 too_many_failed_auth`, whichever key it carries. Fix the key and wait out the ban before retrying.
@@ -29,24 +31,68 @@ Limits are counted **per API key** in fixed one-minute windows: the counter star
   The cheapest way to stay under these limits is to stop polling for things we can push. [Webhooks](/guides/webhooks) deliver order state as it changes, and the [SSE listing stream](/api-reference/get-listings-stream) delivers `new` and `gone` events on one connection — neither counts against your request budget per event.
 </Tip>
 
+## Rate limit headers
+
+Once your key is accepted, every answer carries four headers for the bucket the call spent:
+
+| Header | Meaning |
+|---|---|
+| `X-RateLimit-Limit` | The bucket's ceiling per minute. |
+| `X-RateLimit-Remaining` | Calls left in the current minute. |
+| `X-RateLimit-Reset` | Seconds until the window restarts, from `1` to `60`. |
+| `X-RateLimit-Bucket` | `read` or `trading`. A `429` from the buy-order limit says `buy_orders`. |
+
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 3000
+X-RateLimit-Remaining: 2987
+X-RateLimit-Reset: 41
+X-RateLimit-Bucket: trading
+```
+
+Pace your client from these headers instead of finding the ceiling by hitting it. When `X-RateLimit-Remaining` reaches `0`, hold further calls on that bucket for `X-RateLimit-Reset` seconds.
+
 ## 429 response format
 
 When you exceed a per-key limit the API returns:
 
 ```http
 HTTP/1.1 429 Too Many Requests
-Retry-After: 60
+Retry-After: 23
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 23
+X-RateLimit-Bucket: read
 Content-Type: application/json
 
-{ "code": "rate_limit_exceeded", "detail": "Rate limit of 100 requests/min exceeded." }
+{
+  "code": "rate_limit_exceeded",
+  "detail": "Read rate limit of 100 requests/min exceeded. The counter restarts in 23 s. For new listings use GET /v1/listings/stream instead of polling.",
+  "bucket": "read",
+  "limit_per_min": 100,
+  "retry_after_sec": 23
+}
 ```
 
-The `Retry-After` header value is an integer number of **seconds**. On the per-key limits it is `60`: waiting that long is always enough, because the counter resets at the start of the next minute.
+`bucket` names the spent bucket (`read`, `trading` or `buy_orders`) and `limit_per_min` its ceiling. The `Retry-After` header value is an integer number of **seconds**: the time left until the minute's window restarts, from `1` to `60`. `retry_after_sec` carries the same number. Waiting that long is always enough, because the counter starts again with the window.
 
-The bulk snapshot endpoint uses a distinct error code when rate-limited:
+The bulk price snapshot uses a distinct error code when rate-limited:
 
 ```json
 { "code": "snapshot_rate_limited", "detail": "Snapshot is limited to 1/min. Poll less or cache it." }
+```
+
+Its `Retry-After` is the exact time left in the minute as well, and so is the one from the P2P write limit (`rate_limit_exceeded`) and the Instant Sell quote limit (`rate_limited`). Those bodies carry only `code` and `detail`.
+
+A fourth concurrent listing stream on one key answers `429 too_many_streams` with `Retry-After: 90`. A connection that dropped without closing keeps its slot for up to 90 seconds, so a reconnect right after a network blip may have to wait that long:
+
+```json
+{
+  "code": "too_many_streams",
+  "detail": "At most 3 concurrent streams per key. Close an existing connection first — one stream carries the whole catalogue, so you do not need several. A connection that dropped without closing frees its slot within 90 s.",
+  "max_connections": 3,
+  "retry_after_sec": 90
+}
 ```
 
 The keyless `GET /v1/public/prices` is limited by IP address rather than by key, and its `429` body has no `code` field — branch on the status and `Retry-After`:
@@ -57,9 +103,13 @@ The keyless `GET /v1/public/prices` is limited by IP address rather than by key,
 
 ## Handling 429s in your client
 
-Read `Retry-After` and sleep for at least that many seconds before retrying. The example below shows a simple retry loop in bash:
+Read `Retry-After` and sleep for at least that many seconds before retrying. Better still, read `X-RateLimit-Remaining` on every answer and slow down before it runs out. The example below shows a simple loop in bash that does both:
 
 ```bash
+header() {
+  echo "$RESPONSE" | grep -i "^$1:" | awk '{print $2}' | tr -d '\r'
+}
+
 while true; do
   RESPONSE=$(curl -si https://csboard.com/v1/listings \
     -H "Authorization: Bearer csb_pub_...")
@@ -67,11 +117,16 @@ while true; do
   STATUS=$(echo "$RESPONSE" | head -1 | awk '{print $2}')
 
   if [ "$STATUS" = "429" ]; then
-    RETRY_AFTER=$(echo "$RESPONSE" | grep -i "retry-after" | awk '{print $2}' | tr -d '\r')
+    RETRY_AFTER=$(header retry-after)
     echo "Rate limited. Waiting ${RETRY_AFTER}s..."
     sleep "$RETRY_AFTER"
   else
     echo "$RESPONSE" | tail -1  # print body
+
+    # Last call of this minute: wait for the window to restart before the next one.
+    if [ "$(header x-ratelimit-remaining)" = "0" ]; then
+      sleep "$(header x-ratelimit-reset)"
+    fi
     break
   fi
 done
@@ -80,6 +135,14 @@ done
 <Tip>
   Add a small jitter (e.g. `sleep $((RETRY_AFTER + RANDOM % 5))`) when running multiple workers in parallel so they don't all resume at the same instant and immediately re-trigger the limit.
 </Tip>
+
+<a id="polling-vs-stream" />
+## Polling versus the stream
+
+The [listing stream](/api-reference/get-listings-stream) publishes a `new` event about 0.3 seconds after a listing enters the catalogue. Measured on October 26, 2026: median 0.34 s, maximum under 0.5 s. Polling `GET /v1/listings` faster cannot show you a listing sooner than the stream delivers it. Every key receives the same stream at the same moment — there is no priority tier.
+
+- For new listings and `gone` events, keep one stream open. Reconnect with `Last-Event-ID`, or start from the `X-Stream-Position` of a [listings snapshot](/api-reference/get-listings-snapshot), and you miss nothing.
+- For filtered reads — one item, a float range, a price band — use `GET /v1/listings`.
 
 ## Raising your limits
 

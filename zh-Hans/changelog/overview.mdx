@@ -4,6 +4,28 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年10月26日">
+
+## 新功能
+
+**订单失败的原因：`fail_reason`、`fail_side`、`fail_message`**
+
+订单现在会说明失败原因，适用于 [`GET /v1/orders`](/zh-Hans/api-reference/get-orders)、[`GET /v1/orders/info`](/zh-Hans/api-reference/get-orders-info)、[`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 和 `order.updated` 网络钩子，P2P 行也包括在内。对于 `failed` 或 `cancelled` 的订单，`fail_reason` 是用于程序分支判断的代码，`fail_side` 表示需要采取行动的一方（`recipient`、`seller`、`buyer` 或 `market`），`fail_message` 用一句话说明发生了什么、该怎么做。其他状态下这三个字段都为 `null`。此前这类订单只显示 `unavailable`，即使原因是收货方的库存未公开——而这恰恰只有您能解决。代码列表可能会扩充：遇到不认识的值时请按 `unavailable` 处理。参见 [订单失败的原因](/zh-Hans/api-reference/get-orders#fail-reasons)。
+
+**每个响应都带有速率限制头部**
+
+每个携带密钥的请求，其响应都带有 `X-RateLimit-Limit`、`X-RateLimit-Remaining`、`X-RateLimit-Reset` 和 `X-RateLimit-Bucket`，描述该请求所消耗的额度，便于您在收到 `429` 之前控制节奏。[`GET /v1/key`](/api-reference/get-key) 会在 `rate_limits` 中列出密钥的全部限制。
+
+## 变更
+
+- 携带密钥的请求现在只按密钥自身的额度计数。此前全站按 IP 的限制（约每分钟 133 次）也会计入这些请求，因此所有集成都会先于本文档中的每密钥限制被它卡住，而它返回的 `x-ratelimit-limit: 1000` 头部描述的也并不是您的密钥。无需密钥的端点（`GET /v1/health`、`GET /v1/public/prices`）仍按 IP 限流。参见 [速率限制](/zh-Hans/rate-limits)。
+- 交易请求（`POST /v1/orders`、`POST /v1/market/buy`、`GET /v1/orders*`、`POST /v1/orders/{id}/claim`、`POST /v1/orders/{id}/cancel`、`GET /v1/balance`）拥有独立的额度：每个密钥每分钟 3,000 次；如果密钥的读取限制更高，则以读取限制为准。以上限速度读取目录不会影响购买和订单状态轮询。
+- 来自每密钥额度的 `429 rate_limit_exceeded` 会指明额度：`bucket`（`read`、`trading` 或 `buy_orders`）、`limit_per_min` 和 `retry_after_sec`。`Retry-After` 现在是距离新的一分钟窗口开始的秒数（1–60），而不再固定为 60；`snapshot_rate_limited`、P2P 写操作限制和 Instant Sell 报价限制也是如此。
+- `429 too_many_streams` 带有 `Retry-After: 90`、`max_connections` 和 `retry_after_sec`：未正常关闭就断开的流会在 90 秒内释放名额。
+- CS2 购买返回的 `409 item_unavailable` 会在 `unknown_ids` 中列出我们没有任何记录的 id：不是挂单 id（最常见的是 Steam 资产 id），或离开目录已超过一小时的挂单。`unavailable_ids` 仍列出所有缺失的 id。
+
+</Update>
+
 <Update label="2026年10月22日">
 
 ## 新功能

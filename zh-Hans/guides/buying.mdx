@@ -133,6 +133,18 @@ curl -X POST https://csboard.com/v1/orders \
 
 ---
 
+## 订单失败时
+
+以 `failed` 或 `cancelled` 结束的订单已经退款——`refund` 就是退款凭证。以下三个字段说明原因：
+
+- `fail_reason` —— 用于程序分支判断的代码，例如 `recipient_inventory_private` 或 `listing_gone`。遇到不认识的代码时请按 `unavailable` 处理。
+- `fail_side` —— 需要采取行动的一方。`recipient`：修正收货方的 Steam 账户或交易链接后重新购买。`seller` 或 `market`：购买其他挂单；若为 `market_unavailable`，稍后重试即可。`buyer`：订单是您取消的。
+- `fail_message` —— 可直接展示的一句说明。
+
+其他任何状态下，这三个字段都为 `null`。全部代码见 [订单失败的原因](/zh-Hans/api-reference/get-orders#fail-reasons)。
+
+---
+
 ## 错误参考
 
 | 代码 | HTTP 状态 | 含义 |

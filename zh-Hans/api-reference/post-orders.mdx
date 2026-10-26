@@ -155,11 +155,11 @@ curl -X POST https://csboard.com/v1/orders \
 | 403 | `trading_not_enabled` | 该 API 密钥未启用购买功能。请在您的个人资料中启用。 |
 | 403 | `account_restricted` | 账户受限。请联系客服。 |
 | 409 | `price_moved` | 实时总额超过了 `max_price_usd`。订单被拒绝，未扣款。响应体包含 `quoted_max_usd`、`current_total_usd` 以及每件商品的实时价格。 |
-| 409 | `item_unavailable` | 商品在您的订单到达前已售出。响应体可能包含 `unavailable_ids`。 |
+| 409 | `item_unavailable` | 商品在您的订单到达前已离开目录。响应体可能包含 `unavailable_ids`，CS2 订单还可能包含 `unknown_ids`。参见下方 [不可用的商品](#unavailable-items)。 |
 | 409 | `idempotency_in_progress` | 使用该 `Idempotency-Key` 的请求仍在处理中。请稍候并用同一个键重试。 |
 | 409 | `pending_trades_limit` | 收货方有过多未接受的 Steam 交易报价。上限见响应体中的 `limit`。 |
 | 409 | `price_updating` / `concurrent_update` | 价格正在刷新，或并发订单抢先完成。未扣款——请重试。 |
-| 429 | `rate_limit_exceeded` | 超过每分钟 250 个订单，或超过密钥的通用每分钟限制。请等待 `Retry-After` 响应头中的秒数。 |
+| 429 | `rate_limit_exceeded` | 超过每分钟 250 个购买订单（`bucket: "buy_orders"`），或超过密钥的交易限制（`bucket: "trading"`）。请等待 `Retry-After` 响应头中的秒数。 |
 | 500 | `order_failed` | 意外失败。重试前请先查看 `GET /v1/orders/info`——订单可能已经存在。 |
 | 503 | `market_unavailable` | 其中一件商品所在的市场暂时不可用。未扣款。 |
 | 504 | `upstream_timeout` | 结果未知。请使用相同的 `Idempotency-Key` 重新发送或轮询订单——切勿使用新的键。 |
@@ -175,3 +175,19 @@ curl -X POST https://csboard.com/v1/orders \
 <Note>
   **Dota 2 和 Rust。** `appId` 为 `570` 或 `252490` 的订单会进入交付队列，并返回 `delivery: "pending"` 和 `expected_minutes: null`。请通过 [`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 跟踪。价格上限、余额检查和幂等性与 CS2 完全相同。
 </Note>
+
+<a id="unavailable-items" />
+## 不可用的商品
+
+挂单可能在您读取之后、购买之前离开目录。`409 item_unavailable` 的响应体会在 `unavailable_ids` 中列出所有缺失的 id。对于 CS2 订单，它还可能带有 `unknown_ids`：缺失的 id 中我们完全没有记录的那些。要么它不是 CSBoard 的挂单 id，要么该挂单离开目录已超过一小时。最常见的混淆是把 Steam 资产 id（asset id）当成挂单 id——CSBoard 的挂单 id 从不全由数字组成，请发送 `/v1/listings` 或流中某一行的 `id`。
+
+```json
+{
+  "code": "item_unavailable",
+  "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+  "unavailable_ids": ["31846262931"],
+  "unknown_ids": ["31846262931"]
+}
+```
+
+如需在尝试购买前剔除已售出的挂单，请订阅 [`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream) 的 `gone` 事件。

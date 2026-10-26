@@ -118,7 +118,7 @@ curl "https://csboard.com/v1/prices?category=Rifle&wear=Field-Tested&limit=50" \
 | 400 | `invalid_param` | 在 Dota 2 或 Rust 的 `appId` 下发送了 `wear`。 |
 | 400 | `unsupported_game` | 您的密钥无法使用该 `appId`。`supported_app_ids` 列出了可用的值。 |
 | 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
-| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。请在重试前等待 `Retry-After` 响应头中的秒数。 |
+| 429 | `rate_limit_exceeded` | 超过密钥的读取限制（默认 100 次/分钟）。请在重试前等待 `Retry-After` 响应头中的秒数。 |
 
 <Warning>
   prices 端点返回的是**指示性分组快照**。该数据是周期性实体化的，可能滞后于实时市场。在下单前，请使用 `GET /v1/listings` 获取特定商品权威的实时报价。

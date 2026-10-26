@@ -67,6 +67,15 @@ orders 端点返回您的购买历史，按时间倒序排列，使用键集分�
     <ResponseField name="delivery_deadline_at" type="datetime | null">
       交付截止时间：`manual` 交付为购买后 12 小时，其他情况为供应商的接受窗口。仅在 `status` 为 `pending` 或 `delivering` 时有值；之后以及持有中的订单（它们等待 `hold_until`）为 `null`。如果卖家未能按时交付，订单会被自动取消并退款。如需提前停止等待，请使用 [`POST /v1/orders/{id}/cancel`](/zh-Hans/api-reference/post-orders-cancel)。
     </ResponseField>
+    <ResponseField name="fail_reason" type="string | null">
+      订单失败的原因，是用于程序分支判断的代码——参见 [订单失败的原因](#fail-reasons)。在 `status` 为 `failed` 或 `cancelled` 时有值，否则为 `null`。该列表可能会扩充：遇到不认识的值时请按 `unavailable` 处理。
+    </ResponseField>
+    <ResponseField name="fail_side" type="string | null">
+      需要采取行动的一方：`recipient`（接收皮肤的账户）、`seller`（卖家）、`buyer`（您）或 `market`（市场）。`status` 不是 `failed` 或 `cancelled` 时为 `null`。
+    </ResponseField>
+    <ResponseField name="fail_message" type="string | null">
+      一句英文说明：发生了什么、该怎么做。可展示给用户；程序逻辑请依据 `fail_reason`，因为措辞可能会变。`status` 不是 `failed` 或 `cancelled` 时为 `null`。
+    </ResponseField>
     <ResponseField name="created_at" type="datetime" required>
       ISO 8601 创建时间戳。
     </ResponseField>
@@ -129,6 +138,9 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "hold_until": null,
       "delivery_type": "instant",
       "delivery_deadline_at": null,
+      "fail_reason": null,
+      "fail_side": null,
+      "fail_message": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
       "items": [
@@ -145,6 +157,51 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
     }
   ],
   "meta": { "next_cursor": "eyJpZCI6Im9yZF8wMUo5WjNLOFEyIn0=", "per_page": 50 }
+}
+```
+
+<a id="fail-reasons" />
+## 订单失败的原因
+
+状态为 `failed` 或 `cancelled` 的订单会用三个字段说明原因。其他任何状态下，这三个字段都为 `null`。
+
+- `fail_reason` —— 用于程序分支判断的代码，取值见下表。
+- `fail_side` —— 需要采取行动的一方：`recipient`、`seller`、`buyer` 或 `market`。
+- `fail_message` —— 一句英文说明：发生了什么、该怎么做。可展示给用户；程序逻辑请依据 `fail_reason`。
+
+| `fail_reason` | `fail_side` | 发生了什么、该怎么做 |
+|---|---|---|
+| `recipient_inventory_private` | `recipient` | 收货方的 Steam 库存未公开，因此无法发送交易。请将库存设为公开后重新购买。 |
+| `recipient_inventory_full` | `recipient` | 收货方的 CS2 库存已满。请腾出空位后重新购买。 |
+| `invalid_trade_url` | `recipient` | 交易链接无效，或其 token 已更改。请从 [steamcommunity.com/my/tradeoffers/privacy](https://steamcommunity.com/my/tradeoffers/privacy) 获取当前链接后重新购买。 |
+| `recipient_cannot_trade` | `recipient` | 该账户目前无法交易：交易封禁、交易冷却或 Steam 令牌（Steam Guard）限制。在 Steam 解除限制之前，为该账户重新购买都会失败。 |
+| `recipient_too_many_offers` | `recipient` | 收货方有过多待处理的交易报价。请先接受或拒绝它们，再重新购买。 |
+| `offer_declined` | `recipient` | 收货方拒绝了交易报价。 |
+| `offer_expired` | `recipient` | 交易报价未在规定时间内被接受。 |
+| `seller_did_not_deliver` | `seller` | 卖家未按时发送物品。请购买其他挂单。 |
+| `seller_cancelled` | `seller` | 卖家取消了出售（P2P）。请购买其他挂单。 |
+| `rolled_back` | `seller` | 交付后，该交易在 Steam 中被撤回（P2P）。 |
+| `cancelled_by_buyer` | `buyer` | 订单已按您的请求取消。 |
+| `listing_gone` | `market` | 在购买完成之前，该挂单已在别处售出。请购买其他挂单。 |
+| `market_unavailable` | `market` | 该挂单所在的市场暂时不可用。请稍后重试。 |
+| `unavailable` | `market` | 物品无法交付，且没有更具体的原因。 |
+
+该列表可能会扩充。遇到不认识的 `fail_reason` 时，请按 `unavailable` 处理。逐件商品的 `return_reason` 保持不变。
+
+一个失败的订单（仅保留与此相关的字段）：
+
+```json
+{
+  "order_id": "cmvob1jy500r67b01gygkufd8",
+  "status": "failed",
+  "fail_reason": "recipient_inventory_private",
+  "fail_side": "recipient",
+  "fail_message": "The recipient's Steam inventory is private, so the trade could not be sent. Set Inventory to Public in the recipient's Steam privacy settings and buy again.",
+  "refund": {
+    "amount_usd": 0.24,
+    "refunded_at": "2026-10-25T20:53:26.386Z",
+    "partial": false
+  }
 }
 ```
 

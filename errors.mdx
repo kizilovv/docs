@@ -13,7 +13,7 @@ Every error returns the same JSON shape:
 Note the field is **`detail`**, not `message`. Match on `code` — it is stable and safe to branch on. `detail` is human-readable and may be reworded without notice.
 
 <Note>
-  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, `item_unavailable` may include `unavailable_ids`, `unsupported_game` includes `supported_app_ids`, `price_drift` includes `current_total_usd` and `min_total_usd`, and `price_below_market` includes `market_usd` and `floor_usd`. Ignore unknown fields rather than rejecting the body.
+  Some errors carry extra fields alongside `code` and `detail`. `price_moved` includes the current total, `item_unavailable` may include `unavailable_ids` and `unknown_ids`, a per-key `rate_limit_exceeded` includes `bucket`, `limit_per_min` and `retry_after_sec`, `too_many_streams` includes `max_connections` and `retry_after_sec`, `unsupported_game` includes `supported_app_ids`, `price_drift` includes `current_total_usd` and `min_total_usd`, and `price_below_market` includes `market_usd` and `floor_usd`. Ignore unknown fields rather than rejecting the body.
 </Note>
 
 ---
@@ -34,9 +34,9 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 
 | HTTP | `code` | Cause | What to do |
 |---|---|---|---|
-| 429 | `rate_limit_exceeded` | Per-key limit exceeded. | Sleep for `Retry-After` seconds, then retry. See [Rate Limits](/rate-limits). |
+| 429 | `rate_limit_exceeded` | A per-key limit is spent. `bucket` in the body names it: `read`, `trading` or `buy_orders`. The P2P write limit answers this code too. | Sleep for `Retry-After` seconds — the rest of the current minute — then retry. Pace from the `X-RateLimit-*` headers to avoid it. See [Rate Limits](/rate-limits). |
 | 429 | `snapshot_rate_limited` | Bulk snapshot polled more than once a minute. | Cache the snapshot; use ETags to avoid re-downloading it. |
-| 429 | `too_many_streams` | More than 3 concurrent SSE streams on one key. | Close an idle stream. One stream carries the whole catalogue. |
+| 429 | `too_many_streams` | More than 3 concurrent SSE streams on one key. | Close an idle stream. One stream carries the whole catalogue. A connection that dropped without closing frees its slot within 90 seconds (`Retry-After: 90`). |
 | 429 | — | More than 1 request a minute to the keyless `GET /v1/public/prices` from one IP. This body is `{ "error": "...", "statusCode": 429 }`, with no `code`. | Sleep for `Retry-After` seconds. The feed only changes once a minute anyway. |
 
 ## Reading market data
@@ -60,13 +60,17 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 403 | `external_buy_disabled` | Deliver-to-any-trade-URL buying is not enabled for you. | Ask us to enable it for your account. |
 | 403 | `kyc_required` | The purchase tripped a KYC threshold. | The account owner completes verification on the site. |
 | 409 | `price_moved` | Live price rose past your `max_price_usd`. **Nothing was charged.** | Re-read `price_usd` from `/v1/listings`, decide, retry. The response carries the current total. |
-| 409 | `item_unavailable` | The listing sold before your order landed. | Pick another listing. Subscribe to the [SSE stream](/api-reference/get-listings-stream) — `gone` events remove sold items before you try to buy them. |
+| 409 | `item_unavailable` | The listing left the catalogue before your order landed. On CS2 buys, `unknown_ids` names the ids we have no record of: not a listing id (a Steam asset id is the usual mix-up), or a listing gone for over an hour. | Pick another listing, by the `id` from `/v1/listings` or the stream. Subscribe to the [SSE stream](/api-reference/get-listings-stream) — `gone` events remove sold items before you try to buy them. |
 | 409 | `pending_trades_limit` | The recipient has too many unaccepted Steam offers. | Have them accept pending offers first. `limit` is in the body. |
 | 409 | `idempotency_in_progress` | A request with the same `Idempotency-Key` / `custom_id` is still running. | Wait and poll `GET /v1/orders/info`; do not re-send with a new key or you will double-buy. |
 | 409 | `price_updating` | Prices are mid-refresh. | Retry in a moment. |
 | 409 | `not_claimable` | The order is not in a claimable state. | Read `status` — it is already delivering, completed, or failed. |
 | 503 | `market_unavailable` | The upstream source for that item is temporarily down. **No charge was made.** | Retry shortly, or pick a listing from elsewhere in the catalogue. |
 | 500 | `order_failed` | Unexpected failure. | Check `GET /v1/orders/info` with your `custom_id` before retrying — the order may exist. |
+
+<Note>
+  An order that was accepted and fails later is not an HTTP error. It ends `failed` or `cancelled`, the money comes back in `refund`, and `fail_reason`, `fail_side` and `fail_message` say why. Every code and what to do about it is listed under [why an order failed](/api-reference/get-orders#fail-reasons).
+</Note>
 
 ## P2P listing
 

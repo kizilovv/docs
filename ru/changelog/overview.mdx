@@ -4,6 +4,28 @@ sidebarTitle: "Обзор"
 description: "Обновления продукта, новые возможности и исправления CSBoard API."
 ---
 
+<Update label="26 октября 2026">
+
+## Новые возможности
+
+**Почему заказ не выполнен: `fail_reason`, `fail_side`, `fail_message`**
+
+Заказы теперь объясняют, почему не выполнены, — в [`GET /v1/orders`](/ru/api-reference/get-orders), [`GET /v1/orders/info`](/ru/api-reference/get-orders-info), [`GET /v1/orders/{id}`](/ru/api-reference/get-order) и вебхуке `order.updated`, включая P2P-строки. У заказа `failed` или `cancelled` поле `fail_reason` — код для ветвления логики, `fail_side` — кто должен действовать (`recipient`, `seller`, `buyer` или `market`), а `fail_message` — одно предложение о том, что произошло и что делать. При других статусах все три равны `null`. Раньше такой заказ показывал только `unavailable`, даже если у получателя был скрыт инвентарь — а это можете исправить только вы. Список кодов может пополняться: незнакомое значение обрабатывайте как `unavailable`. См. [«Почему заказ не выполнен»](/ru/api-reference/get-orders#fail-reasons).
+
+**Заголовки лимитов в каждом ответе**
+
+Каждый ответ на запрос с ключом несёт `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` и `X-RateLimit-Bucket` для бюджета, который потратил запрос, — так можно сбавить темп ещё до `429`. [`GET /v1/key`](/api-reference/get-key) показывает все лимиты ключа в объекте `rate_limits`.
+
+## Изменения
+
+- Запросы с ключом теперь считаются только лимитами самого ключа. Раньше их учитывал ещё и общий лимит сайта по IP — около 133 запросов в минуту, — поэтому любая интеграция упиралась в него раньше, чем в лимиты ключа из этой документации, а его заголовок `x-ratelimit-limit: 1000` к вашему ключу не относился. Эндпоинты без ключа (`GET /v1/health`, `GET /v1/public/prices`) по-прежнему ограничены по IP. См. [Лимиты запросов](/ru/rate-limits).
+- У торговых запросов (`POST /v1/orders`, `POST /v1/market/buy`, `GET /v1/orders*`, `POST /v1/orders/{id}/claim`, `POST /v1/orders/{id}/cancel`, `GET /v1/balance`) свой бюджет — 3 000 запросов в минуту на ключ или лимит чтения ключа, если он выше. Чтение каталога на пределе не мешает покупкам и опросу статуса заказов.
+- `429 rate_limit_exceeded` от лимита ключа называет бюджет: `bucket` (`read`, `trading` или `buy_orders`), `limit_per_min` и `retry_after_sec`. `Retry-After` теперь равен числу секунд до нового минутного окна (1–60), а не всегда 60, — и здесь, и у `snapshot_rate_limited`, лимита P2P-записей и лимита котировок Instant Sell.
+- `429 too_many_streams` несёт `Retry-After: 90`, `max_connections` и `retry_after_sec`: стрим, оборванный без закрытия, освобождает слот в течение 90 секунд.
+- `409 item_unavailable` при покупке CS2 называет в `unknown_ids` id, о которых у нас нет записи: это не id листинга (чаще всего — asset id из Steam) или листинг, ушедший из каталога больше часа назад. `unavailable_ids` по-прежнему перечисляет все пропавшие id.
+
+</Update>
+
 <Update label="22 октября 2026">
 
 ## Новые возможности

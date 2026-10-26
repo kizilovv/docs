@@ -67,6 +67,15 @@ openapi: "GET /orders"
     <ResponseField name="delivery_deadline_at" type="datetime | null">
       Срок доставки: 12 часов после покупки при доставке `manual`, иначе окно принятия у поставщика. Заполнен, только пока `status` — `pending` или `delivering`; после этого и у заказов в холде (они ждут `hold_until`) — `null`. Если продавец не успел, заказ отменяется и деньги возвращаются автоматически. Чтобы не ждать, используйте [`POST /v1/orders/{id}/cancel`](/ru/api-reference/post-orders-cancel).
     </ResponseField>
+    <ResponseField name="fail_reason" type="string | null">
+      Почему заказ не выполнен — код для ветвления логики, см. [«Почему заказ не выполнен»](#fail-reasons). Заполнен, когда `status` — `failed` или `cancelled`, иначе `null`. Список может пополняться: незнакомое значение обрабатывайте как `unavailable`.
+    </ResponseField>
+    <ResponseField name="fail_side" type="string | null">
+      Кто должен действовать: `recipient` (аккаунт, на который идут скины), `seller` (продавец), `buyer` (вы) или `market` (маркет). `null`, если `status` не `failed` и не `cancelled`.
+    </ResponseField>
+    <ResponseField name="fail_message" type="string | null">
+      Одно предложение на английском: что произошло и что делать. Показывайте его человеку, а логику стройте по `fail_reason` — формулировка может меняться. `null`, если `status` не `failed` и не `cancelled`.
+    </ResponseField>
     <ResponseField name="created_at" type="datetime" required>
       Временная метка создания в ISO 8601.
     </ResponseField>
@@ -129,6 +138,9 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "hold_until": null,
       "delivery_type": "instant",
       "delivery_deadline_at": null,
+      "fail_reason": null,
+      "fail_side": null,
+      "fail_message": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
       "items": [
@@ -145,6 +157,51 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
     }
   ],
   "meta": { "next_cursor": "eyJpZCI6Im9yZF8wMUo5WjNLOFEyIn0=", "per_page": 50 }
+}
+```
+
+<a id="fail-reasons" />
+## Почему заказ не выполнен
+
+Заказ со статусом `failed` или `cancelled` объясняет причину в трёх полях. При любом другом статусе все три равны `null`.
+
+- `fail_reason` — код для ветвления логики, из таблицы ниже.
+- `fail_side` — кто должен действовать: `recipient`, `seller`, `buyer` или `market`.
+- `fail_message` — одно предложение на английском: что произошло и что делать. Показывайте его человеку, а логику стройте по `fail_reason`.
+
+| `fail_reason` | `fail_side` | Что произошло и что делать |
+|---|---|---|
+| `recipient_inventory_private` | `recipient` | Инвентарь Steam получателя скрыт, поэтому трейд не удалось отправить. Сделайте инвентарь открытым в настройках приватности Steam и купите заново. |
+| `recipient_inventory_full` | `recipient` | Инвентарь CS2 получателя заполнен. Освободите место и купите заново. |
+| `invalid_trade_url` | `recipient` | Trade URL некорректен или его токен сменился. Возьмите актуальный на [steamcommunity.com/my/tradeoffers/privacy](https://steamcommunity.com/my/tradeoffers/privacy) и купите заново. |
+| `recipient_cannot_trade` | `recipient` | Аккаунт сейчас не может обмениваться: трейд-бан, трейд-кулдаун или ограничение Steam Guard. Повторные покупки на этот аккаунт будут срываться, пока Steam не снимет ограничение. |
+| `recipient_too_many_offers` | `recipient` | У получателя слишком много ожидающих трейд-офферов. Примите или отклоните их и купите заново. |
+| `offer_declined` | `recipient` | Получатель отклонил трейд-оффер. |
+| `offer_expired` | `recipient` | Трейд-оффер не приняли вовремя. |
+| `seller_did_not_deliver` | `seller` | Продавец не отправил предмет вовремя. Купите другой листинг. |
+| `seller_cancelled` | `seller` | Продавец отменил продажу (P2P). Купите другой листинг. |
+| `rolled_back` | `seller` | Трейд откатили в Steam уже после доставки (P2P). |
+| `cancelled_by_buyer` | `buyer` | Заказ отменён по вашему запросу. |
+| `listing_gone` | `market` | Листинг продали в другом месте раньше, чем прошла покупка. Купите другой листинг. |
+| `market_unavailable` | `market` | Маркетплейс, где находился листинг, был недоступен. Повторите чуть позже. |
+| `unavailable` | `market` | Предмет не удалось доставить, точная причина неизвестна. |
+
+Список может пополняться. Незнакомый вам `fail_reason` обрабатывайте как `unavailable`. `return_reason` на уровне предмета не изменился.
+
+Заказ со статусом `failed`, сокращённый до нужных здесь полей:
+
+```json
+{
+  "order_id": "cmvob1jy500r67b01gygkufd8",
+  "status": "failed",
+  "fail_reason": "recipient_inventory_private",
+  "fail_side": "recipient",
+  "fail_message": "The recipient's Steam inventory is private, so the trade could not be sent. Set Inventory to Public in the recipient's Steam privacy settings and buy again.",
+  "refund": {
+    "amount_usd": 0.24,
+    "refunded_at": "2026-10-25T20:53:26.386Z",
+    "partial": false
+  }
 }
 ```
 

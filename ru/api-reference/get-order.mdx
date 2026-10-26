@@ -37,6 +37,15 @@ openapi: "GET /orders/{id}"
 <ResponseField name="delivery_deadline_at" type="datetime | null">
   Срок доставки; заполнен, только пока `status` — `pending` или `delivering` (у заказов в холде — `null`). Если продавец не успел, заказ отменяется и деньги возвращаются автоматически. См. [`POST /v1/orders/{id}/cancel`](/ru/api-reference/post-orders-cancel).
 </ResponseField>
+<ResponseField name="fail_reason" type="string | null">
+  Почему заказ не выполнен — код для ветвления логики, например `recipient_inventory_private` или `listing_gone`. Заполнен, только когда `status` — `failed` или `cancelled`. [Список кодов](/ru/api-reference/get-orders#fail-reasons) может пополняться: незнакомое значение обрабатывайте как `unavailable`.
+</ResponseField>
+<ResponseField name="fail_side" type="string | null">
+  Кто должен действовать: `recipient`, `seller`, `buyer` или `market`. Заполнен, только когда `status` — `failed` или `cancelled`.
+</ResponseField>
+<ResponseField name="fail_message" type="string | null">
+  Одно предложение на английском: что произошло и что делать. Показывайте его как есть, а логику стройте по `fail_reason` — формулировка может меняться.
+</ResponseField>
 <ResponseField name="created_at" type="datetime" required />
 <ResponseField name="updated_at" type="datetime | null" />
 <ResponseField name="items" type="OrderItem[]" required>
@@ -64,6 +73,9 @@ curl https://csboard.com/v1/orders/ord_01J9Z3K8Q2 \
   "hold_until": null,
   "delivery_type": "instant",
   "delivery_deadline_at": null,
+  "fail_reason": null,
+  "fail_side": null,
+  "fail_message": null,
   "created_at": "2026-06-29T17:12:04Z",
   "updated_at": "2026-06-29T17:15:40Z",
   "items": [

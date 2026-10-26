@@ -593,7 +593,7 @@
           "Market data"
         ],
         "summary": "Stream listings as they appear and disappear",
-        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n``` CS2 only — this endpoint does not read `appId`.",
+        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that. A fourth connection answers `429 too_many_streams` with `Retry-After: 90`: a connection that dropped without closing keeps its slot for up to 90 seconds.\n\n### Latency\n\nA `new` event goes out about 0.3 s after a listing enters the catalogue (median 0.34 s, maximum under 0.5 s, measured 2026-10-26), to every key at the same moment. Polling `/v1/listings` faster cannot see a listing sooner, and there is no priority tier.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n``` CS2 only — this endpoint does not read `appId`.",
         "operationId": "streamListings",
         "parameters": [
           {
@@ -739,11 +739,44 @@
             }
           },
           "429": {
-            "description": "Too many concurrent streams for this key (max 3).",
+            "description": "A fourth concurrent stream on this key (`too_many_streams`, max 3). Close one, or wait `Retry-After` seconds: a connection that dropped without closing frees its slot within 90 seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until a dropped connection's slot is reclaimed (90).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "max_connections": {
+                      "type": "integer",
+                      "description": "Concurrent streams allowed per key."
+                    },
+                    "retry_after_sec": {
+                      "type": "integer",
+                      "description": "The same number as `Retry-After`."
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                },
+                "example": {
+                  "code": "too_many_streams",
+                  "detail": "At most 3 concurrent streams per key. Close an existing connection first — one stream carries the whole catalogue, so you do not need several. A connection that dropped without closing frees its slot within 90 s.",
+                  "max_connections": 3,
+                  "retry_after_sec": 90
                 }
               }
             }
@@ -1376,6 +1409,9 @@
                       "hold_until": null,
                       "delivery_type": "instant",
                       "delivery_deadline_at": null,
+                      "fail_reason": null,
+                      "fail_side": null,
+                      "fail_message": null,
                       "created_at": "2026-06-29T17:12:04Z",
                       "updated_at": "2026-06-29T17:15:40Z",
                       "items": [
@@ -1598,7 +1634,7 @@
             }
           },
           "409": {
-            "description": "Conflict — the live price moved past your ceiling, an item sold out, a duplicate Idempotency-Key is still processing, the recipient has too many pending offers, prices are mid-refresh, or a concurrent order won the race. Nothing was charged.",
+            "description": "Conflict — the live price moved past your ceiling, an item sold out, a duplicate Idempotency-Key is still processing, the recipient has too many pending offers, prices are mid-refresh, or a concurrent order won the race. Nothing was charged. `item_unavailable` lists every missing id in `unavailable_ids`; on a CS2 buy, `unknown_ids` names the ones we have no record of at all — not a CSBoard listing id (a Steam asset id is the usual mix-up; listing ids are never all digits) or a listing that left the catalogue more than an hour ago. Follow the stream's `gone` events to drop listings before you buy them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1633,6 +1669,19 @@
                       "detail": "One or more items are no longer available.",
                       "unavailable_ids": [
                         "itm_8841999"
+                      ]
+                    }
+                  },
+                  "item_unknown": {
+                    "summary": "Id not known here (e.g. a Steam asset id)",
+                    "value": {
+                      "code": "item_unavailable",
+                      "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+                      "unavailable_ids": [
+                        "31846262931"
+                      ],
+                      "unknown_ids": [
+                        "31846262931"
                       ]
                     }
                   },
@@ -1991,6 +2040,9 @@
                       "hold_until": null,
                       "delivery_type": "instant",
                       "delivery_deadline_at": null,
+                      "fail_reason": null,
+                      "fail_side": null,
+                      "fail_message": null,
                       "created_at": "2026-06-29T17:12:04Z",
                       "updated_at": "2026-06-29T17:15:40Z",
                       "items": []
@@ -2061,6 +2113,9 @@
                   "hold_until": null,
                   "delivery_type": "instant",
                   "delivery_deadline_at": null,
+                  "fail_reason": null,
+                  "fail_side": null,
+                  "fail_message": null,
                   "created_at": "2026-06-29T17:12:04Z",
                   "updated_at": "2026-06-29T17:15:40Z",
                   "items": [
@@ -2446,13 +2501,25 @@
             }
           },
           "429": {
-            "description": "`cancel_limit_reached`: too many cancels for now — try again later. `rate_limit_exceeded`: the per-key trading budget is spent — wait `Retry-After` seconds.",
+            "description": "`cancel_limit_reached`: too many cancels for now — try again later. `rate_limit_exceeded`: the key's trading bucket is spent — wait `Retry-After` seconds, the rest of the current minute.",
             "headers": {
               "Retry-After": {
-                "description": "Seconds to wait before retrying (on `rate_limit_exceeded`).",
+                "description": "Seconds until the one-minute window restarts (on `rate_limit_exceeded`).",
                 "schema": {
                   "type": "integer"
                 }
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-RateLimit-Bucket": {
+                "$ref": "#/components/headers/X-RateLimit-Bucket"
               }
             },
             "content": {
@@ -2472,7 +2539,10 @@
                     "summary": "Rate limit",
                     "value": {
                       "code": "rate_limit_exceeded",
-                      "detail": "Trading rate limit of 10000 requests/min exceeded."
+                      "detail": "Trading rate limit of 3000 requests/min exceeded. The counter restarts in 23 s. For new listings use GET /v1/listings/stream instead of polling.",
+                      "bucket": "trading",
+                      "limit_per_min": 3000,
+                      "retry_after_sec": 23
                     }
                   }
                 }
@@ -2692,7 +2762,7 @@
             }
           },
           "409": {
-            "description": "Conflict.",
+            "description": "Conflict — an item is gone, the live price moved past your ceiling, a request with the same `custom_id` is still running, or prices are mid-refresh. Nothing was charged. `item_unavailable` lists every missing id in `unavailable_ids`; on a CS2 buy, `unknown_ids` names the ones we have no record of at all — not a CSBoard listing id (a Steam asset id is the usual mix-up; listing ids are never all digits) or a listing that left the catalogue more than an hour ago. Follow the stream's `gone` events to drop listings before you buy them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2706,6 +2776,19 @@
                       "detail": "One or more items are no longer available.",
                       "unavailable_ids": [
                         "itm_8841999"
+                      ]
+                    }
+                  },
+                  "item_unknown": {
+                    "summary": "Id not known here (e.g. a Steam asset id)",
+                    "value": {
+                      "code": "item_unavailable",
+                      "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+                      "unavailable_ids": [
+                        "31846262931"
+                      ],
+                      "unknown_ids": [
+                        "31846262931"
                       ]
                     }
                   },
@@ -3800,14 +3883,7 @@
             }
           },
           "429": {
-            "description": "Rate limited.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -4564,7 +4640,7 @@
         ],
         "summary": "Inspect this key",
         "operationId": "getKey",
-        "description": "What this key is allowed to do: its prefix, issue date, rate limit, trading and selling capabilities, and its IP allowlist. Also reports `your_ip` — the address we saw for this request, which is what you need before editing an allowlist from a machine whose egress address you are unsure of.",
+        "description": "What this key is allowed to do: its prefix, issue date, rate limits, trading and selling capabilities, and its IP allowlist. Also reports `your_ip` — the address we saw for this request, which is what you need before editing an allowlist from a machine whose egress address you are unsure of.",
         "responses": {
           "200": {
             "description": "Key capabilities.",
@@ -4586,7 +4662,52 @@
                           "nullable": true
                         },
                         "rate_limit_per_min": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "The read limit per minute — the same number as `rate_limits.read_per_min`, kept for existing clients."
+                        },
+                        "rate_limits": {
+                          "type": "object",
+                          "description": "Every ceiling this key meets, per minute unless the name says otherwise. No per-IP limit applies on top of them; every answer also carries `X-RateLimit-*` for the bucket it spent.",
+                          "properties": {
+                            "read_per_min": {
+                              "type": "integer",
+                              "description": "Reads and every other keyed call outside trading. 100 by default; it can be raised per key.",
+                              "example": 100
+                            },
+                            "trading_per_min": {
+                              "type": "integer",
+                              "description": "Buys, order reads, claims, cancels and `GET /balance`: 3000, or `read_per_min` if that is higher.",
+                              "example": 3000
+                            },
+                            "buy_orders_per_min": {
+                              "type": "integer",
+                              "description": "`POST /orders` and `POST /market/buy`, on top of `trading_per_min`.",
+                              "example": 250
+                            },
+                            "listings_snapshot_downloads_per_hour": {
+                              "type": "integer",
+                              "description": "Full downloads of `GET /listings/snapshot.ndjson.gz` per hour. A `304` is free.",
+                              "example": 6
+                            },
+                            "price_snapshot_per_min": {
+                              "type": "integer",
+                              "description": "`GET /prices/snapshot.ndjson.gz` per minute.",
+                              "example": 1
+                            },
+                            "stream_connections": {
+                              "type": "integer",
+                              "description": "Concurrent `GET /listings/stream` connections.",
+                              "example": 3
+                            }
+                          },
+                          "required": [
+                            "read_per_min",
+                            "trading_per_min",
+                            "buy_orders_per_min",
+                            "listings_snapshot_downloads_per_hour",
+                            "price_snapshot_per_min",
+                            "stream_connections"
+                          ]
                         },
                         "trading_enabled": {
                           "type": "boolean"
@@ -4606,6 +4727,25 @@
                         }
                       }
                     }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "key_prefix": "csb_pub_Xk3f9aQz",
+                    "issued_at": "2026-09-14T08:21:37.000Z",
+                    "rate_limit_per_min": 100,
+                    "rate_limits": {
+                      "read_per_min": 100,
+                      "trading_per_min": 3000,
+                      "buy_orders_per_min": 250,
+                      "listings_snapshot_downloads_per_hour": 6,
+                      "price_snapshot_per_min": 1,
+                      "stream_connections": 3
+                    },
+                    "trading_enabled": true,
+                    "selling_enabled": false,
+                    "allowed_ips": [],
+                    "your_ip": "203.0.113.24"
                   }
                 }
               }
@@ -5437,7 +5577,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Send your key as a Bearer token on every request: `Authorization: Bearer csb_pub_...`. Generate keys in your CSBoard profile."
+        "description": "Send your key as a Bearer token on every request: `Authorization: Bearer csb_pub_...`. Generate keys in your CSBoard profile. Calls made with a key are metered only by that key's own limits — there is no per-IP limit on top — and every answer carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and `X-RateLimit-Bucket` for the bucket the call spent. See [Rate limits](/rate-limits)."
       }
     },
     "responses": {
@@ -5456,23 +5596,38 @@
         }
       },
       "RateLimited": {
-        "description": "Rate limit exceeded. Includes a Retry-After header (60 seconds on the per-key limits).",
+        "description": "A per-key limit is spent. The key's own buckets answer `rate_limit_exceeded` with `bucket` (`read`, `trading` or `buy_orders`), `limit_per_min` and `retry_after_sec`. `Retry-After` is the seconds left until the one-minute window restarts (1–60), not a flat 60. Endpoint-specific limits (`snapshot_rate_limited` on the price snapshot, `rate_limited` on Instant Sell) send only `code` and `detail`.",
         "headers": {
           "Retry-After": {
-            "description": "Seconds to wait before retrying.",
+            "description": "Seconds until the one-minute window restarts (1–60). Waiting that long is always enough.",
             "schema": {
               "type": "integer"
             }
+          },
+          "X-RateLimit-Limit": {
+            "$ref": "#/components/headers/X-RateLimit-Limit"
+          },
+          "X-RateLimit-Remaining": {
+            "$ref": "#/components/headers/X-RateLimit-Remaining"
+          },
+          "X-RateLimit-Reset": {
+            "$ref": "#/components/headers/X-RateLimit-Reset"
+          },
+          "X-RateLimit-Bucket": {
+            "$ref": "#/components/headers/X-RateLimit-Bucket"
           }
         },
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/Error"
+              "$ref": "#/components/schemas/RateLimitError"
             },
             "example": {
               "code": "rate_limit_exceeded",
-              "detail": "Rate limit of 100 requests/min exceeded."
+              "detail": "Read rate limit of 100 requests/min exceeded. The counter restarts in 23 s. For new listings use GET /v1/listings/stream instead of polling.",
+              "bucket": "read",
+              "limit_per_min": 100,
+              "retry_after_sec": 23
             }
           }
         }
@@ -5517,6 +5672,44 @@
             }
           }
         }
+      }
+    },
+    "headers": {
+      "X-RateLimit-Limit": {
+        "description": "The ceiling per minute of the bucket this call spent (named in `X-RateLimit-Bucket`).",
+        "schema": {
+          "type": "integer"
+        },
+        "example": 3000
+      },
+      "X-RateLimit-Remaining": {
+        "description": "Calls left on that bucket in the current one-minute window.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "example": 2987
+      },
+      "X-RateLimit-Reset": {
+        "description": "Seconds until the one-minute window restarts and the counter starts again.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "example": 41
+      },
+      "X-RateLimit-Bucket": {
+        "description": "The bucket this call spent: `read` (reads and every other keyed call) or `trading` (buys, order reads, claims, cancels, balance). A `429` from the buy-order limit says `buy_orders`.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "read",
+            "trading",
+            "buy_orders"
+          ]
+        },
+        "example": "trading"
       }
     },
     "schemas": {
@@ -6091,6 +6284,36 @@
             "format": "date-time",
             "description": "The delivery deadline: 12 hours after purchase for `manual` delivery, the vendor's accept window otherwise. Set only while `status` is `pending` or `delivering`; `null` once the order is completed, cancelled or failed, and on a held order (it waits on `hold_until`). If the seller misses it, the order is cancelled and refunded automatically."
           },
+          "fail_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the order failed. Set when `status` is `failed` or `cancelled`, `null` otherwise. The recipient has to act on `recipient_inventory_private`, `recipient_inventory_full`, `invalid_trade_url`, `recipient_cannot_trade`, `recipient_too_many_offers`, `offer_declined` and `offer_expired`; the seller on `seller_did_not_deliver`, `seller_cancelled` and `rolled_back`; you on `cancelled_by_buyer`; the market on `listing_gone`, `market_unavailable` and `unavailable`. The list may grow: treat a value you do not know as `unavailable`.",
+            "example": "recipient_inventory_private"
+          },
+          "fail_side": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "recipient",
+              "seller",
+              "buyer",
+              "market",
+              null
+            ],
+            "description": "Who has to act on the failure: `recipient` (the account the skins go to — fix it and buy again), `seller` or `market` (buy another listing), `buyer` (you cancelled). `null` unless `status` is `failed` or `cancelled`."
+          },
+          "fail_message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One English sentence: what happened and what to do. Safe to show to a person; branch on `fail_reason`, since the wording can change. `null` unless `status` is `failed` or `cancelled`.",
+            "example": "The recipient's Steam inventory is private, so the trade could not be sent. Set Inventory to Public in the recipient's Steam privacy settings and buy again."
+          },
           "refund": {
             "description": "Refund credited for this order, or `null` if none. A `cancelled` or `failed` order is ALWAYS refunded — this field is the receipt, so you never have to infer it from the status or reconcile against your balance.",
             "oneOf": [
@@ -6263,7 +6486,7 @@
       },
       "Error": {
         "type": "object",
-        "description": "All errors return { code, detail }. Some carry extra fields (e.g. price_moved adds current_total_usd, insufficient_balance adds required_usd/current_usd).",
+        "description": "All errors return { code, detail }. Some carry extra fields (e.g. price_moved adds current_total_usd, insufficient_balance adds required_usd/current_usd, item_unavailable adds unavailable_ids and, on CS2 buys, unknown_ids).",
         "properties": {
           "code": {
             "type": "string",
@@ -6272,6 +6495,42 @@
           "detail": {
             "type": "string",
             "description": "Human-readable explanation."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "RateLimitError": {
+        "type": "object",
+        "description": "The `429` body of a per-key bucket. Endpoint-specific limits send only `code` and `detail`.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "`rate_limit_exceeded` for the key's buckets. Endpoint-specific limits use their own code (`snapshot_rate_limited`, `rate_limited`)."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable explanation."
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "read",
+              "trading",
+              "buy_orders"
+            ],
+            "description": "Which bucket is spent."
+          },
+          "limit_per_min": {
+            "type": "integer",
+            "description": "That bucket's ceiling per minute."
+          },
+          "retry_after_sec": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "description": "Seconds until the window restarts — the same number as `Retry-After`."
           }
         },
         "required": [

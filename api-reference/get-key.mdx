@@ -1,7 +1,7 @@
 ---
 title: "GET /v1/key — Inspect Your API Key"
 sidebarTitle: "GET /key"
-description: "What this key can do: rate limit, trading and selling capabilities, IP allowlist, and the address we saw for your request."
+description: "What this key can do: rate limits, trading and selling capabilities, IP allowlist, and the address we saw for your request."
 openapi: "GET /key"
 ---
 
@@ -10,3 +10,42 @@ Returns the capabilities attached to the key you authenticated with, plus `your_
 `your_ip` exists for one reason: editing an IP allowlist from a machine whose egress address you are not certain of is otherwise guesswork, and getting it wrong locks the key out. Read it here first, then apply the list.
 
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Rate limits
+
+`rate_limits` lists every ceiling this key meets, per minute unless the field name says otherwise. No per-IP limit applies on top of them. See [Rate limits](/rate-limits) for which endpoints count against which bucket.
+
+| Field | Ceiling |
+|---|---|
+| `read_per_min` | Reads and every other keyed call outside trading — listings, prices, games, currency, webhooks, P2P. `100` by default; it can be raised on request. |
+| `trading_per_min` | Buys, order reads, claims, cancels and `GET /v1/balance`. `3000`, or `read_per_min` if that is higher. |
+| `buy_orders_per_min` | `POST /v1/orders` and `POST /v1/market/buy`, on top of `trading_per_min`. |
+| `listings_snapshot_downloads_per_hour` | Full downloads of `GET /v1/listings/snapshot.ndjson.gz`. A `304` is free. |
+| `price_snapshot_per_min` | `GET /v1/prices/snapshot.ndjson.gz`. |
+| `stream_connections` | Concurrent `GET /v1/listings/stream` connections. |
+
+`rate_limit_per_min` stays for existing clients. It is the same number as `rate_limits.read_per_min`.
+
+## Example response
+
+```json
+{
+  "data": {
+    "key_prefix": "csb_pub_Xk3f9aQz",
+    "issued_at": "2026-09-14T08:21:37.000Z",
+    "rate_limit_per_min": 100,
+    "rate_limits": {
+      "read_per_min": 100,
+      "trading_per_min": 3000,
+      "buy_orders_per_min": 250,
+      "listings_snapshot_downloads_per_hour": 6,
+      "price_snapshot_per_min": 1,
+      "stream_connections": 3
+    },
+    "trading_enabled": true,
+    "selling_enabled": false,
+    "allowed_ips": [],
+    "your_ip": "203.0.113.24"
+  }
+}
+```

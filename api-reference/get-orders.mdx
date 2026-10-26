@@ -71,6 +71,15 @@ The orders endpoint returns your purchase history, newest first, using keyset pa
     <ResponseField name="delivery_deadline_at" type="datetime | null">
       Delivery deadline: 12 hours after purchase for `manual` delivery, the vendor's accept window otherwise. Set only while `status` is `pending` or `delivering`; `null` after that and on held orders (they wait on `hold_until`). If the seller misses it, the order is cancelled and refunded automatically. To stop waiting earlier, use [`POST /v1/orders/{id}/cancel`](/api-reference/post-orders-cancel).
     </ResponseField>
+    <ResponseField name="fail_reason" type="string | null">
+      Why the order failed, as a code to branch on — see [why an order failed](#fail-reasons). Set when `status` is `failed` or `cancelled`, `null` otherwise. The list may grow: treat a value you do not know as `unavailable`.
+    </ResponseField>
+    <ResponseField name="fail_side" type="string | null">
+      Who has to act: `recipient` (the account the skins go to), `seller`, `buyer` (you) or `market`. `null` unless `status` is `failed` or `cancelled`.
+    </ResponseField>
+    <ResponseField name="fail_message" type="string | null">
+      One English sentence: what happened and what to do. Show it to a person; branch on `fail_reason`, since the wording can change. `null` unless `status` is `failed` or `cancelled`.
+    </ResponseField>
     <ResponseField name="refund" type="Refund | null">
       Money credited back for this order, or `null` if none was.
 
@@ -148,6 +157,9 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "hold_until": null,
       "delivery_type": "instant",
       "delivery_deadline_at": null,
+      "fail_reason": null,
+      "fail_side": null,
+      "fail_message": null,
       "refund": null,
       "created_at": "2026-06-29T17:12:04Z",
       "updated_at": "2026-06-29T17:15:40Z",
@@ -174,6 +186,9 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
       "hold_until": null,
       "delivery_type": "instant",
       "delivery_deadline_at": null,
+      "fail_reason": "listing_gone",
+      "fail_side": "market",
+      "fail_message": "The listing was sold elsewhere before the purchase went through. Buy another listing.",
       "refund": {
         "amount_usd": 1.28,
         "refunded_at": "2026-06-29T17:20:11Z",
@@ -195,6 +210,51 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
     }
   ],
   "meta": { "next_cursor": "eyJpZCI6Im9yZF8wMUo5WjNLOFEyIn0=", "per_page": 50 }
+}
+```
+
+<a id="fail-reasons" />
+## Why an order failed
+
+A `failed` or `cancelled` order says why in three fields. All three are `null` on every other status.
+
+- `fail_reason` — a code to branch on, from the table below.
+- `fail_side` — who has to act: `recipient`, `seller`, `buyer` or `market`.
+- `fail_message` — one English sentence saying what happened and what to do. Show it to a person; branch on `fail_reason`.
+
+| `fail_reason` | `fail_side` | What happened and what to do |
+|---|---|---|
+| `recipient_inventory_private` | `recipient` | The recipient's Steam inventory is private, so the trade could not be sent. Make the inventory public and buy again. |
+| `recipient_inventory_full` | `recipient` | The recipient's CS2 inventory is full. Free some slots and buy again. |
+| `invalid_trade_url` | `recipient` | The trade URL is invalid, or its token has changed. Take the current one from [steamcommunity.com/my/tradeoffers/privacy](https://steamcommunity.com/my/tradeoffers/privacy) and buy again. |
+| `recipient_cannot_trade` | `recipient` | The account cannot trade right now: a trade ban, a trade cooldown or a Steam Guard restriction. Buying again for this account fails until Steam lifts it. |
+| `recipient_too_many_offers` | `recipient` | The recipient has too many pending trade offers. Accept or decline them, then buy again. |
+| `offer_declined` | `recipient` | The recipient declined the trade offer. |
+| `offer_expired` | `recipient` | The trade offer was not accepted in time. |
+| `seller_did_not_deliver` | `seller` | The seller did not send the item in time. Buy another listing. |
+| `seller_cancelled` | `seller` | The seller cancelled the sale (P2P). Buy another listing. |
+| `rolled_back` | `seller` | The trade was reversed in Steam after delivery (P2P). |
+| `cancelled_by_buyer` | `buyer` | The order was cancelled at your request. |
+| `listing_gone` | `market` | The listing sold elsewhere before the purchase went through. Buy another listing. |
+| `market_unavailable` | `market` | The marketplace holding the listing was unavailable. Retry shortly. |
+| `unavailable` | `market` | The item could not be delivered, and no more specific cause is known. |
+
+The list may grow. Treat a `fail_reason` you do not know as `unavailable`. The item-level `return_reason` is unchanged.
+
+A failed order, trimmed to the fields that matter here:
+
+```json
+{
+  "order_id": "cmvob1jy500r67b01gygkufd8",
+  "status": "failed",
+  "fail_reason": "recipient_inventory_private",
+  "fail_side": "recipient",
+  "fail_message": "The recipient's Steam inventory is private, so the trade could not be sent. Set Inventory to Public in the recipient's Steam privacy settings and buy again.",
+  "refund": {
+    "amount_usd": 0.24,
+    "refunded_at": "2026-10-25T20:53:26.386Z",
+    "partial": false
+  }
 }
 ```
 

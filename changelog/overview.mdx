@@ -4,6 +4,28 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 26, 2026">
+
+## New features
+
+**Why an order failed: `fail_reason`, `fail_side`, `fail_message`**
+
+Orders now say why they failed, in [`GET /v1/orders`](/api-reference/get-orders), [`GET /v1/orders/info`](/api-reference/get-orders-info), [`GET /v1/orders/{id}`](/api-reference/get-order) and the `order.updated` webhook, P2P rows included. On a `failed` or `cancelled` order, `fail_reason` is a code to branch on, `fail_side` says who has to act (`recipient`, `seller`, `buyer` or `market`), and `fail_message` is one sentence saying what happened and what to do. All three are `null` on other statuses. Until now such an order read only as `unavailable`, even when the recipient's inventory was private — a case only you can fix. The list of codes may grow: treat an unknown value as `unavailable`. See [why an order failed](/api-reference/get-orders#fail-reasons).
+
+**Rate limit headers on every answer**
+
+Every answer to a keyed call carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and `X-RateLimit-Bucket` for the bucket it spent, so you can pace yourself before a `429`. [`GET /v1/key`](/api-reference/get-key) lists every limit of the key under `rate_limits`.
+
+## Changes
+
+- Keyed calls are now metered only by the key's own buckets. A site-wide per-IP limit of about 133 requests/min used to count them as well, so it capped every integration below the per-key numbers documented here, and its `x-ratelimit-limit: 1000` header did not describe your key. Keyless endpoints (`GET /v1/health`, `GET /v1/public/prices`) are still limited per IP. See [Rate limits](/rate-limits).
+- The trading bucket is 3,000 requests/min per key, or the key's read limit if that is higher. The 10,000/min announced on October 20 could not be reached because of the per-IP limit above; 3,000 is the ceiling actually in force.
+- A `429 rate_limit_exceeded` from a per-key bucket names it: `bucket` (`read`, `trading` or `buy_orders`), `limit_per_min` and `retry_after_sec`. `Retry-After` is now the seconds left until the window restarts (1–60) instead of a flat 60 — here and on `snapshot_rate_limited`, the P2P write limit and the Instant Sell quote limit.
+- `429 too_many_streams` carries `Retry-After: 90`, `max_connections` and `retry_after_sec`: a stream that dropped without closing frees its slot within 90 seconds.
+- `409 item_unavailable` on CS2 buys names the ids we have no record of in `unknown_ids`: not a listing id (a Steam asset id is the usual mix-up), or a listing gone from the catalogue for over an hour. `unavailable_ids` still lists every missing id.
+
+</Update>
+
 <Update label="October 22, 2026">
 
 ## New features

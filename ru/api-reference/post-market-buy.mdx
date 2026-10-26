@@ -124,13 +124,29 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 403 | `external_buy_disabled` | Kill-switch выключен; эндпоинт сейчас недоступен. |
 | 403 | `trading_not_enabled` | Покупки не включены для этого ключа. |
 | 403 | `account_restricted` | Эндпоинт требует аккаунт без истории реверсов. |
-| 409 | `item_unavailable` | Один или несколько предметов больше недоступны. Включает `unavailable_ids[]`. |
+| 409 | `item_unavailable` | Один или несколько предметов больше недоступны. Включает `unavailable_ids[]`, а для CS2 может включать и `unknown_ids[]`. См. [«Недоступные предметы»](#unavailable-items) ниже. |
 | 409 | `price_moved` | Живой итог превысил верхнюю границу. Включает `quoted_max_usd`, `current_total_usd` и `items[]`. |
 | 409 | `idempotency_in_progress` | Запрос с этим `custom_id` ещё обрабатывается. |
 | 409 | `price_updating` | Цены обновляются; повторите через короткое время. |
-| 429 | `rate_limit_exceeded` | Слишком много запросов. Подождите время, указанное в заголовке `Retry-After`. |
+| 429 | `rate_limit_exceeded` | Более 250 заказов на покупку в минуту (`bucket: "buy_orders"`) или превышен торговый лимит ключа (`bucket: "trading"`). Подождите время, указанное в заголовке `Retry-After`. |
 | 500 | `order_failed` | Покупку не удалось завершить. |
 
 <Note>
   Средства берутся исключительно из вашего **подтверждённого** баланса. Перед большой партией проверяйте `settled_balance_usd` через [`GET /v1/balance`](/api-reference/get-balance) и всегда передавайте `max_price_usd` в качестве защиты от переплаты.
 </Note>
+
+<a id="unavailable-items" />
+## Недоступные предметы
+
+Листинг может уйти из каталога между вашим чтением и покупкой. В теле `409 item_unavailable` все пропавшие id перечислены в `unavailable_ids`. При покупке CS2 (без `appId` или с `730`) там может быть и `unknown_ids` — те из пропавших id, о которых у нас нет никакой записи. Либо это не id листинга CSBoard, либо листинг ушёл из каталога больше часа назад. Чаще всего вместо id листинга присылают asset id из Steam. У листингов CSBoard id никогда не состоит из одних цифр, поэтому отправляйте `id` строки из `/v1/listings` или стрима.
+
+```json
+{
+  "code": "item_unavailable",
+  "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+  "unavailable_ids": ["31846262931"],
+  "unknown_ids": ["31846262931"]
+}
+```
+
+Чтобы убирать проданные листинги до попытки покупки, подпишитесь на события `gone` в [`GET /v1/listings/stream`](/ru/api-reference/get-listings-stream).

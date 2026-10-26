@@ -124,13 +124,29 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 403 | `external_buy_disabled` | Kill-switch is off; the endpoint is currently disabled. |
 | 403 | `trading_not_enabled` | Buying is not enabled for this key. |
 | 403 | `account_restricted` | The endpoint requires a reversal-clean account. |
-| 409 | `item_unavailable` | One or more items are no longer available. Includes `unavailable_ids[]`. |
+| 409 | `item_unavailable` | One or more items are no longer available. Includes `unavailable_ids[]` and, for CS2, may include `unknown_ids[]`. See [unavailable items](#unavailable-items) below. |
 | 409 | `price_moved` | Live total exceeded the ceiling. Includes `quoted_max_usd`, `current_total_usd`, and `items[]`. |
 | 409 | `idempotency_in_progress` | A request with this `custom_id` is still being processed. |
 | 409 | `price_updating` | Prices are refreshing; retry shortly. |
-| 429 | `rate_limit_exceeded` | Too many requests. Back off for the `Retry-After` header value. |
+| 429 | `rate_limit_exceeded` | Over 250 buy orders/min (`bucket: "buy_orders"`), or over your key's trading limit (`bucket: "trading"`). Back off for the `Retry-After` header value. |
 | 500 | `order_failed` | The purchase could not be completed. |
 
 <Note>
   Funds come exclusively from your **settled** balance. Check `settled_balance_usd` on [`GET /v1/balance`](/api-reference/get-balance) before a large batch, and always send `max_price_usd` as overcharge protection.
 </Note>
+
+<a id="unavailable-items" />
+## Unavailable items
+
+Listings can leave the catalogue between your read and your buy. The `409 item_unavailable` body lists every missing id in `unavailable_ids`. On a CS2 buy (no `appId`, or `730`) it may also carry `unknown_ids`: the missing ids we have no record of at all. Either the id is not a CSBoard listing id, or the listing left the catalogue more than an hour ago. A Steam asset id is the usual mix-up — CSBoard listing ids are never all digits, so send the `id` of a row from `/v1/listings` or the stream.
+
+```json
+{
+  "code": "item_unavailable",
+  "detail": "One or more items are no longer available. 1 of the ids are not known here (`unknown_ids`): not a listing id, or a listing gone for over an hour. Steam asset ids are not listing ids: send the `id` of a row from /v1/listings or the stream.",
+  "unavailable_ids": ["31846262931"],
+  "unknown_ids": ["31846262931"]
+}
+```
+
+To drop sold listings before you try to buy them, subscribe to the `gone` events of [`GET /v1/listings/stream`](/api-reference/get-listings-stream).

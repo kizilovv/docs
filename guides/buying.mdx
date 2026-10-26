@@ -133,6 +133,18 @@ Items bought inside a Steam trade hold wait for the hold to end — check the li
 
 ---
 
+## When an order fails
+
+An order that ends `failed` or `cancelled` has already been refunded — `refund` is the receipt. Three fields say why:
+
+- `fail_reason` — a code to branch on, such as `recipient_inventory_private` or `listing_gone`. Treat a code you do not know as `unavailable`.
+- `fail_side` — who has to act. `recipient`: fix the recipient's Steam account or trade URL, then buy again. `seller` or `market`: buy another listing, or retry shortly on `market_unavailable`. `buyer`: you cancelled the order.
+- `fail_message` — one sentence you can show as is.
+
+All three are `null` on every other status. Every code is listed in [why an order failed](/api-reference/get-orders#fail-reasons).
+
+---
+
 ## Error reference
 
 | Code | HTTP Status | Meaning |

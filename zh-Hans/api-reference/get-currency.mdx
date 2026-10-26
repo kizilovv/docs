@@ -75,7 +75,7 @@ curl https://csboard.com/v1/currency \
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
 | 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
-| 429 | `rate_limit_exceeded` | 超过 30 次/分钟。在重试前请检查 `Retry-After` 响应头。 |
+| 429 | `rate_limit_exceeded` | 超过密钥的读取限制（默认 100 次/分钟）。在重试前请检查 `Retry-After` 响应头。 |
 
 <Tip>
   请在客户端缓存 rates 响应，每小时刷新不超过一次。汇率约每小时更新一次，更频繁地轮询不会带来更新鲜的数据，反而会消耗您的速率限制额度。
