@@ -1,7 +1,7 @@
 ---
 title: "Authenticate with the CSBoard API Using Bearer Tokens"
 sidebarTitle: "Authentication"
-description: "Generate a csb_pub_ API key at your profile page, pass it as a Bearer token or query parameter, and understand read vs. trading key capabilities."
+description: "Generate a csb_pub_ API key at your profile page, pass it as a Bearer token, and understand read vs. trading key capabilities."
 ---
 
 Every CSBoard API request (except `GET /v1/health` and `GET /v1/public/prices`) must include a valid API key. Keys belong to the `csb_pub_` namespace, are scoped to either read-only or trading access, and are tied to your CSBoard account. The server stores only the SHA-256 hash of each key — the raw secret is shown once at creation and never again, so store it somewhere safe.
@@ -36,13 +36,7 @@ curl https://csboard.com/v1/listings \
   -H "Authorization: Bearer csb_pub_..."
 ```
 
-As a convenience you can also pass the key as the `api_key` query parameter — useful for quick tests in a browser or tools that don't support custom headers:
-
-```bash
-curl "https://csboard.com/v1/listings?api_key=csb_pub_..."
-```
-
-Prefer the `Authorization` header in production; query parameters are more likely to appear in server logs.
+The header is the only place a key is accepted. A key in the URL (`?api_key=csb_pub_...`) is refused with `401 api_key_in_query_string`, because URLs end up in server logs, browser history and `Referer` headers. If you ever sent your key that way, rotate it in your [profile](https://csboard.com/profile?tab=api).
 
 ## Key capabilities
 
@@ -84,6 +78,7 @@ Every error from the API returns a JSON body in this format:
 |---|---|---|
 | 401 | `missing_api_key` | No key provided or key does not start with `csb_pub_` |
 | 401 | `invalid_api_key` | Key is not recognised or has been revoked |
+| 401 | `api_key_in_query_string` | The key was sent in the URL. Send it in the `Authorization` header |
 | 429 | `too_many_failed_auth` | Too many invalid keys from your IP — 5-minute ban applied |
 | 403 | `trading_not_enabled` | Key is valid but trading has not been enabled for it |
 | 403 | `ip_not_allowed` | Key is restricted to an IP allowlist that does not include your address |

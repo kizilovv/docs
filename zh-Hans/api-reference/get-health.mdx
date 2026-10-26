@@ -41,7 +41,7 @@ curl https://csboard.com/v1/health
 
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
-| 429 | `rate_limit_exceeded` | 超过请求速率限制。请退避后按 `Retry-After` 响应头中的秒数重试。 |
+| 429 | — | 超过按 IP 计算的限制：此端点无需密钥，因此按 IP 地址计数。响应体中没有 `code` 字段。请等待 `Retry-After` 响应头中的秒数。 |
 
 <Tip>
   在执行已认证调用之前，请在健康检查或启动逻辑中轮询此端点。如果 `price_list_age_seconds` 出乎意料地大（例如超过几分钟），请将下游价格数据视为可能已陈旧。

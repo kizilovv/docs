@@ -1,7 +1,7 @@
 ---
 title: "使用 Bearer 令牌进行 CSBoard API 身份验证"
 sidebarTitle: "身份验证"
-description: "在个人资料页面生成 csb_pub_ API 密钥，将其作为 Bearer 令牌或查询参数传递，并了解只读密钥与交易密钥的能力差异。"
+description: "在个人资料页面生成 csb_pub_ API 密钥，将其作为 Bearer 令牌传递，并了解只读密钥与交易密钥的能力差异。"
 ---
 
 每个 CSBoard API 请求（除 `GET /v1/health` 和 `GET /v1/public/prices` 外）都必须包含有效的 API 密钥。密钥属于 `csb_pub_` 命名空间，作用域为只读访问或交易访问，并与您的 CSBoard 账户绑定。服务器仅存储每个密钥的 SHA-256 哈希值——原始密钥仅在创建时显示一次，之后不会再次显示，因此请将其安全地保存。
@@ -36,13 +36,7 @@ curl https://csboard.com/v1/listings \
   -H "Authorization: Bearer csb_pub_..."
 ```
 
-为方便起见，您也可以将密钥作为 `api_key` 查询参数传递——这对于在浏览器中进行快速测试或不支持自定义头部的工具非常有用：
-
-```bash
-curl "https://csboard.com/v1/listings?api_key=csb_pub_..."
-```
-
-在生产环境中应优先使用 `Authorization` 头；查询参数更容易出现在服务器日志中。
+密钥只能通过请求头传递。放在 URL 中的密钥（`?api_key=csb_pub_...`）会被拒绝，返回 `401 api_key_in_query_string`，因为 URL 会进入服务器日志、浏览器历史记录和 `Referer` 头。如果您曾经这样传递过密钥，请在[个人资料](https://csboard.com/profile?tab=api)中轮换密钥。
 
 ## 密钥能力
 
@@ -74,6 +68,7 @@ API 返回的每个错误都会以以下格式返回 JSON 主体：
 |---|---|---|
 | 401 | `missing_api_key` | 未提供密钥或密钥不以 `csb_pub_` 开头 |
 | 401 | `invalid_api_key` | 密钥无法识别或已被撤销 |
+| 401 | `api_key_in_query_string` | 密钥放在了 URL 中。请通过 `Authorization` 头传递 |
 | 429 | `too_many_failed_auth` | 来自您 IP 的无效密钥过多——已应用 5 分钟封禁 |
 | 403 | `trading_not_enabled` | 密钥有效但未启用交易 |
 | 429 | `rate_limit_exceeded` | 您已超出每个密钥的请求限制 |

@@ -41,7 +41,7 @@ curl https://csboard.com/v1/health
 
 | HTTP status | Code | Meaning |
 |---|---|---|
-| 429 | `rate_limit_exceeded` | Over the request rate limit. Back off and retry after the `Retry-After` header value. |
+| 429 | — | Over the per-IP limit: this endpoint takes no key, so it is counted per IP address. The body has no `code` field. Wait for the `Retry-After` header value. |
 
 <Tip>
   Poll this endpoint from your health-check or startup logic before making authenticated calls. If `price_list_age_seconds` is unexpectedly large (e.g. above a few minutes), treat downstream price data as potentially stale.
