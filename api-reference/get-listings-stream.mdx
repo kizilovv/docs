@@ -66,9 +66,11 @@ Filters are applied on our side, before anything is sent to you. They exist to s
 </ResponseField>
 
 <ResponseField name="update" type="Listing">
-  A listing you already received got data filled in: `float_value` or `paint_seed` arrived after its `new` event. The payload is the full `Listing` object, same shape as `new`. Replace your copy by `id`; if you have no listing with that `id` yet, add it.
+  A listing you already received changed: its `price_usd` moved, or `float_value` / `paint_seed` arrived after its `new` event. The payload is the full `Listing` object, same shape as `new`, with the current values. Replace your copy by `id`; if you have no listing with that `id` yet, add it.
 
-  Some markets send float and pattern a few minutes after the lot goes on sale. Before this event the stream kept `float_value: null` for such lots, and the only way to see the value was to re-read `GET /v1/listings`. Filters apply to `update` the same way as to `new`. Sticker wear comes as the market reports it: when the market does not know it, it is `null` both here and in `/v1/listings`.
+  With `new`, `update` and `gone` you can keep the whole catalogue yourself — load it once from the [snapshot](/api-reference/get-listings-snapshot), then apply the stream — instead of polling `GET /v1/listings`. Filters apply to `update` like to `new`, except `min_price` / `max_price`: a listing you hold that reprices out of your range still reaches you, so you never keep it at an old price. Some markets send float and pattern a few minutes after the lot goes on sale, which is why they can come in an `update`. Sticker wear comes as the market reports it: when the market does not know it, it is `null` both here and in `/v1/listings`.
+
+  On lots from $100 the price can still move at checkout because of other listings of the same item. Send `max_price_usd` with your order: a higher price is refused with `price_moved`, never charged.
 </ResponseField>
 
 <ResponseField name="gone" type="object">
@@ -133,7 +135,7 @@ es.addEventListener("new", (e) => {
 es.addEventListener("update", (e) => {
   const listing = JSON.parse(e.data);
   live.set(listing.id, listing);
-  // float_value / paint_seed arrived later
+  // new price, or float_value / paint_seed arrived later
 });
 
 es.addEventListener("gone", (e) => {

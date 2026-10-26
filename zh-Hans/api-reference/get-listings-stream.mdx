@@ -60,9 +60,11 @@ openapi: "GET /listings/stream"
 </ResponseField>
 
 <ResponseField name="update" type="Listing">
-  您已收到的挂单补充了数据：`float_value` 或 `paint_seed` 在其 `new` 事件之后才到达。负载是完整的 `Listing` 对象，与 `new` 相同。请按 `id` 替换您的副本；如果您还没有该 `id` 的挂单，请将其添加。
+  您已收到的挂单发生了变化：`price_usd` 变动，或 `float_value` / `paint_seed` 在其 `new` 事件之后才到达。负载是完整的 `Listing` 对象，与 `new` 相同，包含当前值。请按 `id` 替换您的副本；如果您还没有该 `id` 的挂单，请将其添加。
 
-  部分市场会在挂单上架几分钟后才提供磨损值和图案。在此事件之前，流中这类挂单的 `float_value` 一直为 `null`，只能重新读取 `GET /v1/listings` 才能看到该值。过滤条件对 `update` 的作用与对 `new` 相同。贴纸磨损按市场提供的原样返回：市场未提供时，它在此处和 `/v1/listings` 中都为 `null`。
+  借助 `new`、`update` 和 `gone`，您可以自行维护整个目录——先从[快照](/api-reference/get-listings-snapshot)加载一次，然后应用流——而无需轮询 `GET /v1/listings`。过滤条件对 `update` 的作用与对 `new` 相同，但 `min_price` / `max_price` 除外：您持有的挂单即使价格移出您的范围也仍会推送给您，以免您保留旧价格。部分市场会在挂单上架几分钟后才提供磨损值和图案，因此它们可能通过 `update` 到达。贴纸磨损按市场提供的原样返回：市场未提供时，它在此处和 `/v1/listings` 中都为 `null`。
+
+  对于 $100 及以上的挂单，由于同一商品的其他挂单，购买时价格仍可能变动。请在订单中传入 `max_price_usd`：更高的价格会以 `price_moved` 被拒绝，而不会被扣款。
 </ResponseField>
 
 <ResponseField name="gone" type="object">
@@ -127,7 +129,7 @@ es.addEventListener("new", (e) => {
 es.addEventListener("update", (e) => {
   const listing = JSON.parse(e.data);
   live.set(listing.id, listing);
-  // float_value / paint_seed 稍后到达
+  // 新价格，或 float_value / paint_seed 稍后到达
 });
 
 es.addEventListener("gone", (e) => {

@@ -8,9 +8,9 @@ description: "CSBoard API 的产品更新、新功能和修复。"
 
 ## 新功能
 
-**流：磨损值或图案稍后到达时的 `update` 事件**
+**流：价格变动及磨损值 / 图案稍后到达时的 `update` 事件**
 
-[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream) 现在会在您已收到的挂单补充 `float_value` 或 `paint_seed` 时发送 `update`。部分市场会在挂单上架几分钟后才提供这些数据；此前流中它们一直为 `null`，您需要重新读取 `GET /v1/listings` 才能看到。负载是完整的 `Listing`，与 `new` 相同：请按 `id` 替换您的副本。忽略未知事件类型的客户端无需任何改动。
+[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream) 现在会在您已收到的挂单价格变动，或补充 `float_value` / `paint_seed` 时发送 `update`（部分市场会在挂单上架几分钟后才提供这些数据）。负载是完整的 `Listing`，与 `new` 相同：请按 `id` 替换您的副本。借助[快照](/api-reference/get-listings-snapshot)以及 `new` / `update` / `gone`，您可以在自己一侧维护整个目录，而无需轮询 `GET /v1/listings`。`min_price` / `max_price` 不过滤 `update`，因此价格移出您范围的挂单仍会推送给您。忽略未知事件类型的客户端无需任何改动。
 
 **订单失败的原因：`fail_reason`、`fail_side`、`fail_message`**
 

@@ -8,9 +8,9 @@ description: "Product updates, new features, and fixes for the CSBoard API."
 
 ## New features
 
-**Stream: `update` event when float or pattern arrives later**
+**Stream: `update` event for price changes and late float / pattern**
 
-[`GET /v1/listings/stream`](/api-reference/get-listings-stream) now sends `update` when a listing you already received gets `float_value` or `paint_seed` filled in. Some markets send these a few minutes after the lot goes on sale; until now the stream kept them `null` and you had to re-read `GET /v1/listings` to see them. The payload is the full `Listing`, same as `new`: replace your copy by `id`. Clients that ignore unknown event types keep working unchanged.
+[`GET /v1/listings/stream`](/api-reference/get-listings-stream) now sends `update` when a listing you already received changes price, or gets `float_value` / `paint_seed` filled in (some markets send these a few minutes after the lot goes on sale). The payload is the full `Listing`, same as `new`: replace your copy by `id`. With the [snapshot](/api-reference/get-listings-snapshot) plus `new` / `update` / `gone` you can keep the whole catalogue on your side instead of polling `GET /v1/listings`. `min_price` / `max_price` do not filter `update`, so a listing you hold that reprices out of your range still reaches you. Clients that ignore unknown event types keep working unchanged.
 
 **Why an order failed: `fail_reason`, `fail_side`, `fail_message`**
 
