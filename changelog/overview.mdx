@@ -15,6 +15,8 @@ description: "Product updates, new features, and fixes for the CSBoard API."
 ## Changes
 
 - A stream connection that falls more than 8 MB behind is now closed instead of buffered without limit. Reconnect with `Last-Event-ID` to continue from the last event you processed. If it keeps happening, narrow the feed with `events` and the other filters.
+- The stream now follows the one-listing-per-physical-skin rule of `GET /v1/listings` and the snapshot. When the same skin is on sale through more than one supplier, only the cheapest copy is announced as `new`; a copy you hold is retired with `gone` when a cheaper one appears, and when the announced copy sells the next one arrives as `new`. Before this, the stream announced every copy, so a client could hold two prices for one skin and see a listing the snapshot did not carry. A `gone` for an id you never received is normal: ignore it. When this went live, every open connection was closed and the history before that moment was dropped, so a reconnect with an older `Last-Event-ID` received one `resync`: rebuild from the snapshot or `GET /v1/listings`, which already follow the rule, and the view is clean from there.
+- Fewer `item_unavailable` refusals at checkout: a listing whose live price moved past your ceiling is no longer treated as sold, and listings are checked with their supplier before the order is placed on every market that can answer, so an order is refused before any money moves rather than refunded after.
 
 </Update>
 

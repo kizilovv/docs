@@ -69,6 +69,8 @@ Filters are applied on our side, before anything is sent to you. They exist to s
   A listing entered the catalogue. The payload is exactly the `Listing` object `GET /v1/listings` returns, including `listed_at`.
 
   This fires for genuinely new inventory **and** for re-listings — items returning from cancelled orders, expired trade offers, or released holds. A re-listed item is new to you even though it existed before.
+
+  **One listing per physical skin**, the same rule as `GET /v1/listings` and the snapshot. When the same skin is on sale through more than one supplier, only the cheapest copy is announced; the others are not. If a cheaper copy appears later, the copy you hold is retired with `gone` and the cheaper one arrives as `new`. If the copy you hold sells and another remains, that one arrives as `new`. Your view therefore never carries two prices for one skin, and it matches the snapshot at any moment.
 </ResponseField>
 
 <ResponseField name="update" type="Listing">
@@ -80,15 +82,15 @@ Filters are applied on our side, before anything is sent to you. They exist to s
 </ResponseField>
 
 <ResponseField name="gone" type="object">
-  A listing left the catalogue — sold, reserved, or withdrawn. The payload is `{ "id": "..." }`.
+  A listing left the catalogue — sold, reserved, or withdrawn — or stopped standing for its skin because a cheaper copy of the same skin appeared (see `new`). The payload is `{ "id": "..." }`. A `gone` for an id you never received is normal: ignore it.
 
   **Act on this one.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone. This is the half of the picture polling cannot give you at any frequency.
 </ResponseField>
 
 <ResponseField name="resync" type="object">
-  Your `Last-Event-ID` is older than the retained history, so a replay would be incomplete. Payload is `{ "reason": "last_event_id_expired", "detail": "..." }`.
+  Your `Last-Event-ID` is older than the retained history, so a replay would be incomplete. Payload is `{ "reason": "last_event_id_expired", "detail": "..." }`. The same event with `"reason": "stream_rebased"` arrives on an open connection, once, when the rules the feed follows change (as on October 28, 2026) and a view built before cannot be patched forward; the connection is then closed.
 
-  Re-read `GET /v1/listings?sort=newest` to rebuild your view, then reconnect without `Last-Event-ID`. We send this rather than silently handing you a partial replay you would mistake for a complete one.
+  Re-read `GET /v1/listings?sort=newest` (or reload the snapshot) to rebuild your view, then reconnect without `Last-Event-ID`. We send this rather than silently handing you a partial replay you would mistake for a complete one.
 </ResponseField>
 
 ## Reconnecting without gaps

@@ -63,6 +63,8 @@ openapi: "GET /listings/stream"
   有挂单进入目录。负载正是 `GET /v1/listings` 返回的 `Listing` 对象，包含 `listed_at`。
 
   该事件既会在真正的新库存出现时触发，**也会**在重新上架时触发——来自已取消订单、已过期交易报价或已解除冻结的商品。重新上架的商品对您而言就是新的，即使它此前已经存在。
+
+  **每件实物饰品只有一条挂单**，与 `GET /v1/listings` 和快照的规则相同。同一件饰品通过多个供应商在售时，只公布最便宜的一份，其余不公布。若之后出现更便宜的一份，您持有的那份会以 `gone` 退场，更便宜的以 `new` 到达。若您持有的那份售出而另一份仍在售，另一份会以 `new` 到达。因此您的视图永远不会对同一件饰品保留两个价格，并且在任何时刻都与快照一致。
 </ResponseField>
 
 <ResponseField name="update" type="Listing">
@@ -74,15 +76,15 @@ openapi: "GET /listings/stream"
 </ResponseField>
 
 <ResponseField name="gone" type="object">
-  有挂单离开目录——售出、被预留或被下架。负载为 `{ "id": "..." }`。
+  有挂单离开目录——售出、被预留或被下架——或者因为同一件饰品出现了更便宜的一份而不再代表该饰品（见 `new`）。负载为 `{ "id": "..." }`。收到您从未收到过的 id 的 `gone` 属正常情况：忽略即可。
 
   **请务必处理该事件。** 在商品售出的那一刻将其移除，正是您的购买请求成功与购买请求发现商品已消失之间的区别。这是轮询在任何频率下都无法提供的那一半信息。
 </ResponseField>
 
 <ResponseField name="resync" type="object">
-  您的 `Last-Event-ID` 早于保留的历史记录，因此重放将不完整。负载为 `{ "reason": "last_event_id_expired", "detail": "..." }`。
+  您的 `Last-Event-ID` 早于保留的历史记录，因此重放将不完整。负载为 `{ "reason": "last_event_id_expired", "detail": "..." }`。当流所遵循的规则发生变化（如 2026 年 10 月 28 日）且此前构建的视图无法向前修补时，同一事件会以 `"reason": "stream_rebased"` 在打开的连接上发送一次，随后连接被关闭。
 
-  请重新读取 `GET /v1/listings?sort=newest` 以重建您的视图，然后在不带 `Last-Event-ID` 的情况下重连。我们发送该事件，而不是默默地给您一份您会误认为完整的部分重放。
+  请重新读取 `GET /v1/listings?sort=newest`（或重新加载快照）以重建您的视图，然后在不带 `Last-Event-ID` 的情况下重连。我们发送该事件，而不是默默地给您一份您会误认为完整的部分重放。
 </ResponseField>
 
 ## 无缝重连
