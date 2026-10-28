@@ -57,6 +57,12 @@ Filters are applied on our side, before anything is sent to you. They exist to s
   Resume after this event id. Use only if your client cannot send the `Last-Event-ID` header — the header is the standard mechanism and is preferred.
 </ParamField>
 
+<ParamField query="events" type="string">
+  Event types to receive, comma-separated: `new`, `update`, `gone`. Default: all three.
+
+  `update` is about 80% of the feed, almost all of it price changes. If you only buy new listings and drop sold ones, `events=new,gone` gives you the same picture of what is for sale at about a fifth of the bytes. Leave out `gone` and you keep listings that have already sold.
+</ParamField>
+
 ## Events
 
 <ResponseField name="new" type="Listing">
@@ -96,6 +102,8 @@ A `: heartbeat` comment arrives every 25 seconds. Treat a longer silence as a de
 Three concurrent streams per API key. The connection itself is not rate-limited — once open, events flow as fast as the catalogue changes. A `new` event goes out about 0.3 seconds after a listing enters the catalogue, to every key at the same moment, so polling `/v1/listings` cannot see a listing sooner. See [polling versus the stream](/rate-limits#polling-vs-stream).
 
 A fourth connection answers `429 too_many_streams` with `Retry-After: 90`. A connection that dropped without closing keeps its slot for up to 90 seconds, so a reconnect right after a network blip may have to wait that long.
+
+A connection that falls more than 8 MB behind (about 40 seconds of the full feed) is closed. Reconnect with `Last-Event-ID` and you continue from the last event you processed. If it keeps happening, your client reads slower than the feed arrives: narrow it with `events` and the filters above.
 
 ## Example request
 
@@ -154,6 +162,7 @@ es.addEventListener("resync", () => {
 
 | HTTP status | Code | Meaning |
 | --- | --- | --- |
+| 400 | `invalid_param` | A filter has an invalid value, for example an unknown type in `events`. |
 | 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |
 | 429 | `too_many_streams` | More than 3 concurrent streams for this key. Close an existing connection first, or wait `Retry-After` (90) seconds for a dropped one to free its slot. The body carries `max_connections` and `retry_after_sec`. |
 

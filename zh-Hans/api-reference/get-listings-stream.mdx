@@ -51,6 +51,12 @@ openapi: "GET /listings/stream"
   从该事件 id 之后继续。仅在您的客户端无法发送 `Last-Event-ID` 请求头时使用——该请求头是标准机制，且更受推荐。
 </ParamField>
 
+<ParamField query="events" type="string">
+  要接收的事件类型，用逗号分隔：`new`、`update`、`gone`。默认三种都接收。
+
+  `update` 约占整个流的 80%，几乎全是价格变动。如果您只购买新挂单并删除已售出的挂单，`events=new,gone` 能以约五分之一的流量给出同样的在售情况。不接收 `gone` 的话，您会保留已经售出的挂单。
+</ParamField>
+
 ## 事件
 
 <ResponseField name="new" type="Listing">
@@ -90,6 +96,8 @@ openapi: "GET /listings/stream"
 每个 API 密钥最多 3 个并发流。连接本身不受速率限制——一旦建立，事件将以目录变化的速度推送。挂单进入目录后约 0.3 秒，`new` 事件就会同时推送给所有密钥，因此轮询 `/v1/listings` 不可能更早看到它。详见 [轮询与流](/zh-Hans/rate-limits#polling-vs-stream)。
 
 第 4 个连接会收到 `429 too_many_streams`，并带有 `Retry-After: 90`。未正常关闭就断开的连接最多会继续占用名额 90 秒，因此网络中断后立即重连可能需要等待这么久。
+
+落后超过 8 MB（约为完整流的 40 秒）的连接会被关闭。使用 `Last-Event-ID` 重连，即可从您处理过的最后一个事件继续。如果反复发生，说明您的客户端读取速度慢于流速：请用 `events` 和上面的其他筛选条件缩小流量。
 
 ## 示例请求
 
@@ -148,6 +156,7 @@ es.addEventListener("resync", () => {
 
 | HTTP 状态码 | 代码 | 含义 |
 |---|---|---|
+| 400 | `invalid_param` | 筛选条件的值无效，例如 `events` 中包含未知类型。 |
 | 401 | `missing_api_key`, `invalid_api_key` | API 密钥缺失或无效。 |
 | 429 | `too_many_streams` | 该密钥的并发流超过 3 个。请先关闭已有连接，或等待 `Retry-After`（90）秒，让已断开的连接释放名额。响应体包含 `max_connections` 和 `retry_after_sec`。 |
 

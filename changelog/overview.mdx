@@ -4,6 +4,20 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="October 28, 2026">
+
+## New features
+
+**Stream: choose the event types you need with `events`**
+
+[`GET /v1/listings/stream`](/api-reference/get-listings-stream) takes `events`, a comma-separated list of `new`, `update`, `gone`. `update` is about 80% of the feed, almost all price changes, so a client that only buys new listings and drops sold ones can use `events=new,gone` and read about a fifth of the bytes. Without the parameter you get all three, as before.
+
+## Changes
+
+- A stream connection that falls more than 8 MB behind is now closed instead of buffered without limit. Reconnect with `Last-Event-ID` to continue from the last event you processed. If it keeps happening, narrow the feed with `events` and the other filters.
+
+</Update>
+
 <Update label="October 26, 2026">
 
 ## New features

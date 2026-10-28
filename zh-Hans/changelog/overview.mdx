@@ -4,6 +4,20 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年10月28日">
+
+## 新功能
+
+**流：通过 `events` 选择需要的事件类型**
+
+[`GET /v1/listings/stream`](/zh-Hans/api-reference/get-listings-stream) 支持 `events` 参数：用逗号分隔的 `new`、`update`、`gone`。`update` 约占整个流的 80%，几乎全是价格变动；只购买新挂单并删除已售出挂单的客户端可以使用 `events=new,gone`，流量约为原来的五分之一。不带该参数时，三种事件都会照常推送。
+
+## 变更
+
+- 落后超过 8 MB 的流连接现在会被关闭，而不是无限缓冲。使用 `Last-Event-ID` 重连即可从您处理过的最后一个事件继续。如果反复发生，请用 `events` 和其他筛选条件缩小流量。
+
+</Update>
+
 <Update label="2026年10月26日">
 
 ## 新功能

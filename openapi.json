@@ -715,6 +715,16 @@
               "minimum": 0,
               "maximum": 100
             }
+          },
+          {
+            "name": "events",
+            "in": "query",
+            "required": false,
+            "description": "Event types to receive, comma-separated: new, update, gone. Default: all three. `update` is about 80% of the feed, almost all price changes; `events=new,gone` keeps what is for sale at about a fifth of the bytes.",
+            "schema": {
+              "type": "string",
+              "example": "new,gone"
+            }
           }
         ],
         "responses": {
