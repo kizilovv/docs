@@ -7,7 +7,7 @@ openapi: "POST /market/buy"
 
 This endpoint lets you buy and deliver items directly to **any** Steam trade URL you supply — not just the trade URL linked to your account. The trade URL is built from the `partner` and `token` fields. Purchases are funded **only** from your **settled** (reversal-safe) balance, making it suitable for wholesale volume and automated delivery workflows.
 
-The endpoint is **idempotent via the `custom_id` body field**: retrying with the same `custom_id` replays the original purchase rather than buying twice, and the replayed response carries the header `Idempotent-Replayed: true`.
+Save one `custom_id` per withdrawal. A cached success returns `Idempotent-Replayed: true` for up to 24 hours. If the response is lost, read [order status](/api-reference/get-orders-info) with the saved id. An empty result can precede order creation. Keep the withdrawal pending until reconciled.
 
 <Warning>
   This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. When the kill-switch is off it returns `403 external_buy_disabled`.
@@ -36,7 +36,7 @@ The endpoint is **idempotent via the `custom_id` body field**: retrying with the
 </ParamField>
 
 <ParamField body="custom_id" type="string">
-  Idempotency key (1–128 chars). A retry with the same `custom_id` replays the original purchase; the replay response carries `Idempotent-Replayed: true`.
+  Withdrawal identifier (1–128 characters). After the cached response expires, reusing the same id can start a new purchase.
 </ParamField>
 
 <ParamField body="skip_unavailable" type="boolean" default="false">

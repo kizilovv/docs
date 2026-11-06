@@ -7,7 +7,7 @@ openapi: "POST /market/buy"
 
 此端点允许您将商品购买并直接交付到您提供的**任意** Steam 交易链接——而不仅限于绑定到您账户的交易链接。交易链接由 `partner` 和 `token` 字段组成。购买**只能**使用您的**已结算**（不可撤销）余额，因此适用于批发量与自动化交付工作流。
 
-该端点**通过 `custom_id` 请求体字段实现幂等性**：使用相同的 `custom_id` 重试会重放原始的购买，而不会再次扣款；重放的响应会携带 `Idempotent-Replayed: true` 响应头。
+为每笔提取保存一个 `custom_id`。成功响应最多缓存 24 小时，重放时会返回 `Idempotent-Replayed: true` 响应头。如果响应丢失，请用已保存的标识符[查询订单](/zh-Hans/api-reference/get-orders-info)。订单创建前，查询可能返回空结果。请保持待处理状态，直到核实原订单。
 
 <Warning>
   此端点处于熔断开关保护之下，要求账户启用了交易且不可撤销状态干净。熔断开关关闭时，将返回 `403 external_buy_disabled`。
@@ -36,7 +36,7 @@ openapi: "POST /market/buy"
 </ParamField>
 
 <ParamField body="custom_id" type="string">
-  幂等键（1–128 个字符）。使用相同 `custom_id` 重试会重放原始购买；重放响应会携带 `Idempotent-Replayed: true`。
+  提取标识符（1–128 个字符）。缓存过期后，使用相同标识符可能会发起新的购买。
 </ParamField>
 
 <ParamField body="skip_unavailable" type="boolean" default="false">

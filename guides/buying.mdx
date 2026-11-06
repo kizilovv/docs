@@ -1,7 +1,7 @@
 ---
 title: "Buy CS2 Skins Automatically from Your CSBoard Balance"
 sidebarTitle: "Buying"
-description: "Place automated orders against your CSBoard balance, protect against price moves, and guarantee idempotent delivery using POST /v1/orders."
+description: "Place automated orders against your CSBoard balance, protect against price moves, and reconcile a purchase after a timeout using POST /v1/orders."
 ---
 
 Buying through the CSBoard API lets you acquire CS2 skins programmatically — straight from your balance, with atomic overcharge protection and built-in idempotency. Before your first order goes through, you need to complete a short one-time setup. Follow the steps below in order.
@@ -71,7 +71,7 @@ If the price moved and you receive a `400`, the response body includes `current_
 
 Network failures happen. Without idempotency, a retry after a timeout could buy the same item twice. Prevent that by sending a unique `Idempotency-Key` header with every order request.
 
-- If the server receives two requests with the same key, it replays the original order result — the purchase is never executed a second time.
+- Use one key per order. A cached success can be replayed for up to 24 hours. After a network timeout, check the original order before submitting another purchase.
 - You can also pass `idempotency_key` in the request body instead of the header; both have the same effect.
 - Use a UUID v4 generated per order attempt, not per retry.
 

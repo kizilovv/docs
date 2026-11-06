@@ -74,7 +74,7 @@ Note the field is **`detail`**, not `message`. Match on `code` — it is stable 
 | 425 | `hold_not_cleared` | `POST /v1/orders/{id}/claim`: the item is still inside its hold window. | Retry after `hold_until`, which is in the body. |
 | 502 | `delivery_failed` | `POST /v1/orders/{id}/claim`: the marketplace rejected the withdrawal. `refunded` in the body says whether the money is already back. | If `refunded` is true, nothing to do. Otherwise we retry or refund on our side; follow the order. |
 | 503 | `market_unavailable` | The upstream source for that item is temporarily down. **No charge was made.** | Retry shortly, or pick a listing from elsewhere in the catalogue. |
-| 504 | `upstream_timeout` | The marketplace did not answer in time, so the outcome is **unknown**: the purchase may still have gone through. | Do not re-send blindly. Poll `GET /v1/orders/info` with your `custom_id`, or re-send the identical request with the same `custom_id` / `Idempotency-Key`, which replays the original result instead of buying twice. |
+| 504 | `upstream_timeout` | The marketplace did not answer in time, so the outcome is **unknown**: the purchase may still have gone through. | Poll `GET /v1/orders/info` with the saved identifier. Keep an empty result pending and investigate before submitting another purchase. |
 | 500 | `order_failed` | Unexpected failure. | Check `GET /v1/orders/info` with your `custom_id` before retrying — the order may exist. |
 
 <Note>
@@ -142,7 +142,7 @@ The distinction that matters is whether money moved.
 
 <CardGroup cols={2}>
   <Card title="Safe to retry" icon="rotate">
-    `429` (after `Retry-After`), `price_updating`, `market_unavailable`, `concurrent_update`, `held_balance_blocked` (once the hold clears), `503`, and network timeouts. Nothing was charged. Reuse the **same** `Idempotency-Key` so a request that actually succeeded replays instead of buying twice.
+    `429` (after `Retry-After`), `price_updating`, `market_unavailable`, `concurrent_update`, `held_balance_blocked` (once the hold clears). Respect the returned error code and keep the same order identifier.
   </Card>
   <Card title="Do not retry unchanged" icon="ban">
     `400`, `401`, `403`, `invalid_webhook_url`, `unsupported_item`. The request is wrong; repeating it produces the same error and, on auth failures, an IP ban.
@@ -156,5 +156,5 @@ The distinction that matters is whether money moved.
 </CardGroup>
 
 <Warning>
-  A timeout is not a failure. `POST /v1/orders` and `POST /v1/market/buy` are idempotent on `Idempotency-Key` / `custom_id`: retrying with the same value replays the original order. Retrying with a **new** value after a timeout is how you buy the same skin twice.
+  A lost purchase response leaves the outcome unknown. Successful responses are cached for up to 24 hours. Once the cache expires, the same identifier can start another purchase. Keep the original order pending until you reconcile it.
 </Warning>

@@ -5,7 +5,7 @@ description: "Buy 1–10 CS2 listings by ID in a single atomic request, debited 
 openapi: "POST /orders"
 ---
 
-The orders endpoint lets you buy between 1 and 10 listings in a single atomic request. The charge is debited from your CSBoard balance at the **live** asking price at the moment of execution — not at the price you saw when you queried `/v1/listings`. To protect yourself from price movements between lookup and purchase, always include `max_price_usd` as a total ceiling. The endpoint is idempotent: retrying with the same `Idempotency-Key` replays the original order rather than creating a duplicate charge.
+The orders endpoint lets you buy between 1 and 10 listings in a single atomic request. The charge is debited from your CSBoard balance at the **live** asking price at the moment of execution — not at the price you saw when you queried `/v1/listings`. To protect yourself from price movements between lookup and purchase, always include `max_price_usd` as a total ceiling. Save one `Idempotency-Key` per order.
 
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
 
@@ -22,7 +22,7 @@ Before placing an order, ensure:
 ## Request headers
 
 <ParamField header="Idempotency-Key" type="string">
-  Optional, 8–128 characters (e.g. a UUID) identifying this order attempt. If you retry a request with the same key, the server answers `200` with the header `Idempotent-Replayed: true` and the original order response instead of executing a second purchase. While the first request is still running, a retry answers `409 idempotency_in_progress`. Use this to safely retry on network timeouts without risk of double-charging.
+  Optional, 8–128 characters (for example a UUID). While a successful response is cached, repeating its key returns HTTP 200 and `Idempotent-Replayed: true`. The cache lasts up to 24 hours. Once it expires the same key can start another purchase.
 </ParamField>
 
 ## Request body
@@ -156,13 +156,13 @@ curl -X POST https://csboard.com/v1/orders \
 | 403 | `account_restricted` | The account is restricted. Contact support. |
 | 409 | `price_moved` | The live total exceeded `max_price_usd`. Order rejected; no charge made. The body carries `quoted_max_usd`, `current_total_usd` and the live price of each item. |
 | 409 | `item_unavailable` | An item left the catalogue before your order landed. The body may carry `unavailable_ids` and, for CS2, `unknown_ids`. See [unavailable items](#unavailable-items) below. |
-| 409 | `idempotency_in_progress` | A request with this `Idempotency-Key` is still running. Wait and retry with the same key. |
+| 409 | `idempotency_in_progress` | Wait for Retry-After, then check the original order. |
 | 409 | `pending_trades_limit` | The recipient has too many unaccepted Steam offers. `limit` is in the body. |
 | 409 | `price_updating` / `concurrent_update` | Prices are mid-refresh, or a concurrent order won the race. Nothing was charged — retry. |
 | 429 | `rate_limit_exceeded` | Over 250 buy orders/min (`bucket: "buy_orders"`), or over your key's trading limit (`bucket: "trading"`). Wait for the `Retry-After` header value. |
 | 500 | `order_failed` | Unexpected failure. Check `GET /v1/orders/info` before retrying — the order may exist. |
 | 503 | `market_unavailable` | The marketplace for one of the items is temporarily down. No charge was made. |
-| 504 | `upstream_timeout` | The outcome is unknown. Re-send with the same `Idempotency-Key` or poll your orders — never with a new key. |
+| 504 | `upstream_timeout` | Keep the order pending and reconcile by its saved identifier with GET /v1/orders/info. An empty result can precede order creation. |
 
 <Warning>
   Always include `max_price_usd` in your request. Prices on a live marketplace can change between the moment you query `/v1/listings` and the moment your order executes. Without this ceiling, your balance could be debited at a higher price than you intended, and there is no automatic rollback.

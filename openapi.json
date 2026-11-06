@@ -1472,13 +1472,13 @@
           "Trading"
         ],
         "summary": "Buy listings from your balance",
-        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Answers `201` with the new order. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body — a replay answers `200` with the original body. To buy Dota 2 or Rust listings, send `appId` in the body with the ids you read under that `appId`; such orders answer `delivery: \"pending\"` and `expected_minutes: null`.",
+        "description": "Buy 1–10 listings by id, debited from your CSBoard balance. Requires trading enabled on the key + a linked Steam account and trade URL. Buys are charged at the LIVE price at execution; always send `max_price_usd` as an atomic overcharge ceiling. Answers `201` with the new order. Idempotent via the `Idempotency-Key` header or `idempotency_key` in the body — while a successful response is cached (up to 24 hours), a replay answers `200` with the original body. To buy Dota 2 or Rust listings, send `appId` in the body with the ids you read under that `appId`; such orders answer `delivery: \"pending\"` and `expected_minutes: null`.",
         "operationId": "createOrder",
         "parameters": [
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "description": "Optional, 8–128 characters. A retried request with the same key replays the original order (`200` with `Idempotent-Replayed: true`) instead of buying twice; while the first request is still running it answers `409 idempotency_in_progress`.",
+            "description": "Optional, 8–128 characters. While a successful result is cached (up to 24 hours), the same key returns HTTP 200 with Idempotent-Replayed: true. An active claim returns 409 idempotency_in_progress. Reconcile a lost response before another purchase.",
             "schema": {
               "type": "string"
             }
@@ -1644,7 +1644,7 @@
             }
           },
           "409": {
-            "description": "Conflict — the live price moved past your ceiling, an item sold out, a duplicate Idempotency-Key is still processing, the recipient has too many pending offers, prices are mid-refresh, or a concurrent order won the race. Nothing was charged. `item_unavailable` lists every missing id in `unavailable_ids`; on a CS2 buy, `unknown_ids` names the ones we have no record of at all — not a CSBoard listing id (a Steam asset id is the usual mix-up; listing ids are never all digits) or a listing that left the catalogue more than an hour ago. Follow the stream's `gone` events to drop listings before you buy them.",
+            "description": "Conflict — the live price moved past your ceiling, an item sold out, a duplicate Idempotency-Key is still processing, the recipient has too many pending offers, prices are mid-refresh, or a concurrent order won the race. An in-progress conflict leaves the original request unresolved. `item_unavailable` lists every missing id in `unavailable_ids`; on a CS2 buy, `unknown_ids` names the ones we have no record of at all — not a CSBoard listing id (a Steam asset id is the usual mix-up; listing ids are never all digits) or a listing that left the catalogue more than an hour ago. Follow the stream's `gone` events to drop listings before you buy them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1821,7 +1821,7 @@
             }
           },
           "504": {
-            "description": "Upstream marketplace did not answer in time. The outcome of the purchase is UNKNOWN — it may still have completed. Do NOT re-send blindly: poll the order list, or re-send the identical custom_id / Idempotency-Key, which replays the original result instead of buying again. A retry sent while the original is still unresolved returns 409 idempotency_in_progress.",
+            "description": "The purchase outcome is unknown. Keep the original order pending and reconcile through GET /v1/orders/info using the saved identifier. An empty lookup can precede order creation. Do not automatically repeat an unresolved purchase, even with the same identifier.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2582,7 +2582,7 @@
           "Trading"
         ],
         "summary": "Buy and deliver to a Steam trade URL",
-        "description": "Buy up to 100 items and deliver them straight to any Steam trade URL you supply (built from `partner` + `token`), paid from your **settled** (reversal-safe) balance. Built for wholesale and automated delivery. Idempotent via the `custom_id` body field — a retry with the same `custom_id` replays the original purchase and the response carries the `Idempotent-Replayed: true` header. This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. Pass `appId` (`570` Dota 2, `252490` Rust) to buy those games; leave it out for CS2. Dota 2 and Rust orders are queued, so every skin answers `pending` first.",
+        "description": "Buy up to 100 items and deliver them straight to any Steam trade URL you supply (built from `partner` + `token`), paid from your **settled** (reversal-safe) balance. Built for wholesale and automated delivery. Idempotent via the `custom_id` body field — while the successful response is cached (up to 24 hours), the same `custom_id` returns that response and the response carries the `Idempotent-Replayed: true` header. This endpoint ships behind a kill-switch and requires a trading-enabled, reversal-clean account. Pass `appId` (`570` Dota 2, `252490` Rust) to buy those games; leave it out for CS2. Dota 2 and Rust orders are queued, so every skin answers `pending` first.",
         "operationId": "marketBuy",
         "requestBody": {
           "required": true,
@@ -2772,7 +2772,7 @@
             }
           },
           "409": {
-            "description": "Conflict — an item is gone, the live price moved past your ceiling, a request with the same `custom_id` is still running, or prices are mid-refresh. Nothing was charged. `item_unavailable` lists every missing id in `unavailable_ids`; on a CS2 buy, `unknown_ids` names the ones we have no record of at all — not a CSBoard listing id (a Steam asset id is the usual mix-up; listing ids are never all digits) or a listing that left the catalogue more than an hour ago. Follow the stream's `gone` events to drop listings before you buy them.",
+            "description": "Conflict — an item is gone, the live price moved past your ceiling, a request with the same `custom_id` is still running, or prices are mid-refresh. An in-progress conflict leaves the original request unresolved. `item_unavailable` lists every missing id in `unavailable_ids`; on a CS2 buy, `unknown_ids` names the ones we have no record of at all — not a CSBoard listing id (a Steam asset id is the usual mix-up; listing ids are never all digits) or a listing that left the catalogue more than an hour ago. Follow the stream's `gone` events to drop listings before you buy them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2861,7 +2861,7 @@
             }
           },
           "504": {
-            "description": "Upstream marketplace did not answer in time. The outcome of the purchase is UNKNOWN — it may still have completed. Do NOT re-send blindly: poll the order list, or re-send the identical custom_id / Idempotency-Key, which replays the original result instead of buying again. A retry sent while the original is still unresolved returns 409 idempotency_in_progress.",
+            "description": "The purchase outcome is unknown. Keep the original order pending and reconcile through GET /v1/orders/info using the saved identifier. An empty lookup can precede order creation. Do not automatically repeat an unresolved purchase, even with the same identifier.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6007,7 +6007,7 @@
           },
           "idempotency_key": {
             "type": "string",
-            "description": "Optional; or send the Idempotency-Key header. Replays the original order on retry.",
+            "description": "Optional alternative to the Idempotency-Key header. A cached successful response is reusable for up to 24 hours.",
             "minLength": 8,
             "maxLength": 128
           },
@@ -6396,7 +6396,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "Idempotency key. A retry with the same value replays the original purchase."
+            "description": "Save one key per withdrawal. A cached success can be replayed for up to 24 hours. After expiry the same value may start a new purchase."
           },
           "skip_unavailable": {
             "type": "boolean",

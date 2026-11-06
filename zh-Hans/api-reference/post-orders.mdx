@@ -5,7 +5,7 @@ description: "在单次原子请求中按 ID 购买 1–10 件 CS2 挂单，从�
 openapi: "POST /orders"
 ---
 
-orders 端点允许您在单次原子请求中购买 1 到 10 件挂单。扣款将以执行**当时**的实时报价从您的 CSBoard 余额中划扣——而非您查询 `/v1/listings` 时看到的价格。为防止查询与下单之间的价格波动，请始终包含 `max_price_usd` 作为总价上限。该端点是幂等的：使用相同的 `Idempotency-Key` 重试会重放原始订单，而非产生重复扣款。
+orders 端点允许您在单次原子请求中购买 1 到 10 件挂单。扣款将以执行**当时**的实时报价从您的 CSBoard 余额中划扣——而非您查询 `/v1/listings` 时看到的价格。为防止查询与下单之间的价格波动，请始终包含 `max_price_usd` 作为总价上限。每笔订单使用一个 `Idempotency-Key`。
 
 **需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
 
@@ -22,7 +22,7 @@ orders 端点允许您在单次原子请求中购买 1 到 10 件挂单。扣款
 ## 请求头
 
 <ParamField header="Idempotency-Key" type="string">
-  可选，8–128 个字符（例如 UUID），用于标识本次下单尝试。如果您使用相同的键重试请求，服务器将返回 `200`、附带 `Idempotent-Replayed: true` 响应头以及原始订单响应，而不会执行第二次购买。若第一次请求仍在处理中，重试将返回 `409 idempotency_in_progress`。借此可在网络超时时安全重试而无重复扣款风险。
+  可选标识符，长度为 8–128 个字符，例如 UUID。成功响应最多缓存 24 小时。在缓存有效期内，相同的键会返回 HTTP 200 和 `Idempotent-Replayed: true`。缓存过期后，相同的键可能会发起新的购买。
 </ParamField>
 
 ## 请求体
@@ -156,13 +156,13 @@ curl -X POST https://csboard.com/v1/orders \
 | 403 | `account_restricted` | 账户受限。请联系客服。 |
 | 409 | `price_moved` | 实时总额超过了 `max_price_usd`。订单被拒绝，未扣款。响应体包含 `quoted_max_usd`、`current_total_usd` 以及每件商品的实时价格。 |
 | 409 | `item_unavailable` | 商品在您的订单到达前已离开目录。响应体可能包含 `unavailable_ids`，CS2 订单还可能包含 `unknown_ids`。参见下方 [不可用的商品](#unavailable-items)。 |
-| 409 | `idempotency_in_progress` | 使用该 `Idempotency-Key` 的请求仍在处理中。请稍候并用同一个键重试。 |
+| 409 | `idempotency_in_progress` | 等待 Retry-After 指定的时间，然后查询原订单。 |
 | 409 | `pending_trades_limit` | 收货方有过多未接受的 Steam 交易报价。上限见响应体中的 `limit`。 |
 | 409 | `price_updating` / `concurrent_update` | 价格正在刷新，或并发订单抢先完成。未扣款——请重试。 |
 | 429 | `rate_limit_exceeded` | 超过每分钟 250 个购买订单（`bucket: "buy_orders"`），或超过密钥的交易限制（`bucket: "trading"`）。请等待 `Retry-After` 响应头中的秒数。 |
 | 500 | `order_failed` | 意外失败。重试前请先查看 `GET /v1/orders/info`——订单可能已经存在。 |
 | 503 | `market_unavailable` | 其中一件商品所在的市场暂时不可用。未扣款。 |
-| 504 | `upstream_timeout` | 结果未知。请使用相同的 `Idempotency-Key` 重新发送或轮询订单——切勿使用新的键。 |
+| 504 | `upstream_timeout` | 请保持待处理状态，用保存的标识符通过 GET /v1/orders/info 查询原订单。订单创建前，查询可能返回空结果。 |
 
 <Warning>
   请始终在请求中包含 `max_price_usd`。实时市场上的价格可能在您查询 `/v1/listings` 到订单执行之间发生变化。若没有此上限，您的余额可能以高于预期的价格被扣除，且没有自动回滚机制。
