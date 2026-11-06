@@ -129,7 +129,8 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 409 | `idempotency_in_progress` | 具有该 `custom_id` 的请求仍在处理中。 |
 | 409 | `price_updating` | 价格正在刷新；请稍后重试。 |
 | 429 | `rate_limit_exceeded` | 超过每分钟 250 个购买订单（`bucket: "buy_orders"`），或超过密钥的交易限制（`bucket: "trading"`）。请按照 `Retry-After` 响应头中的秒数退避。 |
-| 500 | `order_failed` | 购买无法完成。 |
+| 500 | `order_failed` | 请先确认原订单是否已创建，再决定是否重新购买。 |
+| 504 | `upstream_timeout` | 市场响应超时。请保持待处理状态，用已保存的标识符查询订单。[Node.js 对账示例（英文）](https://csboard.com/cs2-skins-api/for/case-opening/#reconciliation)。 |
 
 <Note>
   资金完全来自您的**已结算**余额。在大批量下单前，请检查 [`GET /v1/balance`](/api-reference/get-balance) 上的 `settled_balance_usd`，并始终发送 `max_price_usd` 作为超额扣款保护。

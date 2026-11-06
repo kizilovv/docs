@@ -129,7 +129,8 @@ curl -X POST https://csboard.com/v1/market/buy \
 | 409 | `idempotency_in_progress` | Запрос с этим `custom_id` ещё обрабатывается. |
 | 409 | `price_updating` | Цены обновляются; повторите через короткое время. |
 | 429 | `rate_limit_exceeded` | Более 250 заказов на покупку в минуту (`bucket: "buy_orders"`) или превышен торговый лимит ключа (`bucket: "trading"`). Подождите время, указанное в заголовке `Retry-After`. |
-| 500 | `order_failed` | Покупку не удалось завершить. |
+| 500 | `order_failed` | Проверьте, появился ли исходный заказ, прежде чем снова отправлять покупку. |
+| 504 | `upstream_timeout` | Площадка не ответила вовремя. Оставьте выдачу в ожидании и проверьте заказ по сохранённому идентификатору. [Пример запроса на Node.js, на английском](https://csboard.com/cs2-skins-api/for/case-opening/#reconciliation). |
 
 <Note>
   Средства берутся исключительно из вашего **подтверждённого** баланса. Перед большой партией проверяйте `settled_balance_usd` через [`GET /v1/balance`](/api-reference/get-balance) и всегда передавайте `max_price_usd` в качестве защиты от переплаты.
