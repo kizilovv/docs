@@ -4,6 +4,21 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="November 20, 2026">
+
+## New features
+
+**Listings: `asset_id`, the Steam asset id**
+
+Every `Listing` has a new field, `asset_id`: the Steam asset id of the item in the inventory it sits in right now, as a decimal string. It is in [`GET /v1/listings`](/api-reference/get-listings), [`GET /v1/listings/depth`](/api-reference/get-listings-depth), the [snapshot](/api-reference/get-listings-snapshot) and the `new` / `update` events of the [stream](/api-reference/get-listings-stream). Use it to match a listing against the same physical item you already know from another source.
+
+- It is `null` when the market the listing came from does not give us a Steam asset id, and for Dota 2 and Rust. A `null` says nothing about the listing being buyable.
+- Steam assigns a new asset id every time an item is traded. The value identifies the item only while it is listed; the item you receive after buying has a different id.
+- It is a 64-bit number. Keep it as a string.
+- Nothing else in the payload changed, and the stream sent no `update` for the new field. A listing you already hold gets `asset_id` with its next `update`; reload the snapshot to have it on every listing at once.
+
+</Update>
+
 <Update label="October 28, 2026">
 
 ## New features

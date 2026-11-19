@@ -45,7 +45,7 @@ curl https://csboard.com/v1/games \
 
 ## Что меняется для Dota 2 и Rust
 
-- **Та же форма ответа.** У строк Dota 2 и Rust те же ключи, что и у строк CS2, поэтому один парсер читает все три игры. Поля, которые есть только в CS2, — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at` — равны `null`, а `stickers` — `[]`.
+- **Та же форма ответа.** У строк Dota 2 и Rust те же ключи, что и у строк CS2, поэтому один парсер читает все три игры. Поля, которые есть только в CS2, — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `asset_id`, `tradable_at`, `listed_at` — равны `null`, а `stickers` — `[]`.
 - **Фильтры только для CS2 отклоняются, а не игнорируются.** `wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after` или `sort=newest` вместе с `appId` Dota 2 или Rust дают `400 invalid_param`. В `GET /v1/prices` только для CS2 лишь `wear`.
 - **Заказы ставятся в очередь.** Заказ Dota 2 или Rust отвечает `delivery: "pending"` и `expected_minutes: null`. Следите за ним через [`GET /v1/orders/{id}`](/ru/api-reference/get-order).
 - **ID принадлежат своей игре.** Покупайте и проверяйте id с тем же `appId`, с которым вы их получили.

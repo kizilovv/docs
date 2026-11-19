@@ -4,6 +4,21 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026年11月20日">
+
+## 新功能
+
+**挂单：`asset_id`，物品的 Steam asset id**
+
+每个 `Listing` 新增字段 `asset_id`：该物品在其当前所在库存中的 Steam asset id，以十进制字符串给出。该字段出现在 [`GET /v1/listings`](/zh-Hans/api-reference/get-listings)、[`GET /v1/listings/depth`](/api-reference/get-listings-depth)、[快照](/api-reference/get-listings-snapshot)以及[流](/zh-Hans/api-reference/get-listings-stream)的 `new` / `update` 事件中。您可以用它把挂单与您从其他渠道已知的同一件实物进行匹配。
+
+- 当挂单来源的市场不向我们提供 Steam asset id 时，该值为 `null`；Dota 2 和 Rust 也为 `null`。`null` 与挂单能否购买无关。
+- 物品每交易一次，Steam 都会分配新的 asset id。该值只在挂单期间标识这件物品；购买后您收到的物品会带有另一个 id。
+- 这是 64 位整数，请按字符串保存。
+- 负载中的其他字段没有变化，流也没有因为新字段而发送 `update`。您已持有的挂单会在它的下一次 `update` 中带上 `asset_id`；如需所有挂单立即带上该字段，请重新下载快照。
+
+</Update>
+
 <Update label="2026年10月28日">
 
 ## 新功能

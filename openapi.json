@@ -313,6 +313,7 @@
                       "rarity": "Classified",
                       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
                       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+                      "asset_id": "54591538222",
                       "tradable": false,
                       "tradable_at": "2026-07-06T12:00:00Z",
                       "delivery": "hold",
@@ -556,6 +557,7 @@
                       "rarity": "Classified",
                       "image": "https://cdn.csboard.com/…",
                       "inspect_link": "steam://rungame/730/…",
+                      "asset_id": "54591538222",
                       "tradable": true,
                       "tradable_at": null,
                       "delivery": "up_to_12h",
@@ -5870,6 +5872,15 @@
             ],
             "description": "Steam inspect link. `null` when there is none, and for Dota 2 / Rust."
           },
+          "asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "description": "Steam asset id of the item in the inventory it sits in right now, as a decimal string (a 64-bit number: keep it as a string). `null` when the market the listing came from does not give us a Steam asset id, and for Dota 2 / Rust. Steam assigns a new asset id on every trade, so the value identifies the item only while it is listed; after you buy it, the item arrives under a different id. Use it to match a listing against the same physical item you know from another source.",
+            "example": "54591538222"
+          },
           "tradable": {
             "type": "boolean",
             "description": "`false` while the item is inside a Steam trade lock."
@@ -5919,7 +5930,7 @@
           "stickers",
           "tradable"
         ],
-        "description": "One buyable listing. Dota 2 and Rust listings (`appId` 570 / 252490) carry the same keys as CS2 ones; the CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at` — are `null` and `stickers` is `[]`."
+        "description": "One buyable listing. Dota 2 and Rust listings (`appId` 570 / 252490) carry the same keys as CS2 ones; the CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `asset_id`, `tradable_at`, `listed_at` — are `null` and `stickers` is `[]`."
       },
       "PriceRow": {
         "type": "object",

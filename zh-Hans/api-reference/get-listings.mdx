@@ -10,7 +10,7 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
 **需要身份验证。** 请将密钥作为 `Authorization: Bearer csb_pub_...` 发送。
 
 <Note>
-  传入 `appId=570` 读取 Dota 2，传入 `appId=252490` 读取 Rust。这些行的键名相同；仅 CS2 才有的字段（`wear`、`doppler_phase`、`float_value`、`paint_seed`、`inspect_link`、`tradable_at`、`listed_at`）为 `null`，`stickers` 为 `[]`。参见[游戏](/zh-Hans/api-reference/get-games)。
+  传入 `appId=570` 读取 Dota 2，传入 `appId=252490` 读取 Rust。这些行的键名相同；仅 CS2 才有的字段（`wear`、`doppler_phase`、`float_value`、`paint_seed`、`inspect_link`、`asset_id`、`tradable_at`、`listed_at`）为 `null`，`stickers` 为 `[]`。参见[游戏](/zh-Hans/api-reference/get-games)。
 </Note>
 
 ## 查询参数
@@ -168,6 +168,10 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
       该商品的 Steam 检视链接（`steam://rungame/...`）。
     </ResponseField>
 
+    <ResponseField name="asset_id" type="string | null">
+      该物品在其当前所在库存中的 Steam asset id，以十进制字符串给出。这是 64 位整数，请始终按字符串保存。当挂单来源的市场不向我们提供 Steam asset id 时为 `null`，Dota 2 和 Rust 也为 `null`。物品每交易一次，Steam 都会分配新的 asset id，因此该值只在挂单期间标识这件物品：购买后，物品会以另一个 id 到达。请用它把挂单与您从其他渠道得知的同一件实物进行匹配，而不是用来跟踪交付。
+    </ResponseField>
+
     <ResponseField name="tradable" type="boolean" required>
       该商品当前是否可交易。`false` 表示处于交易冻结期。
     </ResponseField>
@@ -238,6 +242,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "rarity": "Classified",
       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "asset_id": "54591538222",
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
       "delivery": "hold",

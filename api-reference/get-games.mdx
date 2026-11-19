@@ -45,7 +45,7 @@ Leave `appId` out and every endpoint answers for CS2, exactly as it did before t
 
 ## What changes for Dota 2 and Rust
 
-- **Same response shape.** Dota 2 and Rust rows have the same keys as CS2 rows, so one parser reads all three. The CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at` — are `null`, and `stickers` is `[]`.
+- **Same response shape.** Dota 2 and Rust rows have the same keys as CS2 rows, so one parser reads all three. The CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `asset_id`, `tradable_at`, `listed_at` — are `null`, and `stickers` is `[]`.
 - **CS2-only filters are refused, not ignored.** Sending `wear`, `min_float`, `max_float`, `stat_trak`, `souvenir`, `available_after` or `sort=newest` with a Dota 2 or Rust `appId` answers `400 invalid_param`. On `GET /v1/prices` only `wear` is CS2-only.
 - **Orders are queued.** A Dota 2 or Rust order answers `delivery: "pending"` and `expected_minutes: null`. Follow it with [`GET /v1/orders/{id}`](/api-reference/get-order).
 - **Ids belong to their game.** Buy and check ids under the same `appId` you read them with.

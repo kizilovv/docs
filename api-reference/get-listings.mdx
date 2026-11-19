@@ -10,7 +10,7 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
 
 <Note>
-  Pass `appId=570` for Dota 2 or `appId=252490` for Rust. Those rows have the same keys; the CS2-only fields (`wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at`) are `null` and `stickers` is `[]`. See [Games](/api-reference/get-games).
+  Pass `appId=570` for Dota 2 or `appId=252490` for Rust. Those rows have the same keys; the CS2-only fields (`wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `asset_id`, `tradable_at`, `listed_at`) are `null` and `stickers` is `[]`. See [Games](/api-reference/get-games).
 </Note>
 
 ## Query parameters
@@ -171,6 +171,10 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
       Steam inspect link (`steam://rungame/...`) for this item.
     </ResponseField>
 
+    <ResponseField name="asset_id" type="string | null">
+      Steam asset id of the item in the inventory it sits in right now, as a decimal string. It is a 64-bit number: keep it as a string. `null` when the market the listing came from does not give us a Steam asset id, and for Dota 2 and Rust. Steam assigns a new asset id every time an item is traded, so the value identifies the item only while it is listed: after you buy it, the item arrives under a different id. Use it to match a listing against the same physical item you know from another source, not to track a delivery.
+    </ResponseField>
+
     <ResponseField name="tradable" type="boolean" required>
       Whether the item is currently tradable. `false` means it is in a trade hold.
     </ResponseField>
@@ -241,6 +245,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "rarity": "Classified",
       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "asset_id": "54591538222",
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
       "delivery": "hold",

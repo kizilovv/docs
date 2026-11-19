@@ -10,7 +10,7 @@ openapi: "GET /listings"
 **Требуется аутентификация.** Отправьте ключ как `Authorization: Bearer csb_pub_...`.
 
 <Note>
-  Передайте `appId=570` для Dota 2 или `appId=252490` для Rust. У таких строк те же ключи; поля, которые есть только в CS2 (`wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `tradable_at`, `listed_at`), равны `null`, а `stickers` — `[]`. См. [Игры](/ru/api-reference/get-games).
+  Передайте `appId=570` для Dota 2 или `appId=252490` для Rust. У таких строк те же ключи; поля, которые есть только в CS2 (`wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `asset_id`, `tradable_at`, `listed_at`), равны `null`, а `stickers` — `[]`. См. [Игры](/ru/api-reference/get-games).
 </Note>
 
 ## Query-параметры
@@ -168,6 +168,10 @@ openapi: "GET /listings"
       Ссылка для осмотра в Steam (`steam://rungame/...`) для этого предмета.
     </ResponseField>
 
+    <ResponseField name="asset_id" type="string | null">
+      Steam asset id предмета в том инвентаре, где он лежит сейчас, десятичной строкой. Это 64-битное число: храните его строкой. `null`, если площадка, с которой пришёл листинг, не передаёт нам Steam asset id, а также для Dota 2 и Rust. Steam выдаёт предмету новый asset id при каждом трейде, поэтому значение опознаёт предмет, только пока он выставлен: после покупки предмет придёт к вам под другим id. Используйте поле, чтобы сопоставить листинг с тем же физическим предметом, известным вам из другого источника, а не чтобы отслеживать доставку.
+    </ResponseField>
+
     <ResponseField name="tradable" type="boolean" required>
       Можно ли сейчас обменивать предмет. `false` означает, что он находится в торговом холде.
     </ResponseField>
@@ -238,6 +242,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "rarity": "Classified",
       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
+      "asset_id": "54591538222",
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
       "delivery": "hold",

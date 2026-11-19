@@ -45,7 +45,7 @@ curl https://csboard.com/v1/games \
 
 ## Dota 2 和 Rust 有哪些不同
 
-- **响应结构相同。** Dota 2 和 Rust 的行与 CS2 的行键名完全一致，一个解析器即可读取三个游戏。仅 CS2 才有的字段——`wear`、`doppler_phase`、`float_value`、`paint_seed`、`inspect_link`、`tradable_at`、`listed_at`——为 `null`，`stickers` 为 `[]`。
+- **响应结构相同。** Dota 2 和 Rust 的行与 CS2 的行键名完全一致，一个解析器即可读取三个游戏。仅 CS2 才有的字段——`wear`、`doppler_phase`、`float_value`、`paint_seed`、`inspect_link`、`asset_id`、`tradable_at`、`listed_at`——为 `null`，`stickers` 为 `[]`。
 - **仅限 CS2 的过滤参数会被拒绝，而不是被忽略。** 在 Dota 2 或 Rust 的 `appId` 下发送 `wear`、`min_float`、`max_float`、`stat_trak`、`souvenir`、`available_after` 或 `sort=newest`，会返回 `400 invalid_param`。在 `GET /v1/prices` 上，只有 `wear` 仅限 CS2。
 - **订单进入队列。** Dota 2 或 Rust 订单返回 `delivery: "pending"` 和 `expected_minutes: null`。请通过 [`GET /v1/orders/{id}`](/zh-Hans/api-reference/get-order) 跟踪。
 - **id 归属于各自的游戏。** 购买和检查 id 时，请使用读取它们时所用的同一个 `appId`。

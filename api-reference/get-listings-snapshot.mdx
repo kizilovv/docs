@@ -47,7 +47,7 @@ If the stream answers `resync`, your position has aged out of its history: downl
 A gzip stream. Every decompressed line is a `Listing`:
 
 ```jsonl
-{"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f","market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"float_value":0.2613,"paint_seed":661,"stickers":[{"name":"Sticker | Natus Vincere | Katowice 2015","image":"https://…","slot":2,"wear":0.12}],"price_usd":31.2,"category":"Rifle","rarity":"Classified","image":"https://…","inspect_link":"steam://rungame/730/…","tradable":true,"tradable_at":null,"delivery":"instant","refund_percent":100,"listed_at":"2026-10-20T09:14:02.481Z"}
+{"id":"000012e8-1f4a-4c2b-9d3e-7a1b2c3d4e5f","market_hash_name":"AK-47 | Redline (Field-Tested)","wear":"Field-Tested","doppler_phase":null,"float_value":0.2613,"paint_seed":661,"stickers":[{"name":"Sticker | Natus Vincere | Katowice 2015","image":"https://…","slot":2,"wear":0.12}],"price_usd":31.2,"category":"Rifle","rarity":"Classified","image":"https://…","inspect_link":"steam://rungame/730/…","asset_id":"54591538222","tradable":true,"tradable_at":null,"delivery":"instant","refund_percent":100,"listed_at":"2026-10-20T09:14:02.481Z"}
 ```
 
 The file is not filtered: all three `delivery` buckets (`instant`, `up_to_12h`, `hold`) are in it. Filter on the field locally. It is rebuilt every 10 minutes while anyone is downloading it, CS2 only (`appId` is not read).
