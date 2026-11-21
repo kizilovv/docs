@@ -42,6 +42,10 @@
       "description": "List your own CS2 skins on the CSBoard P2P market. Free — any valid key, no balance requirement."
     },
     {
+      "name": "Bot connector",
+      "description": "Connect many Steam accounts to one merchant account and sell from all of them for one balance. Switched on per merchant; a Steam read key is optional."
+    },
+    {
       "name": "Account",
       "description": "Your balance, settled funds, and trading status."
     },
@@ -3774,6 +3778,1174 @@
         }
       }
     },
+    "/p2p/bots": {
+      "get": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "List connected accounts",
+        "description": "Every Steam account connected to your merchant account and what it is doing.",
+        "operationId": "listMerchantBots",
+        "responses": {
+          "200": {
+            "description": "The accounts, newest first, and the current `consent_version`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MerchantBot"
+                      }
+                    },
+                    "consent_version": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Connect an account",
+        "description": "Connect a Steam account by its trade link. A read key is optional: without one the account sells in the `public` proof mode and a sale pays 14 days after the buyer accepts. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "connectMerchantBot",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "trade_url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "trade_url": {
+                    "type": "string",
+                    "description": "The account's Steam trade link."
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "steam_web_api_key": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 32,
+                    "description": "The account's Steam Web API key, 32 characters. Never returned by any call."
+                  },
+                  "consent_version": {
+                    "type": "string",
+                    "description": "The version of the terms the key is handed over under, as returned by `GET /p2p/bots` (`consent_version`)."
+                  }
+                }
+              },
+              "example": {
+                "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=914144835&token=Qh3xLm8a",
+                "label": "warehouse 3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The account, with `status: \"checking\"` until we have read its inventory.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantBot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_trade_url`, `invalid_credential` or `consent_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`steam_account_in_use`: the Steam account is connected elsewhere or has a CSBoard account of its own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`credential_rejected`: Steam refuses this key; nothing was saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`steam_unavailable`: Steam did not answer the key check; nothing was saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/bots/{id}": {
+      "get": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Get one connected account",
+        "description": "One account, with its status, proof mode and counters.",
+        "operationId": "getMerchantBot",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id (`bot_id`) from `POST /p2p/bots` or `GET /p2p/bots`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantBot"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`bot_not_found`: no such connected account under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Disconnect an account",
+        "description": "Erases the key at once, takes the account's lots off sale with their prices kept, and leaves open sales open. Never refused because the connector is off. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "disconnectMerchantBot",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id (`bot_id`) from `POST /p2p/bots` or `GET /p2p/bots`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account, now `disconnected`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantBot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`bot_not_found`: no such connected account under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/bots/{id}/credential": {
+      "put": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Add or replace the read key",
+        "description": "Stores the account's Steam Web API key after checking it against Steam. We use it to read trade offers and trade history only. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "setMerchantBotCredential",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id (`bot_id`) from `POST /p2p/bots` or `GET /p2p/bots`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "steam_web_api_key",
+                  "consent_version"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "steam_web_api_key": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 32,
+                    "description": "The account's Steam Web API key, 32 characters. Never returned by any call."
+                  },
+                  "consent_version": {
+                    "type": "string",
+                    "description": "The version of the terms the key is handed over under, as returned by `GET /p2p/bots` (`consent_version`)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account, with `proof: \"key\"`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantBot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_credential` or `consent_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`bot_not_found`: no such connected account under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`bot_disconnected`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`credential_rejected`: Steam refuses this key; nothing was saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`steam_unavailable`: Steam did not answer the key check; nothing was saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Erase the read key",
+        "description": "Erases the key at once. The account keeps selling in the `public` proof mode. Never refused because the connector is off. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "deleteMerchantBotCredential",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id (`bot_id`) from `POST /p2p/bots` or `GET /p2p/bots`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account, with `credential.on_file: false`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantBot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`bot_not_found`: no such connected account under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/pool": {
+      "put": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Sync an account's pool",
+        "description": "Send prices for asset ids. We list only assets we have read in the account's inventory. `merge` lists and reprices; `replace` also takes down every lot of the account that the request does not name. Runs in the background. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "syncP2PPool",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "8 to 128 characters, unique per pool request.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "bot_id",
+                  "mode",
+                  "items"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "bot_id": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "replace"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "maxItems": 5000,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "asset_id",
+                        "price_usd"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "asset_id": {
+                          "type": "string",
+                          "description": "Steam asset id of the item in the account's inventory."
+                        },
+                        "price_usd": {
+                          "type": "number",
+                          "minimum": 0.1,
+                          "maximum": 100000,
+                          "multipleOf": 0.01
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "bot_id": "cmx2k4p9d0001ab12cd34ef56",
+                "mode": "replace",
+                "items": [
+                  {
+                    "asset_id": "44120000001",
+                    "price_usd": 120.0
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The job. Poll `GET /p2p/pool/jobs/{id}` for the result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PPoolJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request` or `idempotency_key_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`bot_not_found`: no such connected account under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`idempotency_key_mismatch` or `bot_disconnected`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/pool/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Get a pool job",
+        "description": "The state and per-row result of one pool sync.",
+        "operationId": "getP2PPoolJob",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "`job_id` from `PUT /p2p/pool`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PPoolJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`job_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales": {
+      "get": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "List sales",
+        "description": "Sales of every connected account, newest first.",
+        "operationId": "listP2PSales",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "to_send",
+                "sent",
+                "delivered",
+                "paid",
+                "cancelled",
+                "rolled_back",
+                "review"
+              ]
+            }
+          },
+          {
+            "name": "bot_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of sales.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/P2PSale"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_param`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales/sent": {
+      "post": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Report a sent offer",
+        "description": "The offer is out. One offer may carry several sales of the same buyer. With a read key on file this only makes us read the offer at once. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "reportP2PSaleSent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "trade_offer_id",
+                  "sale_ids"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "trade_offer_id": {
+                    "type": "string"
+                  },
+                  "sale_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "needs_confirmation": {
+                    "type": "boolean",
+                    "description": "The offer still waits for the account's mobile confirmation."
+                  }
+                }
+              },
+              "example": {
+                "trade_offer_id": "9443417618",
+                "sale_ids": [
+                  "cmx3a1b2c0007ab12cd34ef56"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The sales after the report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/P2PSale"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, or the offer does not match the sale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`sale_not_found`: no such sale under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales/{id}": {
+      "get": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Get one sale",
+        "description": "One sale of a connected account.",
+        "operationId": "getP2PSale",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sale id (`sale_id`) from `GET /p2p/sales` or a `p2p.sale.*` webhook.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PSale"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`sale_not_found`: no such sale under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales/{id}/cancel-confirmed": {
+      "post": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Confirm a cancelled offer",
+        "description": "You cancelled the offer we asked you to cancel (`cancel_requested`). Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "confirmP2PSaleCancelled",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sale id (`sale_id`) from `GET /p2p/sales` or a `p2p.sale.*` webhook.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sale after the report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PSale"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`sale_not_found`: no such sale under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`offer_not_reported`: there is no offer on this sale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales/{id}/decline": {
+      "post": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Decline a sale",
+        "description": "You will not deliver this sale. It is closed and the buyer is refunded. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "declineP2PSale",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sale id (`sale_id`) from `GET /p2p/sales` or a `p2p.sale.*` webhook.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sale, now `cancelled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PSale"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The sale is past the point where it can be declined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`sale_not_found`: no such sale under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales/{id}/offer-state": {
+      "post": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Report the offer's state",
+        "description": "The offer is now in this state. Without a read key, `accepted` is checked against the account's public inventory. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "reportP2PSaleOfferState",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sale id (`sale_id`) from `GET /p2p/sales` or a `p2p.sale.*` webhook.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "state"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "accepted",
+                      "declined",
+                      "canceled",
+                      "expired",
+                      "invalid_items",
+                      "needs_confirmation"
+                    ]
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the offer reached this state."
+                  }
+                }
+              },
+              "example": {
+                "state": "accepted"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The sale after the report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PSale"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`sale_not_found`: no such sale under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`offer_not_reported`, or `asset_still_in_inventory`: the item is still in the account's inventory.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sales/{id}/send-failed": {
+      "post": {
+        "tags": [
+          "Bot connector"
+        ],
+        "summary": "Report a refused send",
+        "description": "Steam refused to create the offer. A note on the sale; it lifts the fine for a send that was never yours to make. Counts toward the 30 requests/minute P2P write limit of the key.",
+        "operationId": "reportP2PSaleSendFailed",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sale id (`sale_id`) from `GET /p2p/sales` or a `p2p.sale.*` webhook.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "detail": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              },
+              "example": {
+                "code": "too_many_offers_to_partner"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The sale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/P2PSale"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`listing_not_enabled`: the connector is not switched on for your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`sale_not_found`: no such sale under your key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transactions": {
       "get": {
         "tags": [
@@ -7346,6 +8518,339 @@
               "null"
             ],
             "description": "`cancelled_by_merchant`, `offer_declined`, `offer_expired`, `invalid_trade_url`, `item_not_tradable`, `reversed`, `price_drift` or `failed`."
+          }
+        }
+      },
+      "MerchantBot": {
+        "type": "object",
+        "description": "One connected Steam account. The Steam key is never returned: `credential.on_file` says only whether one is stored.",
+        "properties": {
+          "bot_id": {
+            "type": "string"
+          },
+          "steam_id": {
+            "type": "string"
+          },
+          "trade_url": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "checking",
+              "connected",
+              "credential_error",
+              "disconnected"
+            ]
+          },
+          "status_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proof": {
+            "type": "string",
+            "enum": [
+              "key",
+              "public"
+            ],
+            "description": "`key`: we read the offer on Steam. `public`: your report and our public reads."
+          },
+          "credential": {
+            "type": "object",
+            "properties": {
+              "on_file": {
+                "type": "boolean"
+              },
+              "set_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "last_ok_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          "payout_hold_hours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Hours after the buyer accepts when a sale pays out; `null` = the standard hold."
+          },
+          "selling": {
+            "type": "boolean"
+          },
+          "lots": {
+            "type": "integer"
+          },
+          "lots_usd": {
+            "type": "number"
+          },
+          "open_sales": {
+            "type": "integer"
+          },
+          "delivered_30d": {
+            "type": "integer"
+          },
+          "delivered_usd_30d": {
+            "type": "number"
+          },
+          "failed_30d": {
+            "type": "integer"
+          },
+          "send_median_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "P2PPoolJob": {
+        "type": "object",
+        "description": "One pool sync. `refused` lists the rows that were not listed, each with a `code`.",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "bot_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "replace"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "accepted": {
+            "type": "integer"
+          },
+          "listed": {
+            "type": "integer"
+          },
+          "repriced": {
+            "type": "integer"
+          },
+          "delisted": {
+            "type": "integer"
+          },
+          "refused_count": {
+            "type": "integer"
+          },
+          "refused": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asset_id": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "detail": {}
+              },
+              "additionalProperties": true
+            }
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "P2PSale": {
+        "type": "object",
+        "description": "A sale of one of your connected accounts.",
+        "properties": {
+          "sale_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "to_send",
+              "sent",
+              "delivered",
+              "paid",
+              "cancelled",
+              "rolled_back",
+              "review"
+            ]
+          },
+          "cancel_requested": {
+            "type": "boolean",
+            "description": "Cancel the offer on Steam, then call `cancel-confirmed`."
+          },
+          "bot_id": {
+            "type": "string"
+          },
+          "listing_id": {
+            "type": "string"
+          },
+          "asset_id": {
+            "type": "string"
+          },
+          "market_hash_name": {
+            "type": "string"
+          },
+          "float_value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "paint_seed": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "price_usd": {
+            "type": "number"
+          },
+          "commission_usd": {
+            "type": "number"
+          },
+          "payout_usd": {
+            "type": "number"
+          },
+          "buyer": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Where the offer goes. Present only while there is an offer to send or to watch.",
+            "properties": {
+              "steam_id": {
+                "type": "string"
+              },
+              "trade_url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "offer_message": {
+            "type": "string"
+          },
+          "send_deadline_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "accept_deadline_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "trade_offer_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proof": {
+            "type": "string",
+            "enum": [
+              "key",
+              "public"
+            ]
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "payout_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "fail_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "seller_did_not_deliver",
+              "seller_cancelled",
+              "offer_declined",
+              "offer_expired",
+              "cancelled",
+              "rolled_back",
+              null
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
