@@ -1,0 +1,313 @@
+---
+title: "Sell from Many Steam Accounts into One CSBoard Balance"
+sidebarTitle: "Bot Connector"
+description: "Connect your bots or your sellers' Steam accounts to one merchant account, list their items, deliver from each account and get paid to one balance. A Steam key is optional."
+---
+
+The bot connector lets one merchant account sell from many Steam accounts: your own bots, or the accounts of sellers you work with. Each connected account lists its own items on the CSBoard P2P market and sends its own trade offers. The money from all of them lands on one balance, yours.
+
+Buyers see ordinary P2P listings. Nothing shows which merchant an account belongs to.
+
+<Note>
+  The connector is switched on per merchant account. Until it is on for yours, every call here answers `403 listing_not_enabled`. Ask us to enable it.
+</Note>
+
+## Two ways a sale is confirmed
+
+A connected account needs no CSBoard extension and no app. You choose how we confirm its sales:
+
+| | Without a key | With a read key |
+|---|---|---|
+| What you give us | the account's trade link | the trade link and its Steam Web API key |
+| How a sale is confirmed | your report, checked against the account's public inventory | we read the offer on Steam ourselves |
+| Payout after the buyer accepts | 14 days | the standard hold, about 7 days |
+
+The key is optional and you can add, replace or erase it at any time. Nothing else differs between the two modes: there are no limits on an account in either.
+
+## How it works
+
+<Steps>
+  <Step title="Connect an account">
+    ```bash
+    curl -X POST https://csboard.com/v1/p2p/bots \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -d '{
+        "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=914144835&token=Qh3xLm8a",
+        "label": "warehouse 3"
+      }'
+    ```
+
+    The account's inventory must be public and it must use Steam Mobile Authenticator. The response is the account with `status: "checking"`. It becomes `connected` once we have read its inventory, usually within a minute. Poll [`GET /v1/p2p/bots/{bot_id}`](#accounts) until then.
+
+    A Steam account that already has a CSBoard account of its own cannot be connected.
+  </Step>
+  <Step title="List its items">
+    Send prices for the asset ids you want on sale. We list only assets we have read in the account's inventory ourselves.
+
+    ```bash
+    curl -X PUT https://csboard.com/v1/p2p/pool \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 6d1f0a52-9c3e-4b7a-8f10-2e5b7c9d4a61" \
+      -d '{
+        "bot_id": "cmx2k4p9d0001ab12cd34ef56",
+        "mode": "replace",
+        "items": [
+          { "asset_id": "44120000001", "price_usd": 120.00 },
+          { "asset_id": "44120000002", "price_usd": 8.45 }
+        ]
+      }'
+    ```
+
+    `mode: "merge"` lists and reprices what you send. `mode: "replace"` does the same and takes down every lot of that account you did not send, so one request is the whole shelf. Up to 5,000 rows per request.
+
+    The answer is `202` with a `job_id`. Read the result per row with `GET /v1/p2p/pool/jobs/{job_id}`.
+
+    `price_usd` is the buyer's price. `seller_payout_usd` on a listing is what you receive.
+  </Step>
+  <Step title="Take the sale">
+    When a buyer pays, the sale is accepted for the account at once. You learn about it from the [`p2p.sale.created`](#webhook-events) webhook, or by polling:
+
+    ```bash
+    curl "https://csboard.com/v1/p2p/sales?status=to_send" \
+      -H "Authorization: Bearer csb_pub_..."
+    ```
+
+    A sale to send carries `buyer.trade_url`, the `asset_id`, the `offer_message` to put in the offer, and `send_deadline_at`.
+  </Step>
+  <Step title="Send the offer and report it">
+    Your software sends the trade offer from the account that holds the item, to `buyer.trade_url`, with `offer_message` as the text, before `send_deadline_at`. Then report the offer:
+
+    ```bash
+    curl -X POST https://csboard.com/v1/p2p/sales/sent \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -d '{ "trade_offer_id": "9443417618", "sale_ids": ["cmx3a1b2c0007ab12cd34ef56"] }'
+    ```
+
+    One offer may carry several sales of the same buyer. When the buyer accepts, report that too:
+
+    ```bash
+    curl -X POST https://csboard.com/v1/p2p/sales/cmx3a1b2c0007ab12cd34ef56/offer-state \
+      -H "Authorization: Bearer csb_pub_..." \
+      -H "Content-Type: application/json" \
+      -d '{ "state": "accepted" }'
+    ```
+
+    With a read key on file both reports are optional: we find the offer among the account's sent offers and follow it ourselves, and a report only makes us look at once.
+  </Step>
+  <Step title="Get paid">
+    An accepted sale shows `status: "delivered"` and a `payout_at`. On that date, after our own check that the trade was not reversed, `payout_usd` is credited to your merchant balance and the sale becomes `paid`.
+  </Step>
+</Steps>
+
+## The read key
+
+A Steam Web API key lets us read the account's trade offers and trade history, so a sale is confirmed by what Steam says and pays on the standard hold. Get it at [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey), signed in as that account.
+
+Send it when you connect the account (`steam_web_api_key` and `consent_version` in `POST /v1/p2p/bots`), or later:
+
+```bash
+curl -X PUT https://csboard.com/v1/p2p/bots/cmx2k4p9d0001ab12cd34ef56/credential \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "steam_web_api_key": "<32 characters>", "consent_version": "2026-11-21" }'
+```
+
+`consent_version` confirms that you hand the key over on these terms:
+
+- **What you hand over.** This account's Steam Web API key.
+- **Why.** CSBoard reads your trade offers and trade history with it to confirm a sale: the offer was sent, it was accepted, the trade was not reversed within 7 days.
+- **What we do not do.** We do not send, accept or cancel offers and we do not sign in to the account. By Steam's own rules the key can cancel and decline offers; it cannot transfer items or sign in.
+- **Storage.** The key is stored encrypted, and the encryption key is kept apart from the database. Every use of the key is recorded.
+- **Revoking.** `DELETE /v1/p2p/bots/{bot_id}/credential` erases the key at once and the account keeps selling without it. `DELETE /v1/p2p/bots/{bot_id}` erases it and disconnects the account. At Steam the key is revoked at steamcommunity.com/dev/apikey.
+- **If the key stops working.** The account keeps selling in the no-key mode. Open sales are not cancelled; they pay on the no-key schedule.
+
+We check a key against Steam before storing it. A key Steam refuses answers `422 credential_rejected` and nothing is saved. The key is never returned by any call: an account shows only `credential.on_file`.
+
+## Accounts
+
+| Call | What it does |
+|---|---|
+| `POST /v1/p2p/bots` | Connect an account by its trade link, with or without a key |
+| `GET /v1/p2p/bots` | Every connected account and what it is doing |
+| `GET /v1/p2p/bots/{bot_id}` | One account |
+| `PUT /v1/p2p/bots/{bot_id}/credential` | Add or replace the read key |
+| `DELETE /v1/p2p/bots/{bot_id}/credential` | Erase the key, keep selling |
+| `DELETE /v1/p2p/bots/{bot_id}` | Disconnect: key erased, lots off sale |
+
+```json
+{
+  "bot_id": "cmx2k4p9d0001ab12cd34ef56",
+  "steam_id": "76561198874410563",
+  "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=914144835&token=Qh3xLm8a",
+  "label": "warehouse 3",
+  "status": "connected",
+  "status_reason": null,
+  "status_changed_at": "2026-12-01T10:01:12.000Z",
+  "proof": "public",
+  "credential": { "on_file": false, "set_at": null, "last_ok_at": null },
+  "payout_hold_hours": 336,
+  "selling": true,
+  "lots": 655,
+  "lots_usd": 9871.36,
+  "open_sales": 2,
+  "delivered_30d": 148,
+  "delivered_usd_30d": 2204.18,
+  "failed_30d": 2,
+  "send_median_seconds": 125,
+  "created_at": "2026-12-01T10:00:00.000Z"
+}
+```
+
+| `status` | Meaning |
+|---|---|
+| `checking` | Connected a moment ago; we are reading its inventory. `status_reason` says why when the read is blocked, for example `private_inventory` or `empty_inventory` |
+| `connected` | Its lots are on sale |
+| `credential_error` | Steam refuses the key on file. The account keeps selling in the no-key mode until you replace or erase the key |
+| `disconnected` | You took it off. Its lots are off sale with their prices kept; connect it again with `POST /v1/p2p/bots` |
+
+`proof` is `key` when we read the offers on Steam and `public` otherwise. `payout_hold_hours` is the hours after the buyer's accept when a sale pays; `null` means the standard hold.
+
+## Listing
+
+`PUT /v1/p2p/pool` is the bulk path. The single-lot calls of the [P2P listing guide](/guides/p2p-listing) work for a connected account too: add `?bot_id=` to `GET /v1/p2p/inventory`, `GET` and `POST /v1/p2p/listings`, `PATCH` and `DELETE /v1/p2p/listings/{id}`.
+
+A pool job result:
+
+```json
+{
+  "job_id": "cmx2m7q1r0004ab12cd34ef56",
+  "bot_id": "cmx2k4p9d0001ab12cd34ef56",
+  "mode": "replace",
+  "status": "done",
+  "accepted": 2,
+  "listed": 1,
+  "repriced": 0,
+  "delisted": 0,
+  "refused_count": 1,
+  "refused": [
+    {
+      "asset_id": "44120000002",
+      "code": "price_below_market",
+      "detail": "price_usd 8.45 is under the minimum 9.1 for this item (market ~18.2). Listings made with an API key cannot go below it.",
+      "market_usd": 18.2,
+      "floor_usd": 9.1,
+      "price_usd": 8.45
+    }
+  ],
+  "error": null,
+  "created_at": "2026-12-01T10:05:00.000Z",
+  "finished_at": "2026-12-01T10:05:04.000Z"
+}
+```
+
+| Row `code` | Meaning |
+|---|---|
+| `asset_not_seen` | The asset is not in our last read of the account's inventory. Sync again once it is there |
+| `not_tradable` | The asset cannot be listed now: trade-locked, or already in a sale |
+| `price_below_market` | Under half of our market price for the item; the row carries `floor_usd` |
+
+A job that cannot start says why in `error`: `private_inventory`, `empty_inventory`, `inventory_unreadable`, `bot_disconnected`. Sending the same `Idempotency-Key` with the same body returns the same job; with a different body it answers `409 idempotency_key_mismatch`.
+
+The pricing rules are those of the P2P market: USD in whole cents, and a price under half of our market price is refused.
+
+## Sales
+
+| Call | What it does |
+|---|---|
+| `GET /v1/p2p/sales` | Sales of every connected account. Filters: `status`, `bot_id`; paging: `cursor`, `limit` (up to 200) |
+| `GET /v1/p2p/sales/{sale_id}` | One sale |
+| `POST /v1/p2p/sales/sent` | The offer is out: `trade_offer_id`, `sale_ids`, optional `needs_confirmation` |
+| `POST /v1/p2p/sales/{sale_id}/offer-state` | The offer is now `active`, `accepted`, `declined`, `canceled`, `expired`, `invalid_items` or `needs_confirmation` |
+| `POST /v1/p2p/sales/{sale_id}/send-failed` | Steam refused the send: `code`, optional `detail` |
+| `POST /v1/p2p/sales/{sale_id}/decline` | You will not deliver this sale |
+| `POST /v1/p2p/sales/{sale_id}/cancel-confirmed` | You cancelled the offer we asked you to cancel |
+
+```json
+{
+  "sale_id": "cmx3a1b2c0007ab12cd34ef56",
+  "status": "to_send",
+  "cancel_requested": false,
+  "bot_id": "cmx2k4p9d0001ab12cd34ef56",
+  "listing_id": "cmx2m9t3u0005ab12cd34ef56",
+  "asset_id": "44120000001",
+  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+  "float_value": 0.1532,
+  "paint_seed": 412,
+  "currency": "USD",
+  "price_usd": 120,
+  "commission_usd": 2.4,
+  "payout_usd": 117.6,
+  "buyer": {
+    "steam_id": "76561198000000777",
+    "trade_url": "https://steamcommunity.com/tradeoffer/new/?partner=39735049&token=aB3dE6gH"
+  },
+  "offer_message": "CSBoard order #CD34EF56",
+  "send_deadline_at": "2026-12-01T12:30:00.000Z",
+  "accept_deadline_at": null,
+  "trade_offer_id": null,
+  "proof": "public",
+  "delivered_at": null,
+  "payout_at": null,
+  "fail_reason": null,
+  "created_at": "2026-12-01T12:00:00.000Z",
+  "updated_at": "2026-12-01T12:00:00.000Z"
+}
+```
+
+| `status` | Meaning |
+|---|---|
+| `to_send` | Paid by the buyer; send the offer before `send_deadline_at` |
+| `sent` | The offer is with the buyer, who has until `accept_deadline_at` |
+| `delivered` | Accepted; the hold is running, `payout_at` says until when |
+| `paid` | `payout_usd` is on your balance |
+| `cancelled` | Closed without a delivery; `fail_reason` says why. The buyer was refunded |
+| `rolled_back` | The trade was reversed on Steam. Nothing is paid |
+| `review` | A person on our side is looking at it |
+
+`fail_reason` is one of `seller_did_not_deliver`, `seller_cancelled`, `offer_declined`, `offer_expired`, `cancelled`, `rolled_back`.
+
+`buyer` is present only while there is an offer to send or to watch.
+
+### When a sale goes wrong
+
+- **You cannot send.** Report Steam's refusal with `send-failed`, or give the sale up with `decline`: a declined sale is closed, the buyer is refunded and there is no fine. An offer that is not out by `send_deadline_at` closes the sale: the buyer is refunded and your balance is charged a fine, 4% of the price with a minimum of $0.50. There is no fine when Steam refused the send and you reported it.
+- **We ask you to cancel.** `cancel_requested: true` means the buyer's time ran out or the order was ended. Cancel the offer on Steam, then call `cancel-confirmed`. An item the buyer accepts after that request is not paid.
+- **Without a key, `accepted` is checked.** If the item is still in the account's public inventory, the report answers `409 asset_still_in_inventory`.
+
+## Webhook events
+
+Register an endpoint as described in [Webhooks](/guides/webhooks). Four events belong to the connector:
+
+| Event | When | `data` |
+|---|---|---|
+| `p2p.sale.created` | A buyer paid for a lot of a connected account | the sale |
+| `p2p.sale.updated` | The sale changed: status, `cancel_requested`, the offer, `payout_at` | the sale |
+| `p2p.bot.updated` | An account changed status or proof mode | `bot_id`, `steam_id`, `label`, `status`, `status_reason`, `proof`, `credential.on_file` |
+| `p2p.listing.updated` | We took a lot off sale because the item left the account's inventory | `id`, `bot_id`, `status`, `needs_resync`, `asset_id`, `market_hash_name`, `price_usd` |
+
+`p2p.sale.created` is sent at once. The other three follow within a minute of the change. The same state is never delivered twice.
+
+## Limits
+
+Connecting, listing and reporting share the P2P write limit of the key: **30 requests per minute**. One pool request of 5,000 rows is one request. Reads follow your key's normal per-minute limit. See [Rate Limits](/rate-limits).
+
+## Errors
+
+| HTTP status | Code | Meaning |
+|---|---|---|
+| 403 | `listing_not_enabled` | The connector is not switched on for your account |
+| 400 | `invalid_trade_url` | Not a Steam trade link |
+| 400 | `invalid_credential` | Not a Steam Web API key |
+| 400 | `consent_required` | `consent_version` is missing or is not the current one |
+| 422 | `credential_rejected` | Steam refuses this key; nothing was saved |
+| 503 | `steam_unavailable` | Steam did not answer the key check; nothing was saved, retry |
+| 409 | `steam_account_in_use` | The Steam account is connected elsewhere or has a CSBoard account of its own |
+| 404 | `bot_not_found` | No such connected account under your key |
+| 409 | `bot_disconnected` | The account is disconnected |
+| 404 | `sale_not_found` | No such sale under your key |
+| 409 | `offer_not_reported` | Report the offer with `sent` first |
+| 409 | `asset_still_in_inventory` | The item is still in the account's inventory, so the offer was not accepted |
+| 409 | `idempotency_key_mismatch` | The `Idempotency-Key` was used with a different pool |
