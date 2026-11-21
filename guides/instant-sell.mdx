@@ -64,7 +64,7 @@ Each offer is credited on its own, so `credited_usd` grows offer by offer.
 | Game | Credited | Why |
 | --- | --- | --- |
 | CS2 | About 7 days after the seller accepts | The market pays once Steam's 7-day trade protection ends, and we credit when it does. |
-| Dota 2 | 7 days after the seller accepts | The market settles at once, but Steam can still reverse the trade for 7 days. We hold the credit until that window closes. |
+| Dota 2 | As soon as the market confirms the trade | Steam cannot reverse a Dota 2 trade, so there is no hold. |
 | Rust | As soon as the market confirms the trade | Steam cannot reverse a Rust trade, so there is no hold. |
 
 While an offer waits, it shows `received` and `unhold_at` carries the expected credit time.
