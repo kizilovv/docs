@@ -1,0 +1,165 @@
+---
+title: "Sell Lots from Your Own Steam Accounts through the CSBoard API"
+sidebarTitle: "Merchant Lots"
+description: "List CS2 items that sit in your Steam accounts, get an order call when one sells, send the trade offer yourself and report its status. Paid to your CSBoard balance."
+---
+
+Merchant lots are for a seller with stock in several Steam accounts and software of his own that sends trade offers. You send us **lots**; we put them on the CSBoard P2P market; when one is bought we call your server; you send the Steam offer and tell us what happened to it.
+
+You do not connect any Steam account to CSBoard and we do not ask for a login, an API key or a trade link of your accounts.
+
+<Note>
+  Off by default. Write to us to have it switched on for your merchant account, and give us the three URLs described below.
+</Note>
+
+## The numbers
+
+| | |
+|---|---|
+| Time to send the offer | **12 hours** from the purchase, every lot |
+| Buyer's time to accept | 24 hours from the moment the offer is out |
+| Buyer may cancel | after 30 minutes with no offer |
+| Missed send | the order is cancelled and the buyer refunded. **No fine.** The miss is counted in your delivery record |
+| Commission | **1%** of the sale price |
+| Payout | to your CSBoard balance **14 days** after the buyer accepted, if nothing went wrong |
+| Faster payout | send the seller account's Steam refresh token with your status reports: once we read the trade as complete after Steam's 7-day protection, the sale is paid without waiting for day 14 |
+| Reversal by your account | the buyer is refunded in full, your merchant account is closed for good and its balance is frozen |
+
+Only items that can be traded right now are accepted (`assetType: 1`).
+
+## Three URLs on your side
+
+| URL | We call it when | You answer |
+|---|---|---|
+| **Order Create** | a lot of yours is being bought, before the buyer's money moves | `{"status": 1, "orderId": "<your id>", "errorMsg": ""}` to take the order, `status: 2` to refuse |
+| **Order Details** | we want the order's current status | `{"requestId", "orderStatus", "reversedType", "tradeOfferStatus", "tradeOfferId"}`, `orderStatus: -1` if you do not know the order |
+| **Order Cancellation** | the buyer gave up waiting | `{"cancelSuccess": true, "message": ""}`; answer `false` if an offer is already out |
+
+All three are `POST` with a JSON body. You have **5 seconds** to answer Order Create (3 seconds when the buyer comes from a partner market). No answer in time means the purchase does not happen, so the same item listed on several markets cannot be sold twice: every sale asks you first.
+
+### Verifying our calls
+
+Every body carries `sign`: take every other field, sort by name, join as `name=value` with `&`, append `&sign=<your app secret>`, MD5, upper case. A `null` value is the string `null`.
+
+```text
+payPrice=12.34&productId=sku-1&requestId=ms3f9c...&tradeUrl=https://steamcommunity.com/tradeoffer/new/?partner=1&token=a&sign=<app secret>
+```
+
+The same body is also signed in the `X-CSBoard-Signature` header (`t=<unix>,v1=<hex>`, HMAC-SHA256 of `<t>.<raw body>` with the same secret), exactly like our [webhooks](/guides/webhooks).
+
+## How a sale goes
+
+<Steps>
+  <Step title="List the lots">
+    ```bash
+    curl https://csboard.com/v1/p2p/sell/create \
+      -H "Authorization: Bearer csb_pub_..." -H "Content-Type: application/json" \
+      -d '{
+        "appId": 730,
+        "assetType": 1,
+        "products": [{
+          "productId": "sku-1",
+          "steamId": "76561198000000001",
+          "assetId": "30000000001",
+          "classId": "310777179",
+          "instanceId": "0",
+          "marketHashName": "AK-47 | Redline (Field-Tested)",
+          "price": 12.34,
+          "tradableTime": 0,
+          "inspectUrl": "steam://rungame/730/..."
+        }]
+      }'
+    ```
+
+    `productId` is your own id for the lot. Up to 100 products per call. A product we cannot take comes back in `errorData.failList` with its reason; the others are accepted.
+
+    A lot is not on sale yet. We first read the Steam account's **public** inventory ourselves and list the lot once we have seen the item there. Follow it with `GET /p2p/sell/detail/{productId}`: `operationStatus` goes `100` (listing) to `101` (listed) or `102` (failed, with `failedCode`).
+  </Step>
+  <Step title="Take the order">
+    We call your Order Create URL with `requestId` (our id for the sale, use it in every report), your `productId`, `payPrice` and the buyer's `tradeUrl`. Answer `status: 1` and send the Steam offer to that trade link.
+  </Step>
+  <Step title="Report every status">
+    ```bash
+    curl https://csboard.com/v1/p2p/order/status/notify \
+      -H "Authorization: Bearer csb_pub_..." -H "Content-Type: application/json" \
+      -d '{"requestId": "ms3f9c...", "orderStatus": 3, "tradeOfferId": "8123456789", "tradeOfferStatus": 2}'
+    ```
+
+    Send one each time the status changes. Repeating a report is safe.
+  </Step>
+  <Step title="Get paid">
+    `GET /p2p/sell/order/list` shows every sale with our `orderStatus`, our `fee` and `settleTime`, the moment it pays to your balance.
+  </Step>
+</Steps>
+
+## Order statuses
+
+| `orderStatus` | Meaning | Needs |
+|---|---|---|
+| `1` | waiting for delivery | |
+| `2` | offer created, waiting for your Steam confirmation | `tradeOfferId` |
+| `3` | offer is out, waiting for the buyer | `tradeOfferId` |
+| `10` | the buyer accepted | |
+| `11` | cancelled | with an offer out: `tradeOfferStatus`, the Steam state that ended it (`5` expired, `6` cancelled, `7` declined, `4` countered, `10` cancelled by second factor) |
+| `200` | Steam's protection is over, the trade was not reversed | |
+| `220` | reversed | `reversedType`: `1` the seller, `2` the buyer |
+
+`tradeOfferStatus` is Steam's own `ETradeOfferState`.
+
+What we do with a report:
+
+- `10` is checked against the seller's public inventory. If the item is still there, the report is refused with `asset_still_in_inventory`.
+- `11` after an offer never closes the sale on your word alone: we look for the item back in the seller's inventory first.
+- `220` with `reversedType: 2` puts the sale on hold for a manual review. It does not pay.
+
+## The Steam refresh token
+
+Add `refreshToken` to a status report to let us read that one trade on Steam:
+
+```json
+{"requestId": "ms3f9c...", "orderStatus": 200, "refreshToken": "eyJ..."}
+```
+
+- It must be the **mobile** refresh token of the Steam account that sent the offer.
+- We use it for one read and discard it. It is not stored and not logged, and we never ask Steam to renew it, so your copy stays valid.
+- With `10` we check the offer was accepted by this sale's buyer. With `200`, sent after Steam's protection has ended, we read the trade: complete means the sale is paid now; reversed means it is settled as a reversal.
+- The answer tells you what the read proved in `tokenRead`: `accepted`, `complete`, `reversed`, `not_final` (too early, send `200` again later), `mismatch` (another account's token or offer), `token_refused`, `unreadable`.
+
+The token is optional. Without it the sale pays on day 14.
+
+## Managing lots
+
+| Call | What it does |
+|---|---|
+| `POST /p2p/sell/update` | new prices; `requestId` makes a retry safe; answers `successList` and `failList` |
+| `POST /p2p/sell/cancel` | take lots off sale; a lot being bought right now answers `lot_in_trade` |
+| `GET /p2p/sell/detail/{productId}` | one lot |
+| `GET /p2p/sell/list` | your lots, plus `deliveryInfo`: delivered share, average send time and missed sends over 7 and 15 days |
+| `POST /p2p/sell/price/reference` | our lowest live ask per `marketHashName` |
+
+Lot `status`: `1` selling, `2` cancelled, `3` hidden (we stopped seeing the item in the account; it returns by itself), `4` in a trade, `5` sold.
+
+A price under half of our market price is refused with `price_below_market`, as for any P2P listing.
+
+## Answers
+
+Every answer has the same shape:
+
+```json
+{"success": true, "data": {}, "errorCode": 0, "errorMsg": null, "errorData": null, "errorCodeStr": null}
+```
+
+On a refusal `success` is `false`, `errorCodeStr` is the code to branch on and `errorMsg` says it in words.
+
+| `errorCodeStr` | When |
+|---|---|
+| `selling_not_enabled` | merchant lots are not switched on for this account |
+| `merchant_terminated` | the account was closed after a reversal |
+| `cooldown_not_supported` | the item is not tradable yet |
+| `steam_account_in_use` | another account already lists from this Steam account |
+| `asset_already_listed` | the item is already in an open lot |
+| `asset_not_in_inventory` | we did not find the item in the account's public inventory |
+| `trade_offer_id_required` | `2`, `3` or `10` without an offer on record |
+| `trade_offer_status_required` | `11` with an offer out and no Steam state |
+| `order_not_delivered` | `200` or `220` before `10` |
+| `rate_limit_exceeded` | 30 lot writes or 600 status reports per minute |

@@ -42,6 +42,10 @@
       "description": "List your own CS2 skins on the CSBoard P2P market. Free — any valid key, no balance requirement."
     },
     {
+      "name": "Merchant lots",
+      "description": "List items that sit in your own Steam accounts, take an order call when one sells, report the trade yourself. Off until we switch it on for your account. See the Merchant Lots guide."
+    },
+    {
       "name": "Account",
       "description": "Your balance, settled funds, and trading status."
     },
@@ -5582,6 +5586,859 @@
           }
         }
       }
+    },
+    "/p2p/sell/create": {
+      "post": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "List lots",
+        "description": "Record lots for sale. A lot goes on sale after we have read the Steam account's public inventory and found the item. Up to 100 products per call; a product we cannot take is returned in `errorData.failList` and does not refuse the others.",
+        "operationId": "createMerchantLots",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "appId",
+                  "assetType",
+                  "products"
+                ],
+                "properties": {
+                  "appId": {
+                    "type": "integer",
+                    "enum": [
+                      730
+                    ]
+                  },
+                  "assetType": {
+                    "type": "integer",
+                    "enum": [
+                      1
+                    ],
+                    "description": "1 = tradable now. The only accepted value."
+                  },
+                  "products": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "productId",
+                        "steamId",
+                        "assetId",
+                        "classId",
+                        "instanceId",
+                        "marketHashName",
+                        "price"
+                      ],
+                      "properties": {
+                        "productId": {
+                          "type": "string",
+                          "maxLength": 64,
+                          "description": "Your own id for the lot. Echoed to you when it sells."
+                        },
+                        "steamId": {
+                          "type": "string",
+                          "description": "64-bit Steam id of the account that holds the item. Its inventory must be public."
+                        },
+                        "assetId": {
+                          "type": "string"
+                        },
+                        "classId": {
+                          "type": "string"
+                        },
+                        "instanceId": {
+                          "type": "string"
+                        },
+                        "marketHashName": {
+                          "type": "string"
+                        },
+                        "price": {
+                          "type": "number",
+                          "multipleOf": 0.01,
+                          "description": "Asking price in USD."
+                        },
+                        "tradableTime": {
+                          "type": "integer",
+                          "description": "Unix seconds; 0 for an item tradable now. Items not tradable yet are refused."
+                        },
+                        "inspectUrl": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "appId": 730,
+                "assetType": 1,
+                "products": [
+                  {
+                    "productId": "sku-1",
+                    "steamId": "76561198000000001",
+                    "assetId": "30000000001",
+                    "classId": "310777179",
+                    "instanceId": "0",
+                    "marketHashName": "AK-47 | Redline (Field-Tested)",
+                    "price": 12.34,
+                    "tradableTime": 0
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted. `errorData.failList` lists the products that were not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sell/cancel": {
+      "post": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "Cancel lots",
+        "description": "Take lots off sale by `productId`. A lot being bought right now is refused with `lot_in_trade`.",
+        "operationId": "cancelMerchantLots",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "products"
+                ],
+                "properties": {
+                  "assetType": {
+                    "type": "integer"
+                  },
+                  "products": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "productId"
+                      ],
+                      "properties": {
+                        "productId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "assetType": 1,
+                "products": [
+                  {
+                    "productId": "sku-1"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancelled. `errorData.failList` lists the lots that were not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sell/update": {
+      "post": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "Change lot prices",
+        "description": "New prices for lots on sale. `requestId` is your idempotency key: the same id answers with what it answered the first time.",
+        "operationId": "updateMerchantLotPrices",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "products",
+                  "requestId"
+                ],
+                "properties": {
+                  "appId": {
+                    "type": "integer"
+                  },
+                  "assetType": {
+                    "type": "integer"
+                  },
+                  "requestId": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "products": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "productId",
+                        "price"
+                      ],
+                      "properties": {
+                        "productId": {
+                          "type": "string"
+                        },
+                        "price": {
+                          "type": "number",
+                          "multipleOf": 0.01
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "appId": 730,
+                "assetType": 1,
+                "requestId": "reprice-2026-11-21-1",
+                "products": [
+                  {
+                    "productId": "sku-1",
+                    "price": 11.9
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-lot outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "successList": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "productId": {
+                                    "type": "string"
+                                  },
+                                  "price": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            },
+                            "failList": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "productId": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "errorCode": {
+                                    "type": "string"
+                                  },
+                                  "errorMsg": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sell/detail/{productId}": {
+      "get": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "Get one lot",
+        "description": "The lot's status and what the last operation on it came to.",
+        "operationId": "getMerchantLot",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your id for the lot."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The lot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/MerchantLot"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sell/list": {
+      "get": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "List your lots",
+        "description": "Your lots, newest first, with your delivery record over 7 and 15 days.",
+        "operationId": "listMerchantLots",
+        "parameters": [
+          {
+            "name": "merchantProductIdList",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated product ids."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of lots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "total": {
+                              "type": "string"
+                            },
+                            "pages": {
+                              "type": "integer"
+                            },
+                            "page": {
+                              "type": "integer"
+                            },
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "list": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/MerchantLot"
+                              }
+                            },
+                            "deliveryInfo": {
+                              "type": "object",
+                              "description": "`day7` and `day15`, each `{deliverySuccessRate, deliveryAvgTime, deliveryNoneNum}`: delivered share, mean seconds from purchase to offer, sales closed with no offer sent."
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sell/price/reference": {
+      "post": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "Reference price",
+        "description": "Our lowest live ask per `marketHashName`. A name nobody lists is absent from the answer.",
+        "operationId": "merchantLotPriceReference",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "products"
+                ],
+                "properties": {
+                  "appId": {
+                    "type": "integer"
+                  },
+                  "assetType": {
+                    "type": "integer"
+                  },
+                  "products": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "marketHashName"
+                      ],
+                      "properties": {
+                        "marketHashName": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "appId": 730,
+                "assetType": 1,
+                "products": [
+                  {
+                    "marketHashName": "AK-47 | Redline (Field-Tested)"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prices keyed by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "products": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "marketHashName": {
+                                    "type": "string"
+                                  },
+                                  "price": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/sell/order/list": {
+      "get": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "List your sales",
+        "description": "Your sales as we hold them, newest first: our status, our fee and when each pays.",
+        "operationId": "listMerchantSellOrders",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderStatus",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unix seconds or ISO date; lower bound of the sale's creation time."
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNum",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sales.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/MerchantSellOrder"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/order/status/notify": {
+      "post": {
+        "tags": [
+          "Merchant lots"
+        ],
+        "summary": "Report an order status",
+        "description": "Tell us one status of one sale. Send it every time the status changes; repeating a report is safe. `refreshToken`, when present, is used for one Steam read and discarded: it is never stored, logged or renewed.",
+        "operationId": "notifyMerchantOrderStatus",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "orderStatus"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "description": "Our id for the sale, from the Order Create call."
+                  },
+                  "orderStatus": {
+                    "type": "integer",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      10,
+                      11,
+                      200,
+                      220
+                    ],
+                    "description": "1 wait delivery, 2 offer created and waiting for your Steam confirmation, 3 offer out, 10 accepted, 11 cancelled, 200 protection over and not reversed, 220 reversed."
+                  },
+                  "tradeOfferId": {
+                    "type": [
+                      "string",
+                      "integer"
+                    ],
+                    "description": "Steam trade offer id. Required with 2 and 3."
+                  },
+                  "tradeOfferStatus": {
+                    "type": "integer",
+                    "description": "Steam ETradeOfferState. Required with 11 once an offer is out (4, 5, 6, 7 or 10)."
+                  },
+                  "reversedType": {
+                    "type": "integer",
+                    "enum": [
+                      1,
+                      2
+                    ],
+                    "description": "Required with 220: 1 the seller, 2 the buyer."
+                  },
+                  "refreshToken": {
+                    "type": "string",
+                    "description": "Optional. The mobile Steam refresh token of the account that sent the offer."
+                  }
+                }
+              },
+              "example": {
+                "requestId": "ms3f9c0d6e2b7a4c1f8e5d2a9b6c3f0e1d",
+                "orderStatus": 3,
+                "tradeOfferId": "8123456789",
+                "tradeOfferStatus": 2
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded. The top-level `tokenRead` says what a presented token proved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SellEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "string",
+                          "enum": [
+                            "success"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`selling_not_enabled` or `merchant_terminated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`order_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The sale's state does not allow this report; `errorCodeStr` says why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7346,6 +8203,153 @@
               "null"
             ],
             "description": "`cancelled_by_merchant`, `offer_declined`, `offer_expired`, `invalid_trade_url`, `item_not_tradable`, `reversed`, `price_drift` or `failed`."
+          }
+        }
+      },
+      "SellEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "errorCode"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "description": "The result of the call."
+          },
+          "errorCode": {
+            "type": "integer",
+            "description": "0 on success."
+          },
+          "errorMsg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorData": {
+            "description": "Extra detail of a refusal; `failList` on a partly accepted call."
+          },
+          "errorCodeStr": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The code to branch on. Null on success."
+          }
+        }
+      },
+      "MerchantLot": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "Your own id for the lot."
+          },
+          "price": {
+            "type": "number"
+          },
+          "status": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "description": "1 selling, 2 cancelled, 3 hidden, 4 in a trade, 5 sold, 6 hidden."
+          },
+          "operationStatus": {
+            "type": "integer",
+            "enum": [
+              100,
+              101,
+              102,
+              200,
+              201,
+              202,
+              300,
+              301,
+              302
+            ],
+            "description": "100/101/102 listing in progress, done, failed; 200/201/202 price change; 300/301/302 delisting."
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failedCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failedDesc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MerchantSellOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "`requestId`: our id for the sale."
+          },
+          "productId": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "fee": {
+            "type": "number",
+            "description": "Our commission in USD."
+          },
+          "orderStatus": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3,
+              10,
+              11,
+              200,
+              220
+            ],
+            "description": "Our status: 1 wait delivery, 2 delivering, 3 wait receive, 10 accepted, 11 cancelled, 200 settled, 220 reversed."
+          },
+          "orderCreateTime": {
+            "type": "integer",
+            "description": "Unix seconds."
+          },
+          "assetType": {
+            "type": "integer"
+          },
+          "settleTime": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds when the sale pays to your balance. Null until the buyer accepted."
+          },
+          "settled": {
+            "type": "boolean"
+          },
+          "tokenRead": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What a presented Steam token proved, if one was presented."
           }
         }
       }

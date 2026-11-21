@@ -36,7 +36,8 @@
                   "guides/automation",
                   "guides/instant-sell",
                   "guides/webhooks",
-                  "guides/p2p-listing"
+                  "guides/p2p-listing",
+                  "guides/merchant-lots"
                 ]
               }
             ]
@@ -157,7 +158,8 @@
                   "ru/guides/buying",
                   "ru/guides/automation",
                   "ru/guides/instant-sell",
-                  "ru/guides/p2p-listing"
+                  "ru/guides/p2p-listing",
+                  "ru/guides/merchant-lots"
                 ]
               }
             ]
