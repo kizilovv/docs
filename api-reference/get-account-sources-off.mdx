@@ -1,0 +1,24 @@
+---
+title: "GET /v1/account/sources_off — Suppliers Your Account Has Off"
+sidebarTitle: "GET /account/sources_off"
+description: "Read the list of supplier numbers switched off for your account."
+openapi: "GET /account/sources_off"
+---
+
+Returns the supplier numbers switched off for your account. Listings from these suppliers are left out of everything you read: listings, depth, prices, both snapshots and the stream.
+
+If we switched suppliers off for your account before November 22, 2026, they are on this list already. Change it with [`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off).
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Example response
+
+```json
+{
+  "data": {
+    "sources_off": [107, 113]
+  }
+}
+```
+
+An empty array means every supplier is on.

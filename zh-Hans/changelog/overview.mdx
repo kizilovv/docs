@@ -4,6 +4,30 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026 年 11 月 22 日">
+
+## 新功能
+
+**按编号标识供应方：`source`、过滤参数和您自己的关闭列表**
+
+现在每条挂单都在 `source` 字段中用整数标明来自哪个供应方。一个编号始终代表同一个供应方，且永不复用；编号背后没有名称。如果您已经直接从其中一些供应方采购，现在可以自行排除这些挂单。
+
+- 每个 `Listing` 都有 `source`：[`GET /v1/listings`](/zh-Hans/api-reference/get-listings)、`GET /v1/listings/depth`、快照、[数据流](/zh-Hans/api-reference/get-listings-stream)的 `new` / `update` 事件以及订单条目。Dota 2 和 Rust 挂单同样有该字段。
+- [`GET /v1/sources`](/zh-Hans/api-reference/get-sources) 列出编号：在架挂单数、发货方式、退款比例范围。
+- `source=103,107` 和 `sources_off=103,107` 可过滤 [`GET /v1/listings`](/zh-Hans/api-reference/get-listings)、深度接口和数据流连接。
+- [`GET`](/zh-Hans/api-reference/get-account-sources-off) / [`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off) 为整个账户保存一份列表。价格、两种快照和数据流都遵循它。如果我们之前为您的账户关闭过供应方，它们已在该列表中，您可以自行修改。
+- 数据流的过滤在我们这一侧执行，并且覆盖 `gone`：您看不到的供应方，其挂单售出的事件不再发送。关闭某个供应方后，请从本地副本中删除它的挂单。
+
+响应中的其他内容没有变化。您已通过数据流持有的挂单会在下一次 `update` 时带上 `source`；重新加载快照可让所有挂单立即带有该字段。
+
+## 变更
+
+- 购买订单：新增 `fail_reason` 值 `recipient_unreachable`（`fail_side: recipient`）。Steam 拒绝向收货方发送交易报价：交易链接已过期，或库存为私密或已满，或账户无法交易。此类订单之前返回 `unavailable`。
+- 购买订单：更多失败情况现在返回具体的 `fail_reason` 而不是 `unavailable`：`invalid_trade_url`、`recipient_inventory_full`、`recipient_cannot_trade`、`seller_cancelled` 和 `seller_did_not_deliver` 覆盖了之前落入通用代码的情况。
+- Instant Sell：当所有买方在发送交易报价之前都拒绝了这笔出售时，`POST /v1/sell/orders` 返回 `409 sale_refused`。之前返回 `500 internal_error`。卖家没有任何物品被取走。立即重新发送相同物品会得到相同结果：请稍后重新获取报价，或出售其他物品。
+
+</Update>
+
 <Update label="2026年11月20日">
 
 ## 新功能

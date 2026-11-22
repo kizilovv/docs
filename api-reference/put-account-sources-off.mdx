@@ -1,0 +1,53 @@
+---
+title: "PUT /v1/account/sources_off — Switch Suppliers Off"
+sidebarTitle: "PUT /account/sources_off"
+description: "Replace the list of supplier numbers switched off for your account."
+openapi: "PUT /account/sources_off"
+---
+
+Replaces the list of suppliers switched off for your account. Send the whole list each time: the numbers you send are off, everything else is on. An empty array switches every supplier back on.
+
+The change takes effect on your next request. It applies to listings, depth, prices, both snapshots and the stream. Take the numbers from [`GET /v1/sources`](/api-reference/get-sources).
+
+<Note>
+  This is a filter on what you are shown, not a block on buying. A listing id you send to `POST /v1/orders` is bought whatever its supplier.
+</Note>
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
+
+## Body
+
+<ParamField body="sources_off" type="integer[]" required>
+  Supplier numbers to switch off. A number that is not in use is refused, so a typo cannot silently switch nothing off.
+</ParamField>
+
+## After a change
+
+- **Stream.** A connection keeps the list it was opened with. Reconnect to apply the new one, and delete the listings of the suppliers you switched off from your copy: their `gone` will not arrive.
+- **Snapshots.** The [listings snapshot](/api-reference/get-listings-snapshot) is built per list. A list nobody has used before answers `202 snapshot_building` until its file is ready.
+
+## Example request
+
+```bash
+curl -X PUT "https://csboard.com/v1/account/sources_off" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "sources_off": [107, 113] }'
+```
+
+## Example response
+
+```json
+{
+  "data": {
+    "sources_off": [107, 113]
+  }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+| --- | --- | --- |
+| 400 | `invalid_request` | `sources_off` is missing, is not an array of integers, or names a number that is not in use. |
+| 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |

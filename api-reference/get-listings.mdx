@@ -71,6 +71,14 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
   `?delivery=instant&min_refund_percent=100` is the pool a withdrawal flow wants: ships immediately, and a Steam reversal costs nobody anything.
 </ParamField>
 
+<ParamField query="source" type="string">
+  Only listings from these suppliers: one or more `source` numbers, comma separated, for example `source=103,107`. [`GET /v1/sources`](/api-reference/get-sources) lists the numbers. A number that no supplier carries returns an empty page. A value that is not a number answers `400 invalid_param`. A supplier your account has switched off stays off: `source` picks among the ones still on.
+</ParamField>
+
+<ParamField query="sources_off" type="string">
+  Leave these suppliers out of this request: `sources_off=103,107`. It adds to the list saved on your account ([`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off)), for this request only.
+</ParamField>
+
 <ParamField query="stat_trak" type="string">
   StatTrak™ filter. `only` returns only StatTrak™ items; `exclude` removes them from results. CS2 only — with another `appId` it answers `400 invalid_param`.
 </ParamField>
@@ -175,6 +183,10 @@ The listings endpoint exposes every buyable item currently on the CSBoard market
       Steam asset id of the item in the inventory it sits in right now, as a decimal string. It is a 64-bit number: keep it as a string. `null` when the market the listing came from does not give us a Steam asset id, and for Dota 2 and Rust. Steam assigns a new asset id every time an item is traded, so the value identifies the item only while it is listed: after you buy it, the item arrives under a different id. Use it to match a listing against the same physical item you know from another source, not to track a delivery.
     </ResponseField>
 
+    <ResponseField name="source" type="integer" required>
+      The supplier the listing comes from, as a number. A number always means the same supplier and is never reused. There is no list of names behind it: listings with the same `source` come from the same place. Compare them with what you already buy elsewhere, then leave out the numbers you do not need, per request with `sources_off` or for the whole account with [`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off). [`GET /v1/sources`](/api-reference/get-sources) shows how many listings each number carries and how they are delivered.
+    </ResponseField>
+
     <ResponseField name="tradable" type="boolean" required>
       Whether the item is currently tradable. `false` means it is in a trade hold.
     </ResponseField>
@@ -246,6 +258,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
       "asset_id": "54591538222",
+      "source": 107,
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
       "delivery": "hold",

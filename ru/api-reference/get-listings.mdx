@@ -71,6 +71,14 @@ openapi: "GET /listings"
   `?delivery=instant&min_refund_percent=100` — тот пул, который нужен сценарию вывода: доставка сразу, а откат трейда в Steam никому ничего не стоит.
 </ParamField>
 
+<ParamField query="source" type="string">
+  Только листинги этих поставщиков: один или несколько номеров `source` через запятую, например `source=103,107`. Номера перечисляет [`GET /v1/sources`](/ru/api-reference/get-sources). Номер, которого нет ни у одного поставщика, вернёт пустую страницу. Значение, которое не является числом, даёт `400 invalid_param`. Поставщик, выключенный на аккаунте, остаётся выключенным: `source` выбирает среди включённых.
+</ParamField>
+
+<ParamField query="sources_off" type="string">
+  Убрать этих поставщиков из этого запроса: `sources_off=103,107`. Добавляется к списку, сохранённому на аккаунте ([`PUT /v1/account/sources_off`](/ru/api-reference/put-account-sources-off)), только на этот запрос.
+</ParamField>
+
 <ParamField query="stat_trak" type="string">
   Фильтр StatTrak™. `only` возвращает только предметы StatTrak™; `exclude` исключает их из результатов. Только для CS2 — с другим `appId` вернёт `400 invalid_param`.
 </ParamField>
@@ -172,6 +180,10 @@ openapi: "GET /listings"
       Steam asset id предмета в том инвентаре, где он лежит сейчас, десятичной строкой. Это 64-битное число: храните его строкой. `null`, если площадка, с которой пришёл листинг, не передаёт нам Steam asset id, а также для Dota 2 и Rust. Steam выдаёт предмету новый asset id при каждом трейде, поэтому значение опознаёт предмет, только пока он выставлен: после покупки предмет придёт к вам под другим id. Используйте поле, чтобы сопоставить листинг с тем же физическим предметом, известным вам из другого источника, а не чтобы отслеживать доставку.
     </ResponseField>
 
+    <ResponseField name="source" type="integer" required>
+      Поставщик, от которого пришёл листинг, в виде номера. Номер всегда означает одного и того же поставщика и никогда не переиспользуется. Расшифровки нет: листинги с одинаковым `source` пришли из одного места. Сравните их с тем, что вы уже покупаете в других местах, и уберите ненужные номера: на один запрос через `sources_off` или на весь аккаунт через [`PUT /v1/account/sources_off`](/ru/api-reference/put-account-sources-off). [`GET /v1/sources`](/ru/api-reference/get-sources) показывает, сколько листингов у каждого номера и как они доставляются.
+    </ResponseField>
+
     <ResponseField name="tradable" type="boolean" required>
       Можно ли сейчас обменивать предмет. `false` означает, что он находится в торговом холде.
     </ResponseField>
@@ -243,6 +255,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
       "asset_id": "54591538222",
+      "source": 107,
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
       "delivery": "hold",

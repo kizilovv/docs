@@ -143,7 +143,7 @@ tag: "仅限邀请"
 
 ## 错误
 
-错误遵循标准的 `{ "code", "detail" }` 结构。出售相关的错误码：`invalid_trade_url`、`private_inventory`、`inventory_unavailable`、`item_not_in_inventory`、`item_not_tradable`、`no_eligible_items`、`price_drift`、`too_many_items`、`active_order_exists`、`too_many_active_orders`、`daily_cap_exceeded`、`offer_declined`、`offer_expired`、`sell_disabled`、`selling_not_enabled`、`rate_limited`。
+错误遵循标准的 `{ "code", "detail" }` 结构。出售相关的错误码：`invalid_trade_url`、`private_inventory`、`inventory_unavailable`、`item_not_in_inventory`、`item_not_tradable`、`no_eligible_items`、`price_drift`、`too_many_items`、`active_order_exists`、`too_many_active_orders`、`daily_cap_exceeded`、`offer_declined`、`offer_expired`、`sell_disabled`、`selling_not_enabled`、`rate_limited`、`sale_refused`（409，所有买方在发送报价前都拒绝了出售；请勿立即重发）。
 
 ## 限制
 

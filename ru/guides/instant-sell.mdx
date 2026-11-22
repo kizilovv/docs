@@ -143,7 +143,7 @@ tag: "По инвайту"
 
 ## Ошибки
 
-Ошибки следуют стандартному конверту `{ "code", "detail" }`. Коды, специфичные для продажи: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`.
+Ошибки следуют стандартному конверту `{ "code", "detail" }`. Коды, специфичные для продажи: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`, `sale_refused` (409, все покупатели отказались до отправки оффера; не отправляйте повторно сразу).
 
 ## Лимиты
 

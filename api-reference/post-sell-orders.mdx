@@ -169,6 +169,7 @@ curl -X POST https://csboard.com/v1/sell/orders \
 | 409 | `item_not_tradable` | The seller's account has a Steam trade hold. |
 | 409 | `active_order_exists` | This seller already has an open offer. Wait for it to finish or cancel it. |
 | 409 | `too_many_active_orders` | Too many open sell orders on this key. |
+| 409 | `sale_refused` | Every buyer turned the sale down before a trade offer was sent. Nothing was taken from the seller. Sending the same items again right away gets the same answer: request a new quote later, or sell other items. |
 | 409 | `idempotency_in_progress` | A request with this key is still processing. Retry after `Retry-After`. |
 | 422 | `unsupported_game` | The game is not open for instant sell on this key. Includes `supported_app_ids`. |
 | 429 | `rate_limited` | More than 5 orders per minute on this key. |

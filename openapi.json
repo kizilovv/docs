@@ -199,6 +199,26 @@
             }
           },
           {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "Only listings from these suppliers: `source` numbers, comma separated (`source=103,107`). See `GET /sources`. A number no supplier carries matches nothing; a value that is not a number answers `400 invalid_param`. A supplier your account has switched off stays off.",
+            "schema": {
+              "type": "string",
+              "example": "103,107"
+            }
+          },
+          {
+            "name": "sources_off",
+            "in": "query",
+            "required": false,
+            "description": "Leave these suppliers out of this request: `sources_off=103,107`. Adds to the list saved on your account (`PUT /account/sources_off`).",
+            "schema": {
+              "type": "string",
+              "example": "103,107"
+            }
+          },
+          {
             "name": "stat_trak",
             "in": "query",
             "description": "Filter StatTrak™ items. CS2 only — sent with another `appId` it answers `400 invalid_param`.",
@@ -451,6 +471,26 @@
             }
           },
           {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "Only listings from these suppliers: `source` numbers, comma separated (`source=103,107`). See `GET /sources`. A number no supplier carries matches nothing; a value that is not a number answers `400 invalid_param`. A supplier your account has switched off stays off.",
+            "schema": {
+              "type": "string",
+              "example": "103,107"
+            }
+          },
+          {
+            "name": "sources_off",
+            "in": "query",
+            "required": false,
+            "description": "Leave these suppliers out of this request: `sources_off=103,107`. Adds to the list saved on your account (`PUT /account/sources_off`).",
+            "schema": {
+              "type": "string",
+              "example": "103,107"
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "description": "Keyset cursor from `next_cursor`. Pages are always cheapest-first.",
@@ -599,7 +639,7 @@
           "Market data"
         ],
         "summary": "Stream listings as they appear and disappear",
-        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `update` — data is the same `Listing` object with current values: `price_usd` changed, or `float_value` / `paint_seed` arrived after the `new` event. Replace your copy by `id` (add it if you have none). `min_price` / `max_price` do not filter `update`.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that. A fourth connection answers `429 too_many_streams` with `Retry-After: 90`: a connection that dropped without closing keeps its slot for up to 90 seconds.\n\n### Latency\n\nA `new` event goes out about 0.3 s after a listing enters the catalogue (median 0.34 s, maximum under 0.5 s, measured 2026-10-26), to every key at the same moment. Polling `/v1/listings` faster cannot see a listing sooner, and there is no priority tier.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n``` CS2 only — this endpoint does not read `appId`.",
+        "description": "Server-Sent Events feed of the catalogue changing. One connection replaces any polling loop.\n\nPolling cannot answer \"what is new?\" cheaply — every client that tries ends up re-reading the same first page on a timer. It also cannot answer \"what is gone?\" at all: a poller only learns an item sold by trying to buy it and failing. This endpoint pushes both edges.\n\n### Events\n\n- `new` — data is exactly the `Listing` object `/v1/listings` returns.\n- `update` — data is the same `Listing` object with current values: `price_usd` changed, or `float_value` / `paint_seed` arrived after the `new` event. Replace your copy by `id` (add it if you have none). `min_price` / `max_price` do not filter `update`.\n- `gone` — data is `{ \"id\": \"…\" }`. The item left the catalogue. **Act on this.** Dropping items as they sell is the difference between your buy calls succeeding and your buy calls discovering the item was already gone.\n- `resync` — your `Last-Event-ID` predates the retained history, so a replay would be incomplete. Re-read `/v1/listings?sort=newest` before trusting the stream again.\n\n### Reconnecting without gaps\n\nEvery event carries an id. Send the last one you processed back as the `Last-Event-ID` header and you receive exactly what you missed — including across our deploys. A `: heartbeat` comment arrives every 25 seconds; treat a longer silence as a dead connection and reconnect.\n\n### Limits\n\nThree concurrent streams per key. One stream already carries the whole catalogue, so the filters below are for your bandwidth, not for working around that. A fourth connection answers `429 too_many_streams` with `Retry-After: 90`: a connection that dropped without closing keeps its slot for up to 90 seconds.\n\n### Latency\n\nA `new` event goes out about 0.3 s after a listing enters the catalogue (median 0.34 s, maximum under 0.5 s, measured 2026-10-26), to every key at the same moment. Polling `/v1/listings` faster cannot see a listing sooner, and there is no priority tier.\n\n```\n: connected\n\nid: 1785312840123-0\nevent: new\ndata: {\"id\":\"000012e8-…\",\"market_hash_name\":\"AK-47 | Redline (Field-Tested)\",\"price_usd\":31.2,\"delivery\":\"instant\",\"listed_at\":\"2026-07-27T09:14:02.481Z\"}\n\nid: 1785312851904-0\nevent: gone\ndata: {\"id\":\"000012e8-…\"}\n\n: heartbeat\n``` CS2 only — this endpoint does not read `appId`.\n\nSuppliers: every `new` and `update` carries the listing's `source`. A connection receives only the suppliers it can see (the list saved on your account, narrowed by `source` / `sources_off`), and that covers `gone` too. When you switch a supplier off, delete its listings from your copy: their `gone` will not arrive.",
         "operationId": "streamListings",
         "parameters": [
           {
@@ -731,6 +771,26 @@
               "type": "string",
               "example": "new,gone"
             }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "Only events of listings from these suppliers: `source` numbers, comma separated (`source=103,107`). See `GET /sources`. A number no supplier carries matches nothing; a value that is not a number answers `400 invalid_param`. A supplier your account has switched off stays off.",
+            "schema": {
+              "type": "string",
+              "example": "103,107"
+            }
+          },
+          {
+            "name": "sources_off",
+            "in": "query",
+            "required": false,
+            "description": "Leave these suppliers out of this connection: `sources_off=103,107`. Adds to the list saved on your account (`PUT /account/sources_off`).",
+            "schema": {
+              "type": "string",
+              "example": "103,107"
+            }
           }
         ],
         "responses": {
@@ -848,6 +908,105 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/sources": {
+      "get": {
+        "tags": [
+          "Market data"
+        ],
+        "summary": "Suppliers by number",
+        "operationId": "listSources",
+        "description": "The suppliers behind the shelf, each as the number listings carry in `source`: how many listings it has, how they are delivered and what a Steam reversal returns on them. There are no names; a number always means the same supplier. Key only — no balance requirement. Counts are refreshed about every 10 minutes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suppliers that have listings right now, ordered by number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "sources",
+                        "updated_at"
+                      ],
+                      "properties": {
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Source"
+                          }
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When the counts were taken."
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "sources": [
+                      {
+                        "source": 101,
+                        "listings": 11400,
+                        "delivery": [
+                          "up_to_12h"
+                        ],
+                        "refund_percent": null,
+                        "off": false
+                      },
+                      {
+                        "source": 103,
+                        "listings": 41300,
+                        "delivery": [
+                          "instant"
+                        ],
+                        "refund_percent": {
+                          "min": 50,
+                          "max": 50
+                        },
+                        "off": false
+                      },
+                      {
+                        "source": 107,
+                        "listings": 1450000,
+                        "delivery": [
+                          "instant",
+                          "up_to_12h"
+                        ],
+                        "refund_percent": {
+                          "min": 0,
+                          "max": 100
+                        },
+                        "off": true
+                      }
+                    ],
+                    "updated_at": "2026-11-22T10:20:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`unsupported_game`: this key cannot use the `appId`."
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -4833,6 +4992,141 @@
         }
       }
     },
+    "/account/sources_off": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Suppliers switched off for this account",
+        "operationId": "getAccountSourcesOff",
+        "description": "The supplier numbers switched off for your account. Their listings are left out of listings, depth, prices, both snapshots and the stream. Suppliers we switched off for an account before 2026-11-22 are on this list already.",
+        "responses": {
+          "200": {
+            "description": "The saved list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "sources_off"
+                      ],
+                      "properties": {
+                        "sources_off": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          },
+                          "description": "Supplier numbers switched off for this account, ascending. Empty = every supplier is on."
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "sources_off": [
+                      107,
+                      113
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Replace the list of suppliers switched off",
+        "operationId": "putAccountSourcesOff",
+        "description": "Replaces the list: the numbers you send are off, everything else is on; an empty array switches every supplier back on. Takes effect on your next request. A filter on what you are shown, not a block on buying: a listing id sent to `POST /orders` is bought whatever its supplier. An open stream connection keeps the list it was opened with.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sources_off"
+                ],
+                "properties": {
+                  "sources_off": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Supplier numbers to switch off, from `GET /sources`. A number that is not in use is refused."
+                  }
+                }
+              },
+              "example": {
+                "sources_off": [
+                  107,
+                  113
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "sources_off"
+                      ],
+                      "properties": {
+                        "sources_off": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          },
+                          "description": "Supplier numbers switched off for this account, ascending. Empty = every supplier is on."
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "sources_off": [
+                      107,
+                      113
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`: `sources_off` is missing, is not an array of integers, or names a number that is not in use."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/sell/status": {
       "get": {
         "tags": [
@@ -5148,7 +5442,7 @@
             }
           },
           "409": {
-            "description": "The order was refused without side effects: `price_drift` (the total it would book is under your `min_total_usd`), `item_not_in_inventory`, `no_eligible_items`, `active_order_exists`, `too_many_active_orders` or `idempotency_in_progress`.",
+            "description": "The order was refused without side effects: `price_drift` (the total it would book is under your `min_total_usd`), `item_not_in_inventory`, `no_eligible_items`, `active_order_exists`, `too_many_active_orders`, `idempotency_in_progress`, or `sale_refused` (every buyer turned the sale down before a trade offer was sent; sending the same items again right away gets the same answer).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6738,6 +7032,11 @@
             "description": "Steam asset id of the item in the inventory it sits in right now, as a decimal string (a 64-bit number: keep it as a string). `null` when the market the listing came from does not give us a Steam asset id, and for Dota 2 / Rust. Steam assigns a new asset id on every trade, so the value identifies the item only while it is listed; after you buy it, the item arrives under a different id. Use it to match a listing against the same physical item you know from another source.",
             "example": "54591538222"
           },
+          "source": {
+            "type": "integer",
+            "description": "The supplier the listing comes from, as a number. A number always means the same supplier and is never reused; there is no list of names behind it. Listings with the same `source` come from the same place. `GET /sources` lists the numbers with their listing counts; filter with `source` / `sources_off`, or keep a list for the whole account with `PUT /account/sources_off`.",
+            "example": 107
+          },
           "tradable": {
             "type": "boolean",
             "description": "`false` while the item is inside a Steam trade lock."
@@ -6785,7 +7084,8 @@
           "category",
           "delivery",
           "stickers",
-          "tradable"
+          "tradable",
+          "source"
         ],
         "description": "One buyable listing. Dota 2 and Rust listings (`appId` 570 / 252490) carry the same keys as CS2 ones; the CS2-only fields — `wear`, `doppler_phase`, `float_value`, `paint_seed`, `inspect_link`, `asset_id`, `tradable_at`, `listed_at` — are `null` and `stickers` is `[]`."
       },
@@ -7049,6 +7349,14 @@
               "null"
             ]
           },
+          "source": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The supplier's number, the same `source` the listing carried. `null` on orders placed before 2026-11-22.",
+            "example": 107
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -7167,7 +7475,7 @@
               "string",
               "null"
             ],
-            "description": "Why the order failed. Set when `status` is `failed` or `cancelled`, `null` otherwise. The recipient has to act on `recipient_inventory_private`, `recipient_inventory_full`, `invalid_trade_url`, `recipient_cannot_trade`, `recipient_too_many_offers`, `offer_declined` and `offer_expired`; the seller on `seller_did_not_deliver`, `seller_cancelled` and `rolled_back`; you on `cancelled_by_buyer`; the market on `listing_gone`, `market_unavailable` and `unavailable`. The list may grow: treat a value you do not know as `unavailable`.",
+            "description": "Why the order failed. Set when `status` is `failed` or `cancelled`, `null` otherwise. The recipient has to act on `recipient_inventory_private`, `recipient_inventory_full`, `invalid_trade_url`, `recipient_cannot_trade`, `recipient_unreachable`, `recipient_too_many_offers`, `offer_declined` and `offer_expired`; the seller on `seller_did_not_deliver`, `seller_cancelled` and `rolled_back`; you on `cancelled_by_buyer`; the market on `listing_gone`, `market_unavailable` and `unavailable`. The list may grow: treat a value you do not know as `unavailable`.",
             "example": "recipient_inventory_private"
           },
           "fail_side": {
@@ -8350,6 +8658,58 @@
               "null"
             ],
             "description": "What a presented Steam token proved, if one was presented."
+          }
+        }
+      },
+      "Source": {
+        "type": "object",
+        "required": [
+          "source",
+          "listings",
+          "delivery",
+          "off"
+        ],
+        "properties": {
+          "source": {
+            "type": "integer",
+            "description": "The supplier's number.",
+            "example": 107
+          },
+          "listings": {
+            "type": "integer",
+            "description": "Listings on the shelf from this supplier.",
+            "example": 1450000
+          },
+          "delivery": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "up_to_12h",
+                "hold"
+              ]
+            },
+            "description": "The delivery kinds its listings have."
+          },
+          "refund_percent": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Lowest and highest `refund_percent` among its listings. `null` when none of them has a figure.",
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            }
+          },
+          "off": {
+            "type": "boolean",
+            "description": "`true` when your account has this supplier switched off."
           }
         }
       }

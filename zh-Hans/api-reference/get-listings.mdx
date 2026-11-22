@@ -71,6 +71,14 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
   `?delivery=instant&min_refund_percent=100` 正是提现流程需要的商品池：立即发货，且 Steam 交易回滚不会让任何人蒙受损失。
 </ParamField>
 
+<ParamField query="source" type="string">
+  只返回这些供应方的挂单：一个或多个 `source` 编号，用逗号分隔，例如 `source=103,107`。编号见 [`GET /v1/sources`](/zh-Hans/api-reference/get-sources)。没有任何供应方使用的编号会返回空页；不是数字的值会返回 `400 invalid_param`。账户已关闭的供应方保持关闭：`source` 只在仍开启的供应方中选择。
+</ParamField>
+
+<ParamField query="sources_off" type="string">
+  在本次请求中排除这些供应方：`sources_off=103,107`。它会叠加到账户已保存的列表上（[`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off)），仅对本次请求有效。
+</ParamField>
+
 <ParamField query="stat_trak" type="string">
   StatTrak™ 过滤。`only` 仅返回 StatTrak™ 商品；`exclude` 将其从结果中移除。仅限 CS2——在其他 `appId` 下发送会返回 `400 invalid_param`。
 </ParamField>
@@ -172,6 +180,10 @@ listings 端点公开了 CSBoard 市场上当前所有可购买的商品。每�
       该物品在其当前所在库存中的 Steam asset id，以十进制字符串给出。这是 64 位整数，请始终按字符串保存。当挂单来源的市场不向我们提供 Steam asset id 时为 `null`，Dota 2 和 Rust 也为 `null`。物品每交易一次，Steam 都会分配新的 asset id，因此该值只在挂单期间标识这件物品：购买后，物品会以另一个 id 到达。请用它把挂单与您从其他渠道得知的同一件实物进行匹配，而不是用来跟踪交付。
     </ResponseField>
 
+    <ResponseField name="source" type="integer" required>
+      挂单来自哪个供应方，用编号表示。一个编号始终代表同一个供应方，且永不复用。编号背后没有名称对照表：`source` 相同的挂单来自同一处。请把它们与您已在别处采购的货源比对，然后排除不需要的编号：单次请求用 `sources_off`，整个账户用 [`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off)。[`GET /v1/sources`](/zh-Hans/api-reference/get-sources) 显示每个编号有多少挂单以及如何发货。
+    </ResponseField>
+
     <ResponseField name="tradable" type="boolean" required>
       该商品当前是否可交易。`false` 表示处于交易冻结期。
     </ResponseField>
@@ -243,6 +255,7 @@ curl "https://csboard.com/v1/listings?category=Rifle&wear=Minimal+Wear&min_float
       "image": "https://cdn.csboard.com/items/ak47_redline_mw.png",
       "inspect_link": "steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20...",
       "asset_id": "54591538222",
+      "source": 107,
       "tradable": false,
       "tradable_at": "2026-07-06T12:00:00Z",
       "delivery": "hold",

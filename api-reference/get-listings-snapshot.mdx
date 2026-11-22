@@ -9,6 +9,8 @@ Every buyable listing as one gzipped NDJSON file. Each decompressed line is one 
 
 This is the way to hold a complete local copy of the shelf. Walking [`/v1/listings`](/api-reference/get-listings) page by page works for a filtered subset; for everything, it is tens of thousands of reads per pass. Download this file once instead, then open [`/v1/listings/stream`](/api-reference/get-listings-stream) from the position the file hands you, and your copy stays current from there.
 
+Each row carries `source`, the supplier's number. The file is built for the supplier list saved on your account ([`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off)); the `source` and `sources_off` query parameters do not apply to it. A list nobody has used before answers `202 snapshot_building` until its file is ready.
+
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.
 
 **Limit:** six full downloads per hour per key. A `304` answer to a conditional request is free.

@@ -1,0 +1,76 @@
+---
+title: "GET /v1/sources — поставщики по номерам"
+sidebarTitle: "GET /sources"
+description: "Номера поставщиков из поля `source`: сколько у каждого листингов, как они доставляются и сколько возвращается при откате в Steam."
+openapi: "GET /sources"
+---
+
+Перечисляет поставщиков, из которых состоит полка. Каждый из них это номер, тот же, что у листинга в поле `source`. Названий нет: номер всегда означает одного и того же поставщика и никогда не переиспользуется, а чего он стоит для вас, вы узнаёте, сравнив его листинги с тем, что уже покупаете в других местах.
+
+По этому списку решают, каких поставщиков убрать, а выбор сохраняют через [`PUT /v1/account/sources_off`](/ru/api-reference/put-account-sources-off) или передают `sources_off` в запросе.
+
+**Требуется аутентификация.** Передавайте ключ как `Authorization: Bearer csb_pub_...`. Баланс не нужен.
+
+## Параметры запроса
+
+<ParamField query="appId" default="730" type="integer">
+  Игра: `730` = CS2, `570` = Dota 2, `252490` = Rust.
+</ParamField>
+
+## Ответ
+
+<ResponseField name="data.sources" type="object[]" required>
+  По одной записи на поставщика, у которого сейчас есть листинги, по возрастанию номера.
+
+  <Expandable title="Объект Source">
+    <ResponseField name="source" type="integer" required>
+      Номер поставщика.
+    </ResponseField>
+    <ResponseField name="listings" type="integer" required>
+      Листингов этого поставщика на полке.
+    </ResponseField>
+    <ResponseField name="delivery" type="string[]" required>
+      Виды доставки его листингов: `instant`, `up_to_12h`, `hold`.
+    </ResponseField>
+    <ResponseField name="refund_percent" type="object | null">
+      `min` и `max` значения `refund_percent` среди его листингов. `null`, если ни у одного нет значения.
+    </ResponseField>
+    <ResponseField name="off" type="boolean" required>
+      `true`, если этот поставщик выключен на вашем аккаунте.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="data.updated_at" type="datetime" required>
+  Когда сняты счётчики. Обновляются примерно раз в 10 минут.
+</ResponseField>
+
+## Пример запроса
+
+```bash
+curl "https://csboard.com/v1/sources" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Пример ответа
+
+```json
+{
+  "data": {
+    "sources": [
+      { "source": 101, "listings": 11400, "delivery": ["up_to_12h"], "refund_percent": null, "off": false },
+      { "source": 103, "listings": 41300, "delivery": ["instant"], "refund_percent": { "min": 50, "max": 50 }, "off": false },
+      { "source": 107, "listings": 1450000, "delivery": ["instant", "up_to_12h"], "refund_percent": { "min": 0, "max": 100 }, "off": true }
+    ],
+    "updated_at": "2026-11-22T10:20:00.000Z"
+  }
+}
+```
+
+## Коды ошибок
+
+| HTTP-статус | Код | Значение |
+| --- | --- | --- |
+| 400 | `unsupported_game` | Ваш ключ не может использовать этот `appId`. |
+| 401 | `missing_api_key`, `invalid_api_key` | Ключ отсутствует или недействителен. |
+| 429 | `rate_limit_exceeded` | Превышен минутный лимит ключа. |

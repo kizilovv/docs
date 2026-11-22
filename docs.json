@@ -53,6 +53,7 @@
                   "api-reference/get-listings-stream",
                   "api-reference/get-listings-snapshot",
                   "api-reference/get-listings-availability",
+                  "api-reference/get-sources",
                   "api-reference/get-games",
                   "api-reference/get-prices",
                   "api-reference/get-prices-snapshot",
@@ -100,7 +101,9 @@
                   "api-reference/get-transactions",
                   "api-reference/get-stats",
                   "api-reference/get-key",
-                  "api-reference/put-key-allowed-ips"
+                  "api-reference/put-key-allowed-ips",
+                  "api-reference/get-account-sources-off",
+                  "api-reference/put-account-sources-off"
                 ]
               },
               {
@@ -173,6 +176,7 @@
                   "ru/api-reference/get-listings",
                   "ru/api-reference/get-listings-stream",
                   "ru/api-reference/get-listings-availability",
+                  "ru/api-reference/get-sources",
                   "ru/api-reference/get-games",
                   "ru/api-reference/get-prices",
                   "ru/api-reference/get-prices-snapshot",
@@ -205,7 +209,9 @@
               {
                 "group": "Аккаунт",
                 "pages": [
-                  "ru/api-reference/get-balance"
+                  "ru/api-reference/get-balance",
+                  "ru/api-reference/get-account-sources-off",
+                  "ru/api-reference/put-account-sources-off"
                 ]
               },
               {
@@ -264,6 +270,7 @@
                   "zh-Hans/api-reference/get-listings",
                   "zh-Hans/api-reference/get-listings-stream",
                   "zh-Hans/api-reference/get-listings-availability",
+                  "zh-Hans/api-reference/get-sources",
                   "zh-Hans/api-reference/get-games",
                   "zh-Hans/api-reference/get-prices",
                   "zh-Hans/api-reference/get-prices-snapshot",
@@ -296,7 +303,9 @@
               {
                 "group": "账户",
                 "pages": [
-                  "zh-Hans/api-reference/get-balance"
+                  "zh-Hans/api-reference/get-balance",
+                  "zh-Hans/api-reference/get-account-sources-off",
+                  "zh-Hans/api-reference/put-account-sources-off"
                 ]
               },
               {

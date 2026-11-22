@@ -88,6 +88,9 @@ orders 端点返回您的购买历史，按时间倒序排列，使用键集分�
       <Expandable title="OrderItem object">
         <ResponseField name="market_hash_name" type="string | null" />
         <ResponseField name="price_usd" type="number | null" />
+        <ResponseField name="source" type="integer | null">
+          供应方编号，与挂单上的 `source` 相同。2026 年 11 月 22 日之前创建的订单为 `null`。
+        </ResponseField>
         <ResponseField name="status" type="string" required>
           可选值：`hold`、`delivering`、`delivered`、`returned` 之一。
         </ResponseField>
@@ -175,6 +178,7 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
 | `recipient_inventory_full` | `recipient` | 收货方的 CS2 库存已满。请腾出空位后重新购买。 |
 | `invalid_trade_url` | `recipient` | 交易链接无效，或其 token 已更改。请从 [steamcommunity.com/my/tradeoffers/privacy](https://steamcommunity.com/my/tradeoffers/privacy) 获取当前链接后重新购买。 |
 | `recipient_cannot_trade` | `recipient` | 该账户目前无法交易：交易封禁、交易冷却或 Steam 令牌（Steam Guard）限制。在 Steam 解除限制之前，为该账户重新购买都会失败。 |
+| `recipient_unreachable` | `recipient` | Steam 拒绝向该收货方发送交易报价。交易链接已过期，或库存为私密或已满，或账户无法交易。请收货方修复后重新购买。 |
 | `recipient_too_many_offers` | `recipient` | 收货方有过多待处理的交易报价。请先接受或拒绝它们，再重新购买。 |
 | `offer_declined` | `recipient` | 收货方拒绝了交易报价。 |
 | `offer_expired` | `recipient` | 交易报价未在规定时间内被接受。 |

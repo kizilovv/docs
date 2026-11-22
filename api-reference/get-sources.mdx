@@ -1,0 +1,76 @@
+---
+title: "GET /v1/sources — Suppliers by Number"
+sidebarTitle: "GET /sources"
+description: "The supplier numbers listings carry in `source`: how many listings each has, how they are delivered and what a Steam reversal returns."
+openapi: "GET /sources"
+---
+
+Lists the suppliers behind the shelf. Each one is a number, the same number every listing carries in `source`. There are no names: a number always means the same supplier and is never reused, and you learn what it is worth to you by comparing its listings with what you already buy elsewhere.
+
+Use it to decide which suppliers to leave out, then save the choice with [`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off) or pass `sources_off` on a request.
+
+**Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`. No balance is needed.
+
+## Query parameters
+
+<ParamField query="appId" default="730" type="integer">
+  Game to read: `730` = CS2, `570` = Dota 2, `252490` = Rust.
+</ParamField>
+
+## Response
+
+<ResponseField name="data.sources" type="object[]" required>
+  One entry per supplier that has listings right now, ordered by number.
+
+  <Expandable title="Source object">
+    <ResponseField name="source" type="integer" required>
+      The supplier's number.
+    </ResponseField>
+    <ResponseField name="listings" type="integer" required>
+      Listings on the shelf from this supplier.
+    </ResponseField>
+    <ResponseField name="delivery" type="string[]" required>
+      The delivery kinds its listings have: `instant`, `up_to_12h`, `hold`.
+    </ResponseField>
+    <ResponseField name="refund_percent" type="object | null">
+      `min` and `max` of `refund_percent` among its listings. `null` when none of them has a figure.
+    </ResponseField>
+    <ResponseField name="off" type="boolean" required>
+      `true` when your account has this supplier switched off.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="data.updated_at" type="datetime" required>
+  When the counts were taken. They are refreshed about every 10 minutes.
+</ResponseField>
+
+## Example request
+
+```bash
+curl "https://csboard.com/v1/sources" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## Example response
+
+```json
+{
+  "data": {
+    "sources": [
+      { "source": 101, "listings": 11400, "delivery": ["up_to_12h"], "refund_percent": null, "off": false },
+      { "source": 103, "listings": 41300, "delivery": ["instant"], "refund_percent": { "min": 50, "max": 50 }, "off": false },
+      { "source": 107, "listings": 1450000, "delivery": ["instant", "up_to_12h"], "refund_percent": { "min": 0, "max": 100 }, "off": true }
+    ],
+    "updated_at": "2026-11-22T10:20:00.000Z"
+  }
+}
+```
+
+## Error codes
+
+| HTTP status | Code | Meaning |
+| --- | --- | --- |
+| 400 | `unsupported_game` | Your key cannot use this `appId`. |
+| 401 | `missing_api_key`, `invalid_api_key` | Missing or invalid API key. |
+| 429 | `rate_limit_exceeded` | Over your key's per-minute limit. |

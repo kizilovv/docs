@@ -1,0 +1,76 @@
+---
+title: "GET /v1/sources — 按编号列出供应方"
+sidebarTitle: "GET /sources"
+description: "挂单 `source` 字段中的供应方编号：每个编号有多少挂单、如何发货以及 Steam 回滚时退还多少。"
+openapi: "GET /sources"
+---
+
+列出构成货架的供应方。每个供应方是一个编号，与挂单 `source` 字段中的编号相同。没有名称：一个编号始终代表同一个供应方且永不复用，您通过把它的挂单与您已在别处采购的货源比对，来判断它对您的价值。
+
+用它决定排除哪些供应方，然后通过 [`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off) 保存，或在请求中传入 `sources_off`。
+
+**需要身份验证。** 以 `Authorization: Bearer csb_pub_...` 发送您的密钥。无需余额。
+
+## 查询参数
+
+<ParamField query="appId" default="730" type="integer">
+  游戏：`730` = CS2，`570` = Dota 2，`252490` = Rust。
+</ParamField>
+
+## 响应
+
+<ResponseField name="data.sources" type="object[]" required>
+  当前有挂单的每个供应方一条记录，按编号升序排列。
+
+  <Expandable title="Source 对象">
+    <ResponseField name="source" type="integer" required>
+      供应方编号。
+    </ResponseField>
+    <ResponseField name="listings" type="integer" required>
+      该供应方在架的挂单数。
+    </ResponseField>
+    <ResponseField name="delivery" type="string[]" required>
+      其挂单的发货方式：`instant`、`up_to_12h`、`hold`。
+    </ResponseField>
+    <ResponseField name="refund_percent" type="object | null">
+      其挂单中 `refund_percent` 的 `min` 和 `max`。若都没有数值则为 `null`。
+    </ResponseField>
+    <ResponseField name="off" type="boolean" required>
+      您的账户已关闭该供应方时为 `true`。
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="data.updated_at" type="datetime" required>
+  统计的时间。大约每 10 分钟刷新一次。
+</ResponseField>
+
+## 请求示例
+
+```bash
+curl "https://csboard.com/v1/sources" \
+  -H "Authorization: Bearer csb_pub_..."
+```
+
+## 响应示例
+
+```json
+{
+  "data": {
+    "sources": [
+      { "source": 101, "listings": 11400, "delivery": ["up_to_12h"], "refund_percent": null, "off": false },
+      { "source": 103, "listings": 41300, "delivery": ["instant"], "refund_percent": { "min": 50, "max": 50 }, "off": false },
+      { "source": 107, "listings": 1450000, "delivery": ["instant", "up_to_12h"], "refund_percent": { "min": 0, "max": 100 }, "off": true }
+    ],
+    "updated_at": "2026-11-22T10:20:00.000Z"
+  }
+}
+```
+
+## 错误码
+
+| HTTP 状态 | 代码 | 含义 |
+| --- | --- | --- |
+| 400 | `unsupported_game` | 您的密钥无法使用该 `appId`。 |
+| 401 | `missing_api_key`, `invalid_api_key` | 密钥缺失或无效。 |
+| 429 | `rate_limit_exceeded` | 超出密钥的每分钟限额。 |

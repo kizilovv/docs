@@ -88,6 +88,9 @@ openapi: "GET /orders"
       <Expandable title="OrderItem object">
         <ResponseField name="market_hash_name" type="string | null" />
         <ResponseField name="price_usd" type="number | null" />
+        <ResponseField name="source" type="integer | null">
+          Номер поставщика, тот же `source`, что был у листинга. `null` у заказов, созданных до 22 ноября 2026.
+        </ResponseField>
         <ResponseField name="status" type="string" required>
           Одно из: `hold`, `delivering`, `delivered`, `returned`.
         </ResponseField>
@@ -175,6 +178,7 @@ curl "https://csboard.com/v1/orders?status=completed&limit=50" \
 | `recipient_inventory_full` | `recipient` | Инвентарь CS2 получателя заполнен. Освободите место и купите заново. |
 | `invalid_trade_url` | `recipient` | Trade URL некорректен или его токен сменился. Возьмите актуальный на [steamcommunity.com/my/tradeoffers/privacy](https://steamcommunity.com/my/tradeoffers/privacy) и купите заново. |
 | `recipient_cannot_trade` | `recipient` | Аккаунт сейчас не может обмениваться: трейд-бан, трейд-кулдаун или ограничение Steam Guard. Повторные покупки на этот аккаунт будут срываться, пока Steam не снимет ограничение. |
+| `recipient_unreachable` | `recipient` | Steam отказался доставить трейд-оффер этому получателю. Трейд-ссылка устарела, либо инвентарь закрыт или заполнен, либо аккаунт не может обмениваться. Пусть получатель это исправит, затем купите снова. |
 | `recipient_too_many_offers` | `recipient` | У получателя слишком много ожидающих трейд-офферов. Примите или отклоните их и купите заново. |
 | `offer_declined` | `recipient` | Получатель отклонил трейд-оффер. |
 | `offer_expired` | `recipient` | Трейд-оффер не приняли вовремя. |

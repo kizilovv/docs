@@ -1,0 +1,53 @@
+---
+title: "PUT /v1/account/sources_off — 关闭供应方"
+sidebarTitle: "PUT /account/sources_off"
+description: "替换您的账户已关闭的供应方编号列表。"
+openapi: "PUT /account/sources_off"
+---
+
+替换您的账户已关闭的供应方列表。每次请发送完整列表：发送的编号为关闭，其余全部开启。空数组会重新开启所有供应方。
+
+修改从您的下一次请求起生效，适用于挂单、深度、价格、两种快照和数据流。编号取自 [`GET /v1/sources`](/zh-Hans/api-reference/get-sources)。
+
+<Note>
+  这只是对展示内容的过滤，不会阻止购买。发送到 `POST /v1/orders` 的挂单 id 无论来自哪个供应方都会成交。
+</Note>
+
+**需要身份验证。** 以 `Authorization: Bearer csb_pub_...` 发送您的密钥。
+
+## 请求体
+
+<ParamField body="sources_off" type="integer[]" required>
+  要关闭的供应方编号。未在使用的编号会被拒绝，以免拼写错误悄悄地什么都没关闭。
+</ParamField>
+
+## 修改之后
+
+- **数据流。** 连接沿用它建立时的列表。请重新连接以应用新列表，并从本地副本中删除已关闭供应方的挂单：它们的 `gone` 不会再到达。
+- **快照。** 挂单快照按列表分别构建。尚未有人使用过的列表会返回 `202 snapshot_building`，直到文件就绪。
+
+## 请求示例
+
+```bash
+curl -X PUT "https://csboard.com/v1/account/sources_off" \
+  -H "Authorization: Bearer csb_pub_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "sources_off": [107, 113] }'
+```
+
+## 响应示例
+
+```json
+{
+  "data": {
+    "sources_off": [107, 113]
+  }
+}
+```
+
+## 错误码
+
+| HTTP 状态 | 代码 | 含义 |
+| --- | --- | --- |
+| 400 | `invalid_request` | `sources_off` 缺失、不是整数数组，或包含未在使用的编号。 |
+| 401 | `missing_api_key`, `invalid_api_key` | 密钥缺失或无效。 |

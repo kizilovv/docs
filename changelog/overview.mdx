@@ -4,6 +4,30 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="November 22, 2026">
+
+## New features
+
+**Suppliers by number: `source`, filters and your own off list**
+
+Every listing now says which supplier it comes from in `source`, an integer. A number always means the same supplier and is never reused; there are no names behind the numbers. If you already buy from some of the same places directly, you can now leave those listings out yourself.
+
+- `source` is on every `Listing`: [`GET /v1/listings`](/api-reference/get-listings), [`GET /v1/listings/depth`](/api-reference/get-listings-depth), the [snapshot](/api-reference/get-listings-snapshot), the `new` / `update` events of the [stream](/api-reference/get-listings-stream), and on order items. Dota 2 and Rust listings have it too.
+- [`GET /v1/sources`](/api-reference/get-sources) lists the numbers: listings on the shelf, delivery kinds, refund range.
+- `source=103,107` and `sources_off=103,107` filter [`GET /v1/listings`](/api-reference/get-listings), the depth endpoint and a stream connection.
+- [`GET`](/api-reference/get-account-sources-off) / [`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off) keep a list for the whole account. Prices, both snapshots and the stream follow it. If we switched suppliers off for your account earlier, they are already on that list, and you can change it.
+- On the stream the filter runs on our side and covers `gone`: you no longer receive the sold event of a listing from a supplier you do not see. When you switch a supplier off, delete its listings from your copy.
+
+Nothing else in the payload changed. A listing you already hold from the stream gets `source` with its next `update`; reload the snapshot to have it on every listing at once.
+
+## Changes
+
+- Buy orders: a new `fail_reason`, `recipient_unreachable` (`fail_side: recipient`). Steam refused to deliver a trade offer to the recipient: the trade URL is outdated, or the inventory is private or full, or the account cannot trade. These orders used to report `unavailable`.
+- Buy orders: more failures now carry a specific `fail_reason` instead of `unavailable`: `invalid_trade_url`, `recipient_inventory_full`, `recipient_cannot_trade`, `seller_cancelled` and `seller_did_not_deliver` cover cases that fell through before.
+- Instant Sell: when every buyer turns a sale down before a trade offer is sent, [`POST /v1/sell/orders`](/api-reference/post-sell-orders) answers `409 sale_refused`. It used to answer `500 internal_error`. Nothing was taken from the seller. Sending the same items again right away gets the same answer: request a new quote later, or sell other items.
+
+</Update>
+
 <Update label="November 21, 2026">
 
 ## Fixes

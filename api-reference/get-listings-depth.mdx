@@ -43,6 +43,14 @@ Every `id` in the answer is accepted by [`POST /v1/orders`](/api-reference/post-
   Only lots at or below this USD price.
 </ParamField>
 
+<ParamField query="source" type="string">
+  Only listings from these suppliers: one or more `source` numbers, comma separated, for example `source=103,107`. [`GET /v1/sources`](/api-reference/get-sources) lists the numbers. A number that no supplier carries returns an empty page. A value that is not a number answers `400 invalid_param`. A supplier your account has switched off stays off: `source` picks among the ones still on.
+</ParamField>
+
+<ParamField query="sources_off" type="string">
+  Leave these suppliers out of this request: `sources_off=103,107`. It adds to the list saved on your account ([`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off)), for this request only.
+</ParamField>
+
 <ParamField query="cursor" type="string">
   Keyset cursor from `next_cursor`. Pages are always cheapest-first.
 </ParamField>

@@ -50,7 +50,7 @@ Filters are applied on our side, before anything is sent to you. They exist to s
 <ParamField query="delivery" type="string">
   `instant` or `hold`. Narrows `new` events to one delivery bucket — a withdrawal bot subscribing with `delivery=instant` never sees an item it cannot ship today.
 
-  `gone` events are never filtered: you may be holding the item from before your filter existed, and a missed removal is the ghost listing this feed exists to prevent.
+  `gone` events are not narrowed by this filter: you may be holding the item from before your filter existed, and a missed removal is the ghost listing this feed exists to prevent. Only the supplier filters reach `gone`, see [Suppliers](#suppliers).
 </ParamField>
 
 <ParamField query="last_event_id" type="string">
@@ -61,6 +61,14 @@ Filters are applied on our side, before anything is sent to you. They exist to s
   Event types to receive, comma-separated: `new`, `update`, `gone`. Default: all three.
 
   `update` is about 80% of the feed, almost all of it price changes. If you only buy new listings and drop sold ones, `events=new,gone` gives you the same picture of what is for sale at about a fifth of the bytes. Leave out `gone` and you keep listings that have already sold.
+</ParamField>
+
+<ParamField query="source" type="string">
+  Only events of listings from these suppliers: `source` numbers, comma separated, for example `source=103,107`. See [`GET /v1/sources`](/api-reference/get-sources). A supplier your account has switched off stays off.
+</ParamField>
+
+<ParamField query="sources_off" type="string">
+  Leave these suppliers out of this connection: `sources_off=103,107`. It adds to the list saved on your account ([`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off)).
 </ParamField>
 
 ## Events
@@ -92,6 +100,14 @@ Filters are applied on our side, before anything is sent to you. They exist to s
 
   Re-read `GET /v1/listings?sort=newest` (or reload the snapshot) to rebuild your view, then reconnect without `Last-Event-ID`. We send this rather than silently handing you a partial replay you would mistake for a complete one.
 </ResponseField>
+
+## Suppliers
+
+Every `new` and `update` carries the listing's `source`, the supplier's number. A connection receives only the suppliers it can see: the list saved on your account, narrowed further by this connection's `source` and `sources_off`.
+
+That covers `gone` as well. You are not sent the sold event of a listing from a supplier you do not see, so a client with most suppliers off reads a fraction of the feed. One rule follows from it: when you switch a supplier off, delete the listings with that `source` from your copy. Their `gone` will not arrive.
+
+The filter is applied on our side, per connection. You do not need to open the full feed and drop events yourself.
 
 ## Reconnecting without gaps
 

@@ -1,0 +1,24 @@
+---
+title: "GET /v1/account/sources_off — 账户已关闭的供应方"
+sidebarTitle: "GET /account/sources_off"
+description: "读取您的账户已关闭的供应方编号列表。"
+openapi: "GET /account/sources_off"
+---
+
+返回您的账户已关闭的供应方编号。这些供应方的挂单会从您读取的所有内容中排除：挂单、深度、价格、两种快照和数据流。
+
+如果我们在 2026 年 11 月 22 日之前为您的账户关闭过供应方，它们已在该列表中。可通过 [`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off) 修改。
+
+**需要身份验证。** 以 `Authorization: Bearer csb_pub_...` 发送您的密钥。
+
+## 响应示例
+
+```json
+{
+  "data": {
+    "sources_off": [107, 113]
+  }
+}
+```
+
+空数组表示所有供应方均已开启。

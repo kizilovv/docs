@@ -87,6 +87,18 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 ---
 
+## Choosing suppliers
+
+Listings come from several suppliers, and every listing says which one in `source`, a number. If you already buy from some of the same places directly, those listings are duplicates for you. You can leave them out.
+
+1. Read [`GET /v1/sources`](/api-reference/get-sources). It lists each number with how many listings it carries, how they are delivered and what a Steam reversal returns on them.
+2. Match a few listings of each number against your own direct stock (`asset_id`, float and price make that quick). The numbers have no names; a number always means the same supplier.
+3. Switch off what you do not need: [`PUT /v1/account/sources_off`](/api-reference/put-account-sources-off) for the whole account, or `sources_off` / `source` on a single request.
+
+The account list applies everywhere: listings, depth, prices, both snapshots and the stream. The request parameters work on [`GET /v1/listings`](/api-reference/get-listings), [`GET /v1/listings/depth`](/api-reference/get-listings-depth) and a [stream](/api-reference/get-listings-stream) connection.
+
+This is a filter on what you are shown. It does not block a purchase: a listing id you send to `POST /v1/orders` is bought whatever its supplier.
+
 ## Price list
 
 `GET /v1/prices` returns one row per unique skin group (market hash name \+ wear \+ Doppler phase), showing the current cheapest ask and how many are listed. It is designed for fast market scans and price comparisons across thousands of items — not for picking a specific listing to buy.

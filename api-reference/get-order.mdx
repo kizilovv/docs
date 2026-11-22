@@ -52,7 +52,7 @@ The response is a single `Order` object with the same shape as the items in [`GE
 <ResponseField name="created_at" type="datetime" required />
 <ResponseField name="updated_at" type="datetime | null" />
 <ResponseField name="items" type="OrderItem[]" required>
-  Per-item breakdown. Each item has `market_hash_name`, `price_usd`, `status` (`hold` | `delivering` | `delivered` | `returned`), `tradable_at`, `return_reason`, `steam_trade_offer_id`, and `steam_trade_offer_finished_at`.
+  Per-item breakdown. Each item has `market_hash_name`, `price_usd`, `source` (the supplier's number, see [`GET /v1/sources`](/api-reference/get-sources)), `status` (`hold` | `delivering` | `delivered` | `returned`), `tradable_at`, `return_reason`, `steam_trade_offer_id`, and `steam_trade_offer_finished_at`.
 </ResponseField>
 
 ## Example request

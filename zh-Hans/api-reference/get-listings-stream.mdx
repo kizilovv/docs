@@ -57,6 +57,14 @@ openapi: "GET /listings/stream"
   `update` 约占整个流的 80%，几乎全是价格变动。如果您只购买新挂单并删除已售出的挂单，`events=new,gone` 能以约五分之一的流量给出同样的在售情况。不接收 `gone` 的话，您会保留已经售出的挂单。
 </ParamField>
 
+<ParamField query="source" type="string">
+  只接收这些供应方挂单的事件：`source` 编号，用逗号分隔，例如 `source=103,107`。见 [`GET /v1/sources`](/zh-Hans/api-reference/get-sources)。账户已关闭的供应方保持关闭。
+</ParamField>
+
+<ParamField query="sources_off" type="string">
+  在本连接中排除这些供应方：`sources_off=103,107`。它会叠加到账户已保存的列表上（[`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off)）。
+</ParamField>
+
 ## 事件
 
 <ResponseField name="new" type="Listing">
@@ -86,6 +94,14 @@ openapi: "GET /listings/stream"
 
   请重新读取 `GET /v1/listings?sort=newest`（或重新加载快照）以重建您的视图，然后在不带 `Last-Event-ID` 的情况下重连。我们发送该事件，而不是默默地给您一份您会误认为完整的部分重放。
 </ResponseField>
+
+## 供应方
+
+每个 `new` 和 `update` 事件都带有挂单的 `source`，即供应方编号。一个连接只会收到它可见的供应方：账户已保存的列表，再加上本连接的 `source` 和 `sources_off`。
+
+这同样适用于 `gone`。对于您看不到的供应方，其挂单售出的事件不会发送给您，因此关闭了大部分供应方的客户端只需读取数据流的一小部分。由此有一条规则：关闭某个供应方后，请从本地副本中删除该 `source` 的挂单，它们的 `gone` 不会再到达。
+
+过滤在我们这一侧按连接执行。您无需打开完整数据流再自行丢弃事件。
 
 ## 无缝重连
 

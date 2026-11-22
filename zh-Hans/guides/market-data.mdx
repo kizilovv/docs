@@ -87,6 +87,18 @@ curl "https://csboard.com/v1/listings?category=Knife&limit=100&cursor=eyJpZCI6Im
 
 ---
 
+## 选择供应方
+
+挂单来自多个供应方，每条挂单都在 `source` 字段中用编号标明来自哪一个。如果您已经直接从其中一些供应方采购，这些挂单对您来说就是重复的，可以排除。
+
+1. 读取 [`GET /v1/sources`](/zh-Hans/api-reference/get-sources)。它列出每个编号的挂单数量、发货方式以及 Steam 回滚时的退款比例。
+2. 把每个编号的几条挂单与您自己的直接货源比对（用 `asset_id`、磨损值和价格很快就能完成）。编号没有名称；一个编号始终代表同一个供应方。
+3. 关闭不需要的：整个账户用 [`PUT /v1/account/sources_off`](/zh-Hans/api-reference/put-account-sources-off)，单次请求用 `sources_off` / `source`。
+
+账户列表在所有地方生效：挂单、深度、价格、两种快照和数据流。请求参数适用于 [`GET /v1/listings`](/zh-Hans/api-reference/get-listings)、`GET /v1/listings/depth` 和[数据流](/zh-Hans/api-reference/get-listings-stream)连接。
+
+这只是对展示内容的过滤，不会阻止购买：发送到 `POST /v1/orders` 的挂单 id 无论来自哪个供应方都会成交。
+
 ## 价格列表
 
 `GET /v1/prices` 为每个唯一的皮肤分组（市场哈希名 + 磨损 + Doppler 阶段）返回一行，显示当前最低询价以及挂出数量。它专为跨数千个物品的快速市场扫描和价格比较而设计——不适合用来挑选特定挂单进行购买。

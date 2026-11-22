@@ -107,6 +107,9 @@ The orders endpoint returns your purchase history, newest first, using keyset pa
       <Expandable title="OrderItem object">
         <ResponseField name="market_hash_name" type="string | null" />
         <ResponseField name="price_usd" type="number | null" />
+        <ResponseField name="source" type="integer | null">
+          The supplier's number, the same `source` the listing carried. `null` on orders placed before November 22, 2026.
+        </ResponseField>
         <ResponseField name="status" type="string" required>
           One of: `hold`, `delivering`, `delivered`, `returned`.
         </ResponseField>
@@ -228,6 +231,7 @@ A `failed` or `cancelled` order says why in three fields. All three are `null` o
 | `recipient_inventory_full` | `recipient` | The recipient's CS2 inventory is full. Free some slots and buy again. |
 | `invalid_trade_url` | `recipient` | The trade URL is invalid, or its token has changed. Take the current one from [steamcommunity.com/my/tradeoffers/privacy](https://steamcommunity.com/my/tradeoffers/privacy) and buy again. |
 | `recipient_cannot_trade` | `recipient` | The account cannot trade right now: a trade ban, a trade cooldown or a Steam Guard restriction. Buying again for this account fails until Steam lifts it. |
+| `recipient_unreachable` | `recipient` | Steam refused to deliver a trade offer to this recipient. The trade URL is outdated, or the inventory is private or full, or the account cannot trade. Have the recipient fix it and buy again. |
 | `recipient_too_many_offers` | `recipient` | The recipient has too many pending trade offers. Accept or decline them, then buy again. |
 | `offer_declined` | `recipient` | The recipient declined the trade offer. |
 | `offer_expired` | `recipient` | The trade offer was not accepted in time. |
