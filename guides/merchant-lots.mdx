@@ -88,6 +88,8 @@ The same body is also signed in the `X-CSBoard-Signature` header (`t=<unix>,v1=<
     ```
 
     Send one each time the status changes. Repeating a report is safe.
+
+    `tradeOfferId` is Steam's own `tradeofferid` of the offer you sent for this order. It is required with `2`, `3` and `10` unless you already reported it, one order has one offer, and we look that offer up on Steam by it.
   </Step>
   <Step title="Get paid">
     `GET /p2p/sell/order/list` shows every sale with our `orderStatus`, our `fee` and `settleTime`, the moment it pays to your balance.
@@ -110,7 +112,7 @@ The same body is also signed in the `X-CSBoard-Signature` header (`t=<unix>,v1=<
 
 What we do with a report:
 
-- `10` without a refresh token is checked by us: the item must be gone from the seller's public inventory and from the account's trade window, which our bots read through the lot's `tradeUrl`. Still there: `asset_still_in_inventory`. We could not look (private inventory, stale trade link, Steam refusing the read): `inventory_unreadable`, repeat the report in a minute. This call can take up to 30 seconds.
+- `10` is acknowledged like every status, and then we check it ourselves: the offer you named, read on Steam by its `tradeOfferId` from the buyer's side, or else the item gone from the seller account (its public inventory and its trade window, read through the lot's `tradeUrl`). Until we have seen it the answer's `data` is `checking` and the order stays at `3` in `GET /p2p/sell/order/list`. You do not send it again: we look again by ourselves every few minutes.
 - `11` after an offer never closes the sale on your word alone: we look for the item back in the seller's inventory first.
 - `220` with `reversedType: 2` puts the sale on hold for a manual review. It does not pay.
 
@@ -166,7 +168,6 @@ On a refusal `success` is `false`, `errorCodeStr` is the code to branch on and `
 | `trade_url_required` | the lot has no `tradeUrl`, or it is not a Steam trade link |
 | `trade_url_mismatch` | `tradeUrl` belongs to another account than `steamId` |
 | `invalid_delivery` | `delivery` is neither `1` nor `2` |
-| `inventory_unreadable` | a `10` we could not check yet; repeat it, or send the refresh token |
 | `trade_offer_id_required` | `2`, `3` or `10` without an offer on record |
 | `trade_offer_status_required` | `11` with an offer out and no Steam state |
 | `order_not_delivered` | `200` or `220` before `10` |
