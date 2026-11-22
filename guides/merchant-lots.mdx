@@ -9,7 +9,7 @@ Merchant lots are for a seller with stock in several Steam accounts and software
 You do not connect any Steam account to CSBoard and we do not ask for a login or an API key of your accounts. Each lot names the trade link of the account it sits in: our bots look into the account through it.
 
 <Note>
-  Off by default. Write to us to have it switched on for your merchant account, and give us the three URLs described below.
+  Off by default. Write to us to have it switched on for your merchant account. Then set it up yourself: in the [merchant portal](https://merchant.csboard.com/developers), under **Developers → Merchant lots**, save the three URLs described below. The first save shows your app secret once; **New secret** replaces a lost one, and the old one stops working at once.
 </Note>
 
 ## The numbers
@@ -160,6 +160,7 @@ On a refusal `success` is `false`, `errorCodeStr` is the code to branch on and `
 | `errorCodeStr` | When |
 |---|---|
 | `selling_not_enabled` | merchant lots are not switched on for this account |
+| `selling_not_configured` | switched on, but your three URLs are not saved in the portal yet |
 | `merchant_terminated` | the account was closed after a reversal |
 | `cooldown_not_supported` | the item is not tradable yet |
 | `steam_account_in_use` | another account already lists from this Steam account |
