@@ -122,10 +122,12 @@ Add `refreshToken` to a status report to let us read that one trade on Steam:
 
 - It must be the **mobile** refresh token of the Steam account that sent the offer.
 - We use it for one read and discard it. It is not stored and not logged, and we never ask Steam to renew it, so your copy stays valid.
-- With `10` we check the offer was accepted by this sale's buyer. With `200`, sent after Steam's protection has ended, we read the trade: complete means the sale is paid now; reversed means it is settled as a reversal.
-- The answer tells you what the read proved in `tokenRead`: `accepted`, `complete`, `reversed`, `not_final` (too early, send `200` again later), `mismatch` (another account's token or offer), `token_refused`, `unreadable`.
+- With `10` we check the offer carries the sold item and was accepted by this sale's buyer. With `200`, sent after Steam's protection has ended, we read the trade: complete means the sale is paid now; reversed means it is settled as a reversal.
+- The answer tells you what the read proved in `tokenRead`: `accepted`, `complete`, `reversed`, `not_final` (too early, send `200` again later), `mismatch` (another account's token, or an offer or trade that does not give this sale's item to this sale's buyer), `token_refused`, `unreadable`.
 
 The token is optional. Without it the sale pays on day 14.
+
+Keep the seller account's inventory public until the sale is paid. On day 14 we look at it once more; if we cannot read it, the payout waits and we look again every hour.
 
 ## Managing lots
 
