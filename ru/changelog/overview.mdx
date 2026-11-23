@@ -4,6 +4,14 @@ sidebarTitle: "Обзор"
 description: "Обновления продукта, новые возможности и исправления CSBoard API."
 ---
 
+<Update label="23 ноября 2026">
+
+## Изменения
+
+- Instant Sell: у `POST /v1/sell/orders` больше нет лимитов объёма на ключ. Лимит 5 ордеров в минуту, лимит активных ордеров (`409 too_many_active_orders`) и дневной кап объёма (`429 daily_cap_exceeded`) сняты, а `GET /v1/sell/status` возвращает `max_active_orders: null`. У одного продавца по-прежнему может быть только один открытый оффер (`409 active_order_exists`), котировки — как и раньше, 10 в минуту на ключ.
+
+</Update>
+
 <Update label="22 ноября 2026">
 
 ## Новые возможности

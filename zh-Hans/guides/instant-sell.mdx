@@ -52,7 +52,7 @@ tag: "仅限邀请"
   "selling_enabled_for_key": false,
   "min_item_usd": 0.5,
   "max_items_per_order": 250,
-  "max_active_orders": 10,
+  "max_active_orders": null,
   "hold_days_estimate": 8
 }
 ```
@@ -143,9 +143,9 @@ tag: "仅限邀请"
 
 ## 错误
 
-错误遵循标准的 `{ "code", "detail" }` 结构。出售相关的错误码：`invalid_trade_url`、`private_inventory`、`inventory_unavailable`、`item_not_in_inventory`、`item_not_tradable`、`no_eligible_items`、`price_drift`、`too_many_items`、`active_order_exists`、`too_many_active_orders`、`daily_cap_exceeded`、`offer_declined`、`offer_expired`、`sell_disabled`、`selling_not_enabled`、`rate_limited`、`sale_refused`（409，所有买方在发送报价前都拒绝了出售；请勿立即重发）。
+错误遵循标准的 `{ "code", "detail" }` 结构。出售相关的错误码：`invalid_trade_url`、`private_inventory`、`inventory_unavailable`、`item_not_in_inventory`、`item_not_tradable`、`no_eligible_items`、`price_drift`、`too_many_items`、`active_order_exists`、`offer_declined`、`offer_expired`、`sell_disabled`、`selling_not_enabled`、`rate_limited`、`sale_refused`（409，所有买方在发送报价前都拒绝了出售；请勿立即重发）。
 
 ## 限制
 
 - 报价：每个密钥每分钟 10 次请求（库存扫描开销较大）。
-- 订单：每个密钥每分钟 5 次创建，10 个活跃订单，默认每日 \$2,000 的成交额上限。上限可按账户提高 — 请联系支持团队。
+- 订单：每个密钥的每分钟订单数、活跃订单数和每日成交额均不设上限。同一卖家同一时间只能有一个未完成的报价（`409 active_order_exists`）。每单物品上限见 `GET /v1/sell/status` 中的 `max_items_per_order`。

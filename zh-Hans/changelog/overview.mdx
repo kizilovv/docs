@@ -4,6 +4,14 @@ sidebarTitle: "概览"
 description: "CSBoard API 的产品更新、新功能和修复。"
 ---
 
+<Update label="2026 年 11 月 23 日">
+
+## 变更
+
+- Instant Sell：`POST /v1/sell/orders` 不再有每个密钥的成交量限制。每分钟 5 个订单的限制、活跃订单上限（`409 too_many_active_orders`）和每日成交额上限（`429 daily_cap_exceeded`）均已取消，`GET /v1/sell/status` 现在返回 `max_active_orders: null`。同一卖家同一时间仍只能有一个未完成的报价（`409 active_order_exists`），报价仍为每个密钥每分钟 10 次。
+
+</Update>
+
 <Update label="2026 年 11 月 22 日">
 
 ## 新功能

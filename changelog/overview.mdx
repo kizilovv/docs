@@ -4,6 +4,14 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="November 23, 2026">
+
+## Changes
+
+- Instant Sell: [`POST /v1/sell/orders`](/api-reference/post-sell-orders) has no per-key volume limits any more. The limit of 5 orders per minute, the open-orders limit (`409 too_many_active_orders`) and the daily volume cap (`429 daily_cap_exceeded`) are gone, and [`GET /v1/sell/status`](/api-reference/get-sell-status) returns `max_active_orders: null`. One seller can still have only one open offer at a time (`409 active_order_exists`), and quotes stay at 10 per minute per key.
+
+</Update>
+
 <Update label="November 22, 2026">
 
 ## New features
