@@ -116,9 +116,9 @@ On a sale with several offers each offer has its own status. If one offer is dec
 
 ## Errors
 
-Errors follow the standard `{ "code", "detail" }` envelope. Sell-specific codes: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift` (409, with `current_total_usd` and `min_total_usd`), `below_min_total`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `unsupported_game` (422, with `supported_app_ids`), `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`, `not_cancellable`, `order_not_found`, `sale_refused` (409, every buyer turned the sale down before an offer was sent; do not resend at once).
+Errors follow the standard `{ "code", "detail" }` envelope. Sell-specific codes: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift` (409, with `current_total_usd` and `min_total_usd`), `below_min_total`, `too_many_items`, `active_order_exists`, `unsupported_game` (422, with `supported_app_ids`), `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`, `not_cancellable`, `order_not_found`, `sale_refused` (409, every buyer turned the sale down before an offer was sent; do not resend at once).
 
 ## Limits
 
 - Quotes: 10 requests/min per key (inventory scans are expensive).
-- Orders: 5 creations/min per key and a daily volume cap, \$2,000 by default. The basket and active-order limits for your key are in [`GET /v1/sell/status`](/api-reference/get-sell-status). Caps are raised per account, ask support.
+- Orders: no per-key limit on orders per minute, open orders or daily volume. One seller can have one open offer at a time (`409 active_order_exists`). The basket limit is `max_items_per_order` in [`GET /v1/sell/status`](/api-reference/get-sell-status).

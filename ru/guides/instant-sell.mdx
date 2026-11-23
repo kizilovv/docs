@@ -52,7 +52,7 @@ tag: "По инвайту"
   "selling_enabled_for_key": false,
   "min_item_usd": 0.5,
   "max_items_per_order": 250,
-  "max_active_orders": 10,
+  "max_active_orders": null,
   "hold_days_estimate": 8
 }
 ```
@@ -143,9 +143,9 @@ tag: "По инвайту"
 
 ## Ошибки
 
-Ошибки следуют стандартному конверту `{ "code", "detail" }`. Коды, специфичные для продажи: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift`, `too_many_items`, `active_order_exists`, `too_many_active_orders`, `daily_cap_exceeded`, `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`, `sale_refused` (409, все покупатели отказались до отправки оффера; не отправляйте повторно сразу).
+Ошибки следуют стандартному конверту `{ "code", "detail" }`. Коды, специфичные для продажи: `invalid_trade_url`, `private_inventory`, `inventory_unavailable`, `item_not_in_inventory`, `item_not_tradable`, `no_eligible_items`, `price_drift`, `too_many_items`, `active_order_exists`, `offer_declined`, `offer_expired`, `sell_disabled`, `selling_not_enabled`, `rate_limited`, `sale_refused` (409, все покупатели отказались до отправки оффера; не отправляйте повторно сразу).
 
 ## Лимиты
 
 - Котировки: 10 запросов/мин на ключ (сканирование инвентаря — дорогая операция).
-- Ордера: 5 созданий/мин на ключ, 10 активных ордеров, дневной кап объёма \$2 000 по умолчанию. Лимиты поднимаются индивидуально — напишите в поддержку.
+- Ордера: без лимита на ключ по числу ордеров в минуту, активным ордерам и дневному объёму. У одного продавца одновременно может быть только один открытый оффер (`409 active_order_exists`). Лимит корзины — `max_items_per_order` в `GET /v1/sell/status`.

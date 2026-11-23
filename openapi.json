@@ -5147,7 +5147,7 @@
                   "margin": null,
                   "min_item_usd": 1,
                   "max_items_per_order": 250,
-                  "max_active_orders": 100000,
+                  "max_active_orders": null,
                   "hold_days_estimate": 8
                 }
               }
@@ -5294,7 +5294,7 @@
         ],
         "summary": "Create a sell order",
         "operationId": "createSellOrder",
-        "description": "Sell quoted items. A bot from the CSBoard network sends the seller a Steam trade offer, or several when `split` is true. Send `Idempotency-Key` or `external_id` so a retried request replays the original order instead of selling twice. 5 orders per minute per key.",
+        "description": "Sell quoted items. A bot from the CSBoard network sends the seller a Steam trade offer, or several when `split` is true. Send `Idempotency-Key` or `external_id` so a retried request replays the original order instead of selling twice.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -5442,7 +5442,7 @@
             }
           },
           "409": {
-            "description": "The order was refused without side effects: `price_drift` (the total it would book is under your `min_total_usd`), `item_not_in_inventory`, `no_eligible_items`, `active_order_exists`, `too_many_active_orders`, `idempotency_in_progress`, or `sale_refused` (every buyer turned the sale down before a trade offer was sent; sending the same items again right away gets the same answer).",
+            "description": "The order was refused without side effects: `price_drift` (the total it would book is under your `min_total_usd`), `item_not_in_inventory`, `no_eligible_items`, `active_order_exists`, `idempotency_in_progress`, or `sale_refused` (every buyer turned the sale down before a trade offer was sent; sending the same items again right away gets the same answer).",
             "content": {
               "application/json": {
                 "schema": {

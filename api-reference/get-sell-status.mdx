@@ -25,7 +25,9 @@ Feature discovery for Instant Sell. Works for every key, whether or not selling 
 </ResponseField>
 <ResponseField name="min_item_usd" type="number" required />
 <ResponseField name="max_items_per_order" type="integer" required />
-<ResponseField name="max_active_orders" type="integer" required />
+<ResponseField name="max_active_orders" type="null" required>
+  Always `null`: there is no limit on open sell orders per key.
+</ResponseField>
 <ResponseField name="hold_days_estimate" type="integer" required>
   Rough days from acceptance to credit for CS2. Dota 2 and Rust differ, see [when the money arrives](/guides/instant-sell#when-the-money-arrives).
 </ResponseField>
@@ -47,7 +49,7 @@ curl https://csboard.com/v1/sell/status \
   "margin": null,
   "min_item_usd": 1,
   "max_items_per_order": 250,
-  "max_active_orders": 100000,
+  "max_active_orders": null,
   "hold_days_estimate": 8
 }
 ```
