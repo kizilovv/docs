@@ -12,6 +12,8 @@ Two things about what the numbers mean:
 - **Held orders you cancelled yourself are not failures.** Buying a held item and changing your mind before the hold clears is the feature working. They are reported separately as `cancelled_by_you` and excluded from `refund_rate_pct`.
 - **The denominator is settled orders only.** An order still in flight has no outcome yet; counting it would make your rate drift down simply because you ordered recently. `refund_rate_pct` is `null` until you have at least one settled order.
 
+- **A refund is split by whose side it was on.** If you resell to your own customers, an offer your customer declined, let lapse or could not receive ends the order as a refund, and it is not a delivery we failed. `refunded_by_side` counts the refunded orders by the `fail_side` each of them reports (`recipient`, `seller`, `market`, `buyer`), and `refunded_by_reason` by `fail_reason`. `delivery_rate_pct` is `delivered / (delivered + refunded - refunded_by_side.recipient)`: delivered out of the orders that were ours to deliver. `refund_rate_pct` is unchanged and still counts every refund.
+
 Delivery timing is median and p90 over completed orders, never a mean — one order that sat in a week-long Steam hold would otherwise swamp a thousand one-minute ones.
 
 **Authentication required.** Send your key as `Authorization: Bearer csb_pub_...`.

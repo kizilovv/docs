@@ -4,6 +4,14 @@ sidebarTitle: "Overview"
 description: "Product updates, new features, and fixes for the CSBoard API."
 ---
 
+<Update label="November 25, 2026">
+
+## New features
+
+- [`GET /v1/stats`](/api-reference/get-stats) splits your refunds by whose side they were on. `refunded_by_side` counts them by `fail_side` (`recipient`, `seller`, `market`, `buyer`), `refunded_by_reason` by `fail_reason`, and `delivery_rate_pct` is the share delivered out of the orders that were ours to deliver, leaving out offers the recipient declined, let lapse or could not receive. The existing fields, `refund_rate_pct` included, are unchanged.
+
+</Update>
+
 <Update label="November 23, 2026">
 
 ## Changes

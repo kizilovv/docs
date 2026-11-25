@@ -4779,6 +4779,40 @@
                           "nullable": true,
                           "description": "refunded / (delivered + refunded). Null with no settled orders."
                         },
+                        "refunded_by_side": {
+                          "type": "object",
+                          "description": "The refunded orders by the `fail_side` each of them reports. All four keys are always present.",
+                          "properties": {
+                            "recipient": {
+                              "type": "integer",
+                              "description": "The recipient declined the offer, did not accept it in time, or their Steam account could not receive it."
+                            },
+                            "seller": {
+                              "type": "integer",
+                              "description": "The seller did not send the item or cancelled the sale."
+                            },
+                            "market": {
+                              "type": "integer",
+                              "description": "The listing was gone or the marketplace was unavailable."
+                            },
+                            "buyer": {
+                              "type": "integer",
+                              "description": "Cancelled at your request, other than a held order (those are `cancelled_by_you`)."
+                            }
+                          }
+                        },
+                        "refunded_by_reason": {
+                          "type": "object",
+                          "description": "The refunded orders by `fail_reason`. Only reasons that occurred are present.",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "delivery_rate_pct": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "delivered / (delivered + refunded - refunded_by_side.recipient): delivered out of the orders that were ours to deliver. Null until one such order has settled."
+                        },
                         "delivery_minutes": {
                           "type": "object",
                           "properties": {
