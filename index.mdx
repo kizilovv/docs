@@ -1,15 +1,15 @@
 ---
 title: "CSBoard B2B API for CS2 skins — developer documentation"
 sidebarTitle: "Overview"
-description: "Official CSBoard partner API documentation for live CS2 listings, price snapshots and automated buying. Learn how to apply for access and authenticate requests."
+description: "Integrate the CSBoard API to source CS2 skins for your marketplace, deliver withdrawals to players on Steam, or accept skin deposits. Apply for partner access."
 ---
 
 [Apply for a CSBoard partner API key](https://csboard.com/cs2-skins-api/#apply) through the [CSBoard B2B skins API program](https://csboard.com/cs2-skins-api/). Buying requires separate permission. The API base URL is `https://csboard.com/v1`. Use it to:
 
 - Fetch live buyable listings complete with float values, paint seeds, sticker data, and USD prices.
-- Pull a full gzipped price-list snapshot for bulk catalog ingestion.
-- Retrieve FX rates aligned with the site's payment flows.
-- Place automated buy orders debited directly from your CSBoard balance.
+- Pull a full gzipped price-list snapshot for bulk catalog ingestion and retrieve FX rates for your payment flows.
+- [Fulfill a skin withdrawal](/api-reference/post-market-buy) from live supplier listings. Pay from your settled balance and send the items to the player’s Steam trade URL.
+- [Accept a skin deposit](/guides/instant-sell) with sell access. Quote the player’s inventory and reconcile the amount credited to your merchant balance.
 
 ## Get started
 
