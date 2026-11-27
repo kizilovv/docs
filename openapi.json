@@ -5602,41 +5602,122 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/SellOrder"
-                      }
-                    },
-                    "meta": {
+                  "oneOf": [
+                    {
                       "type": "object",
                       "properties": {
-                        "next_cursor": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SellOrder"
+                          }
                         },
-                        "per_page": {
-                          "type": "integer"
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "next_cursor": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "per_page": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "next_cursor",
+                            "per_page"
+                          ]
                         }
                       },
                       "required": [
-                        "next_cursor",
-                        "per_page"
+                        "data",
+                        "meta"
                       ]
+                    },
+                    {
+                      "$ref": "#/components/schemas/SellOrder"
                     }
-                  },
-                  "required": [
-                    "data",
-                    "meta"
                   ]
                 },
-                "example": {
-                  "data": [
-                    {
+                "examples": {
+                  "page": {
+                    "summary": "Without external_id",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "cmgk2x9a10001qs01sell0001",
+                          "external_id": "my-shop-order-1017",
+                          "app_id": 730,
+                          "status": "offer_sent",
+                          "currency": "USD",
+                          "total_usd": 61.42,
+                          "credited_usd": 0,
+                          "created_at": "2026-10-06T14:02:11Z",
+                          "unhold_at": null,
+                          "trade_offer_ids": [
+                            "7654321098",
+                            "7654321111"
+                          ],
+                          "offers": [
+                            {
+                              "offer_group": "a",
+                              "trade_offer_id": "7654321098",
+                              "status": "offer_sent",
+                              "amount_usd": 48.3,
+                              "expires_at": "2026-10-06T14:17:11Z",
+                              "items": [
+                                {
+                                  "asset_id": "41165110534",
+                                  "market_hash_name": "AK-47 | Redline (Field-Tested)",
+                                  "price_usd": 48.3,
+                                  "status": "offer_sent"
+                                }
+                              ],
+                              "bot": {
+                                "name": "CSBoard Bot #4",
+                                "avatar": "https://avatars.steamstatic.com/abc_full.jpg",
+                                "steam_id": "76561199000000004",
+                                "profile_url": "https://steamcommunity.com/profiles/76561199000000004",
+                                "level": 30
+                              }
+                            },
+                            {
+                              "offer_group": "b",
+                              "trade_offer_id": "7654321111",
+                              "status": "offer_sent",
+                              "amount_usd": 13.12,
+                              "expires_at": "2026-10-06T14:17:40Z",
+                              "items": [
+                                {
+                                  "asset_id": "41165110599",
+                                  "market_hash_name": "Glock-18 | Water Elemental (Minimal Wear)",
+                                  "price_usd": 13.12,
+                                  "status": "offer_sent"
+                                }
+                              ],
+                              "bot": {
+                                "name": "CSBoard Bot #9",
+                                "avatar": "https://avatars.steamstatic.com/def_full.jpg",
+                                "steam_id": "76561199000000009",
+                                "profile_url": "https://steamcommunity.com/profiles/76561199000000009",
+                                "level": 24
+                              }
+                            }
+                          ],
+                          "fail_reason": null
+                        }
+                      ],
+                      "meta": {
+                        "next_cursor": null,
+                        "per_page": 50
+                      }
+                    }
+                  },
+                  "byExternalId": {
+                    "summary": "Matching external_id",
+                    "value": {
                       "id": "cmgk2x9a10001qs01sell0001",
                       "external_id": "my-shop-order-1017",
                       "app_id": 730,
@@ -5698,10 +5779,6 @@
                       ],
                       "fail_reason": null
                     }
-                  ],
-                  "meta": {
-                    "next_cursor": null,
-                    "per_page": 50
                   }
                 }
               }

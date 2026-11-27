@@ -86,6 +86,20 @@ Every offer exposes the sending bot's profile and the Steam trade offer id:
 
 Render this next to your own UI so the seller can match each incoming Steam offer against the expected `trade_offer_id` and bot `steam_id` before accepting. That check defeats impersonation scams regardless of which bot ships the offer. On a split sale, show every entry of `offers[]`.
 
+## Recover a sell order after a timeout
+
+Save your deposit reference as `external_id` when creating the order. If the response is interrupted, look up that reference with the same merchant account:
+
+```bash
+curl --get 'https://csboard.com/v1/sell/orders' \
+  -H "Authorization: Bearer $CSBOARD_API_KEY" \
+  --data-urlencode 'external_id=deposit-1042'
+```
+
+A match returns one order. Read `id`, `status` and `credited_usd` directly from the response object. Omit `external_id` to list orders under `data` with pagination under `meta`.
+
+A `404 order_not_found` means the lookup found no matching order on this account at that moment. If you retry the original submission, keep its payload and idempotency key. On `409 idempotency_in_progress`, wait for the interval in `Retry-After` before retrying.
+
 ## Endpoints
 
 All endpoints live under `/v1/sell` and use the same `csb_pub_` Bearer key as the rest of the API.
